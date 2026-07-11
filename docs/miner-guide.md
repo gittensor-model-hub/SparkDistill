@@ -32,19 +32,21 @@ The full flow, end to end:
    dataset rows **and** the proof artifacts under `proof/` in the same HF repo.
 3. **Open a text-only PR** here appending one line to `datasets/registry.jsonl` with your
    HF URL and the `trajectories_sha256` from `dataset_manifest.json` — see
-   [`datasets/README.md`](../datasets/README.md). No dataset files are committed.
+   [`datasets/README.md`](../datasets/README.md). Check **Dataset track submission** in
+   the PR template. No dataset files are committed, and a dataset PR may not change any
+   file other than the registry.
 4. **The validator** runs `python -m eval.dataset_verify --hf-repo <you>/<repo>
    --claimed-sha256 <hash> --sparkproof-root ../SparkProof`, which checks GPU CC
    attestation, the release gate, the row hash, and full SparkProof policy (unmodified
-   request hashes, pinned teachers, merkle root). Pass → merged with a size label,
-   rewarded by SN74 gittensor:
+   request hashes, pinned teachers, merkle root). The workflow applies the computed
+   `dataset:*` label and merges only at the `dataset:s` threshold or above:
 
 | label | verified rows |
 |---|---|
 | `dataset:l` | >= 10000 |
 | `dataset:m` | >= 1000 |
 | `dataset:s` | >= 100 |
-| `dataset:none` | merged, below reward threshold |
+| `dataset:none` | proof valid but below 100 rows; not merged or rewarded |
 | `dataset:REJECT` | attestation, decontamination, hash, or policy failure |
 
 **Verified smoke test (2026-07-11):** 2 rows published to

@@ -21,7 +21,7 @@ artifacts), and opens a text-only PR here linking that HF repo plus the bundle's
    | `dataset:l` | >= 10000 |
    | `dataset:m` | >= 1000 |
    | `dataset:s` | >= 100 |
-   | `dataset:none` | < 100 (mergeable, below reward threshold) |
+   | `dataset:none` | < 100 (proof may verify, but below merge/reward threshold) |
    | `dataset:REJECT` | any check above failed |
 
     python -m eval.dataset_verify --hf-repo <user>/sparkproof-triton-v0 \\

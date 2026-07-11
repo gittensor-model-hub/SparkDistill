@@ -1,23 +1,52 @@
 name: Dataset registry gate
 
 on:
-  pull_request:
+  # Use the trusted base branch for code execution while retaining write access
+  # for labels and merge on fork PRs. The untrusted PR is fetched as a git
+  # object only; none of its code or workflows are executed.
+  pull_request_target:
+    types: [opened, synchronize, reopened, edited]
     paths:
       - "datasets/registry.jsonl"
 
 permissions:
+  actions: read
   contents: write
   pull-requests: write
+
+concurrency:
+  # Serialize registry merges so two simultaneously-valid PRs cannot race the
+  # duplicate check. A stale PR must rebase and preserve the latest registry.
+  group: dataset-registry
+  cancel-in-progress: false
 
 jobs:
   verify-and-merge:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Checkout SparkDistill
+      - name: Checkout trusted SparkDistill base
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.base.sha }}
           fetch-depth: 0
+
+      - name: Read untrusted submission without executing it
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          git fetch --no-tags origin \
+            "${BASE_REF}:refs/remotes/origin/dataset-base"
+          git fetch --no-tags origin \
+            "pull/${PR_NUMBER}/head:refs/remotes/origin/dataset-pr-head"
+          jq -r '.pull_request.body // ""' "$GITHUB_EVENT_PATH" > /tmp/pr_body.md
+          MERGE_BASE="$(git merge-base \
+            refs/remotes/origin/dataset-base \
+            refs/remotes/origin/dataset-pr-head)"
+          git diff --name-only \
+            "${MERGE_BASE}" \
+            refs/remotes/origin/dataset-pr-head > /tmp/changed_paths.txt
 
       - name: Checkout SparkProof
         uses: actions/checkout@v4
@@ -37,25 +66,18 @@ jobs:
       - name: Install SparkDistill
         run: uv sync --extra dev --frozen
 
-      - name: Verify registry PR
+      - name: Verify, label, and merge eligible dataset
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: |
-          uv run python -m eval.registry_gate \
-            --base-ref "origin/${{ github.event.pull_request.base.ref }}" \
-            --head-ref HEAD \
-            --sparkproof-root SparkProof \
-            --out eval/results/registry_gate_report.json
-
-      - name: Merge on pass
-        if: success()
-        env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           uv run python -m eval.registry_gate \
-            --base-ref "origin/${{ github.event.pull_request.base.ref }}" \
-            --head-ref HEAD \
+            --base-ref refs/remotes/origin/dataset-base \
+            --head-ref refs/remotes/origin/dataset-pr-head \
             --sparkproof-root SparkProof \
             --out eval/results/registry_gate_report.json \
+            --pr-body-file /tmp/pr_body.md \
+            --changed-paths-file /tmp/changed_paths.txt \
+            --apply-label \
             --merge-on-pass \
             --pr-number ${{ github.event.pull_request.number }}

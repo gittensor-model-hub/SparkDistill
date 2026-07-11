@@ -11,7 +11,8 @@ dataset-track counterpart of `runs/` (which records proof-of-training runs).
    artifacts under `proof/` in the same HF repo (`manifest.json`,
    `dataset_manifest.json`, `gpu_attestation.json`, `trajectories.jsonl`, ...).
 3. Open a **text-only PR** against this repo that appends one JSON line to
-   `datasets/registry.jsonl`:
+   `datasets/registry.jsonl`. In the PR template, check
+   **Dataset track submission**. Dataset PRs may not modify any other file:
 
 ```json
 {"miner": "<github-handle>", "hf_url": "https://huggingface.co/datasets/<user>/<repo>", "trajectories_sha256": "<from dataset_manifest.json>", "rows_total": 128, "dataset_version": "triton-distill-v0.2"}
@@ -23,8 +24,10 @@ exact gated rows.
 ## What the validator does
 
 Registry PRs are gated automatically by `.github/workflows/dataset_registry.yml`.
-On pass, the workflow merges the PR; on failure it leaves the PR open with a reject
-report in `eval/results/registry_gate_report.json`.
+The workflow reads the dataset-track checkbox, rejects changes outside
+`datasets/registry.jsonl`, verifies the proof, replaces any stale `dataset:*` label with
+the computed result, and merges only submissions that reach `dataset:s` or above. Failed
+or sub-threshold PRs remain open.
 
 The gate runs `eval.registry_gate`, which for each appended registry line:
 
@@ -52,7 +55,7 @@ python -m eval.dataset_verify --hf-repo <user>/<repo> \
 | `dataset:l` | >= 10000 |
 | `dataset:m` | >= 1000 |
 | `dataset:s` | >= 100 |
-| `dataset:none` | < 100 (merged, below reward threshold) |
+| `dataset:none` | < 100 (proof may be valid, but not merged/rewarded) |
 | `dataset:REJECT` | attestation, release-gate, hash, or policy failure |
 
 Merged datasets become fair game for the training track: any training miner may cite a
