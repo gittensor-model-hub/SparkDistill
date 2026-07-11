@@ -168,3 +168,27 @@ def test_score_flags_triton_regression():
     report = score(candidate, frontier)
     assert "regression-triton" in report["regressions"]
     assert report["label"] == "eval:REJECT"
+
+
+def test_locate_results_file_prefers_exact_then_date_suffixed(tmp_path):
+    from eval.benchmarks import _locate_results_file
+
+    exact = tmp_path / "gsm8k.json"
+    dated_old = tmp_path / "gsm8k_2026-07-11T00-00-00.json"
+    dated_new = tmp_path / "gsm8k_2026-07-11T01-00-00.json"
+    dated_old.write_text("{}")
+    os.utime(dated_old, ns=(1, 1))
+    dated_new.write_text("{}")
+    assert _locate_results_file(exact) == dated_new
+    exact.write_text("{}")
+    assert _locate_results_file(exact) == exact
+
+
+def test_extract_metric_handles_lm_eval_filter_suffixes():
+    from eval.benchmarks import _extract_metric
+
+    assert _extract_metric({"exact_match": 0.9}, "exact_match") == 0.9
+    assert (
+        _extract_metric({"exact_match,flexible-extract": 0.8, "exact_match,strict-match": 0.7}, "exact_match") == 0.7
+    )
+    assert _extract_metric({"acc,none": 0.6}, "acc") == 0.6

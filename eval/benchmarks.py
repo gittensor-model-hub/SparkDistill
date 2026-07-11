@@ -89,5 +89,38 @@ def run_benchmark(benchmark: Benchmark, model_path: str, output_dir: Path, limit
     if limit is not None:
         command += ["--limit", str(limit)]
     subprocess.run(command, check=True)
-    payload = json.loads(result_path.read_text())
-    return float(payload["results"][benchmark.lm_eval_task][benchmark.metric])
+    payload = json.loads(_locate_results_file(result_path).read_text())
+    return _extract_metric(payload["results"][benchmark.lm_eval_task], benchmark.metric)
+
+
+def _locate_results_file(result_path: Path) -> Path:
+    """Find the results JSON lm-eval actually wrote for `--output_path result_path`.
+
+    lm-eval 0.4.x appends a date id to a `.json` output path (`gsm8k.json` becomes
+    `gsm8k_<date>.json`); older versions wrote the exact path. Prefer the exact
+    path, else the newest date-suffixed sibling.
+    """
+    if result_path.exists():
+        return result_path
+    candidates = list(result_path.parent.glob(f"{result_path.stem}_*.json"))
+    if not candidates:
+        raise FileNotFoundError(f"lm-eval wrote no results for {result_path}")
+    return max(candidates, key=lambda p: p.stat().st_mtime_ns)
+
+
+def _extract_metric(task_results: dict, metric: str) -> float:
+    """Read `metric` from a task's results, tolerating lm-eval's filter suffixes.
+
+    0.4.x reports metrics as `<metric>,<filter>` (e.g. `exact_match,strict-match`);
+    the strict/none variants are preferred over flexible extraction so scores stay
+    comparable across submissions.
+    """
+    if metric in task_results:
+        return float(task_results[metric])
+    for preferred in (f"{metric},strict-match", f"{metric},none"):
+        if preferred in task_results:
+            return float(task_results[preferred])
+    suffixed = sorted(key for key in task_results if key.split(",")[0] == metric)
+    if suffixed:
+        return float(task_results[suffixed[0]])
+    raise KeyError(f"metric {metric!r} not in lm-eval results (have: {sorted(task_results)})")
