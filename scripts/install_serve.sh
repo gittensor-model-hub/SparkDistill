@@ -30,8 +30,9 @@ VIRTUAL_ENV="$VENV" uv pip uninstall -q torchcodec 2>/dev/null || true
 "$VENV/bin/python" -c "import vllm; print(f'  vllm: {vllm.__version__}')"
 
 echo ""
-echo "Serve a checkpoint for TritonBench eval:"
-echo "  $VENV/bin/vllm serve <checkpoint-dir> --served-model-name <name> --port 8000"
+echo "Serve a checkpoint for TritonBench eval (venv bin must be on PATH — vLLM's"
+echo "engine JIT shells out to ninja by bare name):"
+echo "  PATH=\"$VENV/bin:\$PATH\" vllm serve <checkpoint-dir> --served-model-name <name> --port 8000"
 echo "Then:"
 echo "  uv run python -m eval.triton_bench --checkpoint <checkpoint-dir> \\"
 echo "      --endpoint http://127.0.0.1:8000/v1 --quick --out eval/results/triton.json"
