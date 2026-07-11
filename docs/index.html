@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SPARKDISTILL — verified Triton intelligence on Blackwell</title>
 <meta name="description" content="SPARKDISTILL is a trustless pipeline for building Triton-specialist AI from pinned frontier teachers, Blackwell confidential-computing proofs, and deterministic frontier evaluation through SN74 on Gittensor.">
+<link rel="icon" href="https://github.com/gittensor-model-hub.png?size=64">
 <style>
   :root {
     --bg: #f8fbff;
@@ -99,7 +100,9 @@
     border-bottom: 1px solid var(--border);
   }
   header.site .wrap { display: flex; align-items: center; justify-content: space-between; min-height: 72px; }
-  .brand { font-weight: 900; letter-spacing: -0.035em; font-size: 1.22rem; line-height: 1; }
+  .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 900; letter-spacing: -0.035em; font-size: 1.22rem; line-height: 1; }
+  .brand img { width: 38px; height: 38px; border-radius: 10px; object-fit: cover; box-shadow: 0 5px 16px color-mix(in srgb, var(--purple) 22%, transparent); }
+  .brand-mark { display: inline-flex; align-items: center; }
   .brand .spark { color: var(--blue-dark); }
   .brand .bolt { color: var(--orange); padding: 0 0.04em; filter: drop-shadow(0 0 8px color-mix(in srgb, var(--orange) 45%, transparent)); }
   .brand .distill { color: var(--purple); }
@@ -191,7 +194,10 @@
 
 <header class="site">
   <div class="wrap">
-    <div class="brand" aria-label="SparkDistill"><span class="spark">SP</span><span class="bolt">⚡</span><span class="spark">RK</span><span class="distill">DISTILL</span></div>
+    <div class="brand" aria-label="SparkDistill">
+      <img src="https://github.com/gittensor-model-hub.png?size=80" alt="Gittensor Model Hub organization logo">
+      <span class="brand-mark"><span class="spark">SP</span><span class="bolt">⚡</span><span class="spark">RK</span><span class="distill">DISTILL</span></span>
+    </div>
     <nav class="links">
       <a href="#pipeline">Pipeline</a>
       <a href="#sparkproof">SparkProof</a>

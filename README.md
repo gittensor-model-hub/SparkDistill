@@ -32,6 +32,11 @@ seeded rerun, every row GPU-validated and release-gated, sealed with confidentia
 attestation, and cheap for anyone to re-verify from the published `proof/` bundle — not a
 trust-me CSV.
 
+Production proofs run on **NVIDIA RTX PRO 6000 Blackwell GPUs** using confidential
+compute from [Targon](https://targon.com/), **Bittensor Subnet 4 (SN4)** — keeping
+SparkProof's attested GPU execution live inside the
+[Bittensor ecosystem](https://bittensor.com/).
+
 **Built through SN74 on [Gittensor](https://gittensor.io/).** Contributors submit PRs (datasets, recipes, eval
 improvements); a deterministic harness scores marginal quality over the current frontier;
 SN74 rewards verified wins. This lives inside the existing SN74 subnet — not a separate
