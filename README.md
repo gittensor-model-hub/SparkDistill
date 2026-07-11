@@ -1,6 +1,6 @@
-# _SP⚡RKDISTILL_
-
 ![SparkDistill banner](docs/images/banner.png)
+
+# _SP⚡RKDISTILL_
 
 **Continuously-improving student models for the SparkInfer runtime.**
 
