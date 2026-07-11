@@ -21,16 +21,16 @@ uv pip install -q axolotl torchvision numba "numpy<2.5"
 
 if [ "${SPARKDISTILL_SKIP_FLASH_ATTN:-0}" = "1" ]; then
   echo "  flash-attn: skipped (SPARKDISTILL_SKIP_FLASH_ATTN=1; training will use SDPA)"
-elif uv run python -c "import flash_attn" 2>/dev/null; then
-  uv run python -c "import flash_attn; print(f'  flash-attn: {flash_attn.__version__}')"
-elif uv run python -c "from transformers.utils import is_flash_attn_3_available; import sys; sys.exit(0 if is_flash_attn_3_available() else 1)" 2>/dev/null; then
+elif uv run --no-sync python -c "import flash_attn" 2>/dev/null; then
+  uv run --no-sync python -c "import flash_attn; print(f'  flash-attn: {flash_attn.__version__}')"
+elif uv run --no-sync python -c "from transformers.utils import is_flash_attn_3_available; import sys; sys.exit(0 if is_flash_attn_3_available() else 1)" 2>/dev/null; then
   echo "  flash-attn-3: installed"
 else
-  cuda_tag="$(uv run python -c "import torch; v=torch.version.cuda or ''; print('cu' + v.replace('.', '')[:3] if v else 'cu130')")"
+  cuda_tag="$(uv run --no-sync python -c "import torch; v=torch.version.cuda or ''; print('cu' + v.replace('.', '')[:3] if v else 'cu130')")"
   fa3_index="https://download.pytorch.org/whl/${cuda_tag}"
   echo ">>> installing FlashAttention 3 wheel (${cuda_tag}, ~30s)"
   if uv pip install -q "flash-attn-3" --index-url "$fa3_index" \
-    && uv run python -c "from transformers.utils import is_flash_attn_3_available; import sys; sys.exit(0 if is_flash_attn_3_available() else 1)" 2>/dev/null; then
+    && uv run --no-sync python -c "from transformers.utils import is_flash_attn_3_available; import sys; sys.exit(0 if is_flash_attn_3_available() else 1)" 2>/dev/null; then
     echo "  flash-attn-3: installed from ${fa3_index}"
   else
     export CUDA_HOME="${CUDA_HOME:-/usr/local/cuda}"
@@ -45,12 +45,12 @@ else
       FLASH_ATTN_CUDA_ARCHS="${FLASH_ATTN_CUDA_ARCHS:-120}" \
         MAX_JOBS="$build_jobs" \
         uv pip install "flash-attn==2.8.3.post1" --no-build-isolation
-      uv run python -c "import flash_attn; print(f'  flash-attn: {flash_attn.__version__}')"
+      uv run --no-sync python -c "import flash_attn; print(f'  flash-attn: {flash_attn.__version__}')"
     fi
   fi
 fi
 
-if uv run axolotl --help >/dev/null 2>&1; then
+if uv run --no-sync axolotl --help >/dev/null 2>&1; then
   echo ">>> Axolotl ready"
 else
   echo "error: axolotl CLI not available after install" >&2
