@@ -36,10 +36,10 @@ The full flow, end to end:
    [`datasets/README.md`](../datasets/README.md). Check **Dataset track submission** in
    the PR template. No dataset files are committed, and a dataset PR may not change any
    file other than the registry.
-4. **The validator** runs `python -m eval.dataset_verify --hf-repo <you>/<repo>
-   --claimed-sha256 <hash> --sparkproof-root ../SparkProof`, which checks GPU CC
-   attestation, the release gate, the row hash, and full SparkProof policy (unmodified
-   request hashes, pinned teachers, merkle root). The workflow applies the computed
+4. **The validator** runs `python -m eval.dataset_verify`, then aggregates every registry
+   line (including yours) into the canonical mining dataset on Hugging Face
+   ([`gittensor-model-hub/sparkproof-mining`](https://huggingface.co/datasets/gittensor-model-hub/sparkproof-mining))
+   **before** merging. Publish failure blocks merge. The workflow applies the computed
    `dataset:*` label and merges only at the `dataset:xs` threshold (25 rows) or above:
 
 | label | verified rows |
@@ -292,10 +292,9 @@ In practice today:
 
 - Small recipe changes: just include the changed `sft.yaml` (or new recipe file) in your
   PR as normal.
-- Datasets: `data/processed/` is git-ignored (these files are large). Train on a dataset
-  merged through the **dataset track** (`datasets/registry.jsonl`) and cite its HF URL via
-  `proof.bundle --dataset-url`, or combine multiple registry entries with
-  `scripts/mix_registry.sh` and cite `proof.bundle --mix-manifest data/processed/mix_manifest.json`.
+- Datasets: `data/processed/` is git-ignored (these files are large). Train on the
+  **canonical mining dataset** ([`gittensor-model-hub/sparkproof-mining`](https://huggingface.co/datasets/gittensor-model-hub/sparkproof-mining))
+  updated automatically when registry PRs merge, and cite it via `proof.bundle --dataset-url`.
   If you generated new Triton data, run it through SparkProof and the registry first —
   that verifies, labels, and rewards it on its own, and makes your training PR trivially
   reproducible. See [`datasets/README.md`](../datasets/README.md) and

@@ -145,29 +145,18 @@ verification behavior are held for manual review — this protects the eval loop
 being tuned to inflate scores rather than to improve real quality. In particular, only
 the eval bot appends to `runs/ledger.jsonl` — it is not an append-anything log.
 
-## Cross-miner dataset mixing
+## Canonical mining dataset
 
-After one or more datasets are merged into [`datasets/registry.jsonl`](datasets/registry.jsonl),
-training miners can combine them with [`eval/mix_registry.py`](eval/mix_registry.py):
+Registry CI aggregates all merged datasets into one Hugging Face repo before each merge
+(default [`gittensor-model-hub/sparkproof-mining`](https://huggingface.co/datasets/gittensor-model-hub/sparkproof-mining)).
+Training PRs should cite that URL via `proof.bundle --dataset-url`. Local re-mix:
 
 ```bash
-scripts/mix_registry.sh mix \
-  --registry datasets/registry.jsonl \
-  --sha256 <sha-a> --sha256 <sha-b> \
+scripts/mix_registry.sh mix --registry datasets/registry.jsonl --all \
   --out data/processed/mix_sft.jsonl \
   --manifest-out data/processed/mix_manifest.json \
   --sparkproof-root ../SparkProof
-
-scripts/mix_registry.sh verify \
-  --manifest data/processed/mix_manifest.json \
-  --sft data/processed/mix_sft.jsonl
 ```
-
-The tool downloads each component's pinned `proof/trajectories.jsonl`, deduplicates across
-sources (SparkProof novelty fingerprints when `--sparkproof-root` is set), writes Axolotl
-`messages` records with per-row provenance metadata, and emits `mix_manifest.json` listing
-every `hf_url` + `trajectories_sha256` included. Commit the manifest in your training PR;
-attach it to a proof bundle with `proof.bundle --mix-manifest`.
 
 ## SparkProof: Blackwell-verified Triton datasets
 
@@ -220,12 +209,9 @@ the manifest if providers start exposing them; publish manifests to an append-on
 transparency log; optional zero-knowledge proofs of dataset properties (e.g. licensing,
 policy compliance) without revealing prompts/responses.
 
-If you have a proposal for weighted mixing policies or automated recipe updates, open an
-issue or draft PR against this section rather than against the eval harness directly.
-
 Validated datasets live on Hugging Face and are indexed in-repo via `datasets/registry.jsonl`.
-Cross-miner mixes reference only registry-pinned components via `mix_manifest.json`.
-SparkProof proves each component's integrity; the mix manifest proves composition.
+CI maintains the canonical mining dataset at `gittensor-model-hub/sparkproof-mining`.
+SparkProof proves each component's integrity; `mix_manifest.json` on HF proves composition.
 
 ## What Does Not Score
 

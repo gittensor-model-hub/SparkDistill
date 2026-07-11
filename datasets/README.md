@@ -32,8 +32,11 @@ exact gated rows.
 
 Registry PRs are gated automatically by `.github/workflows/dataset_registry.yml`.
 The workflow reads the dataset-track checkbox, rejects changes outside
-`datasets/registry.jsonl`, verifies the proof, replaces any stale `dataset:*` label with
-the computed result, and merges only submissions that reach `dataset:xs` or above.
+`datasets/registry.jsonl`, verifies the proof, **aggregates every merged registry line
+(including the proposed submission) into the canonical mining dataset on Hugging Face**
+(default: [`gittensor-model-hub/sparkproof-mining`](https://huggingface.co/datasets/gittensor-model-hub/sparkproof-mining)),
+replaces any stale `dataset:*` label with the computed result, and merges only when
+verification, aggregation publish, and the `dataset:xs` threshold all pass.
 Rejected PRs are labeled `dataset:REJECT` and closed automatically. Failed
 or sub-threshold PRs remain open.
 
@@ -72,7 +75,27 @@ Merged datasets become fair game for the training track: any training miner may 
 registry entry's `hf_url` as the dataset behind a proof-of-training PR, or combine
 multiple entries with `scripts/mix_registry.sh` (see *Cross-miner mixing* below).
 
-## Cross-miner mixing
+## Canonical mining dataset
+
+**Default HF repo:** [`gittensor-model-hub/sparkproof-mining`](https://huggingface.co/datasets/gittensor-model-hub/sparkproof-mining)
+
+Before a registry PR merges, CI:
+
+1. Verifies the miner's `proof/` bundle
+2. Mixes **all** registry lines (existing + proposed) with deduplication
+3. Publishes the union to the mining dataset repo (`train` split + `mix_manifest.json`)
+4. Merges the PR only if publish succeeds
+
+Training miners should point recipes at this URL (or pass it to `proof.bundle --dataset-url`).
+Override the target repo with `SPARKDISTILL_MINING_DATASET_REPO` in CI or locally.
+
+Local dry-run without HF upload:
+
+```bash
+uv run python -m eval.registry_gate ... --skip-mining-publish
+```
+
+## Cross-miner mixing (local)
 
 ```bash
 scripts/mix_registry.sh mix \

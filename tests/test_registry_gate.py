@@ -166,6 +166,7 @@ def test_verified_dataset_xs_is_merge_eligible(monkeypatch):
         sparkproof_root=Path("."),
         pr_body="- [x] **Dataset track submission**",
         changed_paths=["datasets/registry.jsonl"],
+        mining_dataset_repo_id=None,
     )
     assert report["reward_eligible"] is True
     assert report["merge_eligible"] is True
@@ -189,6 +190,7 @@ def test_verified_dataset_s_is_merge_eligible(monkeypatch):
         sparkproof_root=Path("."),
         pr_body="- [x] **Dataset track submission**",
         changed_paths=["datasets/registry.jsonl"],
+        mining_dataset_repo_id=None,
     )
     assert report["reward_eligible"] is True
     assert report["merge_eligible"] is True

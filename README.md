@@ -109,34 +109,28 @@ completely valid — and expected — way to compete.
 datasets, use the **dataset track** — SparkProof on a Blackwell CC VM, then
 `sparkproof-publish-dataset`, then a text-only registry PR against
 [`datasets/registry.jsonl`](datasets/registry.jsonl). GitHub Actions verifies the Hugging
-Face `proof/` bundle, labels `dataset:xs`–`xl`, and merges at ≥25 verified rows. Build the
-registry line with `scripts/registry_line.sh` (see [`datasets/README.md`](datasets/README.md)).
-Training PRs cite a merged registry entry via `proof.bundle --dataset-url`, or a
-**cross-miner mix** built with `scripts/mix_registry.sh` (see below).
+Face `proof/` bundle, **aggregates all merged datasets into the canonical mining dataset**
+([`gittensor-model-hub/sparkproof-mining`](https://huggingface.co/datasets/gittensor-model-hub/sparkproof-mining)),
+labels `dataset:xs`–`xl`, and merges only if aggregation + publish succeed (≥25 verified rows).
+Build the registry line with `scripts/registry_line.sh` (see [`datasets/README.md`](datasets/README.md)).
+Training miners point recipes at the mining dataset HF URL or cite it via
+`proof.bundle --dataset-url`.
 
-## Cross-miner dataset mixing
+## Canonical mining dataset
 
-Compose multiple merged registry entries into one Axolotl-ready SFT file with a committed
-`mix_manifest.json` that records per-miner provenance:
+Every successful dataset registry merge updates one Hugging Face repo (default:
+[`gittensor-model-hub/sparkproof-mining`](https://huggingface.co/datasets/gittensor-model-hub/sparkproof-mining))
+with the deduplicated union of all merged registry entries plus `mix_manifest.json`
+provenance. CI runs this **before** the PR merges — a publish failure blocks merge.
+
+Local re-mix (optional):
 
 ```bash
-# After two+ datasets are merged into datasets/registry.jsonl
-scripts/mix_registry.sh mix \
-  --registry datasets/registry.jsonl \
-  --sha256 <sha-from-alice> --sha256 <sha-from-bob> \
+scripts/mix_registry.sh mix --registry datasets/registry.jsonl --all \
   --out data/processed/mix_sft.jsonl \
   --manifest-out data/processed/mix_manifest.json \
   --sparkproof-root ../SparkProof
-
-# Re-check before a training PR
-scripts/mix_registry.sh verify \
-  --manifest data/processed/mix_manifest.json \
-  --sft data/processed/mix_sft.jsonl
 ```
-
-Point your recipe at `data/processed/mix_sft.jsonl` and include `mix_manifest.json` in the
-training PR. For proof-of-training, pass `--mix-manifest data/processed/mix_manifest.json`
-to `proof.bundle` — `eval.verify` checks every component is still in the registry.
 
 ## Quickstart
 
@@ -253,6 +247,9 @@ rejected, and the local commands to run before opening a PR.
 **Phase 1 — Qwen3.5-4B proof of concept.** Prove the trajectory-generation → Axolotl SFT →
 eval-harness loop end to end on a dense student model that's cheap to iterate on and fits
 comfortably on the hardware `sparkinfer` already targets (RTX PRO 6000 Blackwell class).
+Includes the full dataset track: SparkProof prove → registry PR → **auto-aggregate into
+[`gittensor-model-hub/sparkproof-mining`](https://huggingface.co/datasets/gittensor-model-hub/sparkproof-mining)
+before merge** → train the Phase 1 student on that canonical mix.
 
 **Phase 2 — Qwen3.6-35B-A3B.** Extend the pipeline to the MoE student model that matches
 `sparkinfer`'s own MoE decode focus (Qwen3-MoE family), once Phase 1's loop is proven and
@@ -261,11 +258,6 @@ the eval basket is stable.
 **Phase 3 — Continuous distillation.** Feed verified frontier checkpoints back into
 `sparkinfer`'s benchmark and eval-trust pipeline automatically, closing the loop between
 model quality improvements here and serving-speed improvements there.
-
-**Phase 4 — Cross-miner dataset mixing (shipped).** `eval/mix_registry.py` composes
-multiple registry-indexed Hugging Face datasets into one SFT file plus
-`mix_manifest.json` provenance. Each component stays individually SparkProof-verified;
-the mix does not create a new attested bundle.
 
 ## Dataset warning (read before you submit)
 

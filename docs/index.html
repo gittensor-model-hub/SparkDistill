@@ -275,7 +275,7 @@ scripts/eval.sh --checkpoint outputs/qwen3.5-4b-phase1 --compare-frontier</code>
     <div class="roadmap-item">
       <span class="pill">Phase 1</span>
       <h3>Qwen3.5-4B proof of concept</h3>
-      <p>Prove the trajectory-generation → Axolotl SFT → eval-harness loop end to end on a dense student model that's cheap to iterate on and fits comfortably on RTX PRO 6000 Blackwell-class hardware.</p>
+      <p>Prove the trajectory-generation → Axolotl SFT → eval-harness loop end to end on a dense student model that's cheap to iterate on and fits comfortably on RTX PRO 6000 Blackwell-class hardware. Dataset registry PRs auto-aggregate into <a href="https://huggingface.co/datasets/gittensor-model-hub/sparkproof-mining">gittensor-model-hub/sparkproof-mining</a> before merge.</p>
     </div>
     <div class="roadmap-item">
       <span class="pill">Phase 2</span>
@@ -286,11 +286,6 @@ scripts/eval.sh --checkpoint outputs/qwen3.5-4b-phase1 --compare-frontier</code>
       <span class="pill">Phase 3</span>
       <h3>Continuous distillation</h3>
       <p>Feed verified frontier checkpoints back into SparkInfer's benchmark and eval-trust pipeline automatically, closing the loop between model quality and serving speed.</p>
-    </div>
-    <div class="roadmap-item">
-      <span class="pill">Phase 4</span>
-      <h3>Cross-miner dataset mixing</h3>
-      <p><code>eval/mix_registry.py</code> composes multiple registry-indexed Hugging Face datasets into one SFT file plus a committed <code>mix_manifest.json</code> with per-miner provenance.</p>
     </div>
   </section>
 

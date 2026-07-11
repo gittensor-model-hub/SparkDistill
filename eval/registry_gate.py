@@ -14,7 +14,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from eval.dataset_verify import MERGE_THRESHOLD_ROWS, REWARDED_DATASET_LABELS, verify_dataset_submission
 
@@ -294,6 +294,8 @@ def gate_registry_pr(
     sparkproof_root: Path,
     pr_body: str | None = None,
     changed_paths: list[str] | None = None,
+    mining_dataset_repo_id: str | None = None,
+    publish_mining_dataset: Callable[..., dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Gate every newly appended registry line in a PR."""
     preflight_issues = validate_changed_paths(changed_paths)
@@ -346,13 +348,36 @@ def gate_registry_pr(
             f"dataset proof is valid but fewer than {MERGE_THRESHOLD_ROWS} verified rows does not meet "
             "the dataset:xs merge/reward threshold"
         )
+
+    mining_report: dict[str, Any] | None = None
+    merge_eligible = eligible
+    if eligible and mining_dataset_repo_id:
+        from eval.mining_dataset import aggregate_and_publish_mining_dataset, aggregate_registry_text
+
+        proposed_registry = aggregate_registry_text(base_registry_text, head_registry_text)
+        try:
+            publish = publish_mining_dataset or aggregate_and_publish_mining_dataset
+            mining_report = publish(
+                proposed_registry,
+                repo_id=mining_dataset_repo_id,
+                sparkproof_root=sparkproof_root,
+            )
+        except (OSError, RuntimeError, ValueError) as exc:
+            merge_eligible = False
+            issues.append(f"mining dataset aggregation failed: {exc}")
+        else:
+            if not mining_report.get("published"):
+                merge_eligible = False
+                issues.extend(list(mining_report.get("issues") or ["mining dataset publish failed"]))
+
     return {
         "verified": report.get("verified", False),
         "reward_eligible": eligible,
-        "merge_eligible": eligible,
+        "merge_eligible": merge_eligible,
         "label": report.get("label"),
         "issues": issues,
         "submissions": [report],
+        "mining_dataset": mining_report,
     }
 
 
@@ -402,7 +427,19 @@ def main(argv: list[str] | None = None) -> int:
         help="close the GitHub PR when the gate label is dataset:REJECT (CI only)",
     )
     parser.add_argument("--pr-number", type=int, default=None)
+    parser.add_argument(
+        "--mining-dataset-repo",
+        default=None,
+        help=f"canonical HF datasets repo to update before merge (default: env or {DEFAULT_MINING_DATASET_REPO})",
+    )
+    parser.add_argument(
+        "--skip-mining-publish",
+        action="store_true",
+        help="skip aggregating into the canonical mining dataset (local dev only)",
+    )
     args = parser.parse_args(argv)
+
+    from eval.mining_dataset import DEFAULT_MINING_DATASET_REPO, mining_dataset_repo
 
     base_text = _git_show(args.base_ref, REGISTRY_PATH)
     head_text = _git_show(args.head_ref, REGISTRY_PATH)
@@ -425,6 +462,9 @@ def main(argv: list[str] | None = None) -> int:
         sparkproof_root=args.sparkproof_root,
         pr_body=pr_body,
         changed_paths=changed_paths,
+        mining_dataset_repo_id=None
+        if args.skip_mining_publish
+        else (args.mining_dataset_repo or mining_dataset_repo()),
     )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
@@ -433,6 +473,13 @@ def main(argv: list[str] | None = None) -> int:
         f"{report['label']} verified={report['verified']} issues={len(report.get('issues') or [])}",
         file=sys.stderr,
     )
+    if report.get("mining_dataset"):
+        mining = report["mining_dataset"]
+        print(
+            f"mining dataset published={mining.get('published')} "
+            f"rows={mining.get('rows_total')} url={mining.get('hf_url')}",
+            file=sys.stderr,
+        )
     if report.get("issues"):
         for issue in report["issues"]:
             print(f"  - {issue}", file=sys.stderr)
