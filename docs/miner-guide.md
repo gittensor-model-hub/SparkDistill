@@ -30,8 +30,9 @@ The full flow, end to end:
 2. **Publish** with `sparkproof-publish-dataset --bundle <dir> --repo-id <you>/<repo>`.
    The release gate (decontamination + provenance) must pass; the publisher uploads the
    dataset rows **and** the proof artifacts under `proof/` in the same HF repo.
-3. **Open a text-only PR** here appending one line to `datasets/registry.jsonl` with your
-   HF URL and the `trajectories_sha256` from `dataset_manifest.json` — see
+3. **Open a text-only PR** here appending one line to `datasets/registry.jsonl` — build it
+   with `scripts/registry_line.sh --bundle <dir> --miner <github-handle> --repo-id <you>/<repo>`
+   (reads `trajectories_sha256` from `dataset_manifest.json`). See
    [`datasets/README.md`](../datasets/README.md). Check **Dataset track submission** in
    the PR template. No dataset files are committed, and a dataset PR may not change any
    file other than the registry.
@@ -291,16 +292,12 @@ In practice today:
 
 - Small recipe changes: just include the changed `sft.yaml` (or new recipe file) in your
   PR as normal.
-- Datasets: `data/processed/` is git-ignored (these files are large), so datasets are
-  never committed. The preferred path is to train on a dataset already merged through
-  the **dataset track** (`datasets/registry.jsonl`) and cite its HF URL via
-  `proof.bundle --dataset-url`. If you generated your own data, run it through the
-  dataset track first — that gets it verified, labeled, and rewarded on its own, and
-  makes your training PR trivially reproducible.
-
-Aggregating datasets across many miners into something more structured than the registry
-is still an open research problem (see `CONTRIBUTING.md`'s *Open research: dataset
-aggregation* section), but linking a verified registry entry is the expected baseline.
+- Datasets: `data/processed/` is git-ignored (these files are large). Train on a dataset
+  merged through the **dataset track** (`datasets/registry.jsonl`) and cite its HF URL via
+  `proof.bundle --dataset-url`. If you generated new Triton data, run it through SparkProof
+  and the registry first — that verifies, labels, and rewards it on its own, and makes your
+  training PR trivially reproducible. See [`datasets/README.md`](../datasets/README.md) and
+  `scripts/registry_line.sh` to build the registry JSON line after publish.
 
 ## Proof Of Training (Skip Full Retrain-Verification)
 

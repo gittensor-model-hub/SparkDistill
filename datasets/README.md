@@ -10,9 +10,16 @@ dataset-track counterpart of `runs/` (which records proof-of-training runs).
 2. Publish to Hugging Face. The publisher uploads the dataset rows **and** the proof
    artifacts under `proof/` in the same HF repo (`manifest.json`,
    `dataset_manifest.json`, `gpu_attestation.json`, `trajectories.jsonl`, ...).
-3. Open a **text-only PR** against this repo that appends one JSON line to
-   `datasets/registry.jsonl`. In the PR template, check
-   **Dataset track submission**. Dataset PRs may not modify any other file:
+3. Build the registry line and open a **text-only PR** that appends it to
+   `datasets/registry.jsonl`:
+
+```bash
+scripts/registry_line.sh --bundle <sparkproof-bundle-dir> --miner <github-handle> \
+  --repo-id <user>/<repo> --append datasets/registry.jsonl
+```
+
+   In the PR template, check **Dataset track submission**. Dataset PRs may not modify any
+   other file:
 
 ```json
 {"miner": "<github-handle>", "hf_url": "https://huggingface.co/datasets/<user>/<repo>", "trajectories_sha256": "<from dataset_manifest.json>", "rows_total": 128, "dataset_version": "triton-distill-v0.2"}

@@ -1,18 +1,18 @@
 # Contributing to SparkDistill
 
-SparkDistill is the model-quality arm of **SN74 on Gittensor**, the same subnet that funds
+SparkDistill is the model-quality arm of **SN74 on [Gittensor](https://gittensor.io/)**, the same subnet that funds
 [`sparkinfer`](https://github.com/gittensor-ai-lab/sparkinfer). Contributions are rewarded
 for **real, verified distillation quality improvements** — not benchmark gaming. This guide
 is how to make a contribution that counts.
 
-## Built through Gittensor
+## Built through [Gittensor](https://gittensor.io/)
 
-Gittensor helps power SPARKDISTILL through SN74: the project receives subnet emissions,
+[Gittensor](https://gittensor.io/) helps power SPARKDISTILL through SN74: the project receives subnet emissions,
 contributors submit source PRs, the evaluator retrains or re-scores those PRs against a
 frozen reference, and rewards are assigned from verified marginal quality improvements
 that keep the checkpoint honest. You do not need to be in Discord or understand the
 subnet internals to contribute, but the source of the incentive loop is clear: SPARKDISTILL
-is built through **SN74 on Gittensor**.
+is built through **SN74 on [Gittensor](https://gittensor.io/)**.
 
 ## Principles
 
@@ -66,18 +66,22 @@ basket.
 
 ## Sharing your dataset (required on every PR)
 
-Whatever dataset you trained on must be included with your PR — either committed if it's
-small, or published externally and linked in the PR description if not. This is what
-makes "the submission is the recipe + dataset" (see *Principles*) actually true in
-practice, and it's what lets another miner fork your work and improve on it.
+Whatever dataset you trained on must be reproducible from your PR. Small files can be
+committed; Triton training data uses the **dataset track** instead of `data/processed/`
+in git.
 
-> **Known gap:** `data/processed/` (generated trajectories / formatted SFT datasets) is
-> git-ignored because these files are large — there's no dataset-hosting or aggregation
-> tooling in this repo yet (see *Open research* below). For now, publish the dataset you
-> trained on externally (e.g. a Hugging Face `datasets` repo — the same pattern
-> `proof/publish.py` uses for checkpoints) and link it in your PR. A PR whose recipe can't
-> actually be reproduced because the dataset was never shared should be treated as
-> incomplete, even if local eval numbers look good.
+**Dataset track (Triton, shipped):**
+
+1. Generate and prove on a Blackwell CC VM with [SparkProof](https://github.com/gittensor-model-hub/SparkProof)
+   (`scripts/run_triton_pipeline.sh --release-gate --publish <org>/<repo>`).
+2. Publish verified rows + `proof/` artifacts to Hugging Face (`sparkproof-publish-dataset`).
+3. Append one line to [`datasets/registry.jsonl`](datasets/registry.jsonl) via a text-only PR.
+   Build the line with `scripts/registry_line.sh --bundle <dir> --miner <handle> --repo-id <org>/<repo>`.
+4. Registry CI verifies the bundle and merges at `dataset:xs` (≥25 verified rows).
+
+Training PRs cite a merged registry `hf_url` with `proof.bundle --dataset-url`. A PR whose
+recipe can't be reproduced because the dataset was never shared or verified should be treated
+as incomplete, even if local eval numbers look good.
 
 ## Proof of training (optional fast path for eval verification)
 
@@ -114,7 +118,7 @@ hardware (e.g. a Blackwell RTX PRO 6000 Server Edition node) can skip attestatio
 entirely and still use the HF bundle + cheap re-run path — attestation only affects how
 much trust the ledger records for that run, not whether the fast path is available.
 
-## How rewards work (SN74 on Gittensor)
+## How rewards work (SN74 on [Gittensor](https://gittensor.io/))
 
 **Quality-only.** You're paid for the **verified marginal quality improvement** your PR
 adds over the current best ("frontier") checkpoint, not your rank — so "copy the leader +
@@ -141,16 +145,18 @@ verification behavior are held for manual review — this protects the eval loop
 being tuned to inflate scores rather than to improve real quality. In particular, only
 the eval bot appends to `runs/ledger.jsonl` — it is not an append-anything log.
 
-## Open research: dataset aggregation
+## Open research: cross-miner dataset mixing
 
-Sharing a single miner's dataset via an external link (see *Sharing your dataset* above)
-works, but there's no way yet to aggregate and validate a **qualified dataset** across many
-miners' trajectory contributions into something the project can build on collectively.
-This is an open problem, not a shipped feature.
+The **dataset track** already hosts verified per-miner datasets: SparkProof proves generation
+on Blackwell, `sparkproof-publish-dataset` uploads rows + `proof/` to Hugging Face, and
+[`datasets/registry.jsonl`](datasets/registry.jsonl) is gated by automated CI
+(`eval/registry_gate.py`, `.github/workflows/dataset_registry.yml`). What's still open is
+composing **multiple** registry entries into a single training mix with provenance
+accounting — not proving or hosting a single miner's bundle.
 
 ### SparkProof: Blackwell-verified Triton datasets
 
-**Implementation:** [sparkproof](https://github.com/gittensor-ai-lab/sparkproof) (sibling repo).
+**Implementation:** [SparkProof](https://github.com/gittensor-model-hub/SparkProof) (sibling repo).
 
 **Production Triton datasets (`sparkproof-2`) must be validated on NVIDIA Blackwell**
 (RTX PRO 6000 Server Edition CC, `SPARKPROOF_BLACKWELL_PROFILE=workstation`). SparkProof:
@@ -199,13 +205,13 @@ the manifest if providers start exposing them; publish manifests to an append-on
 transparency log; optional zero-knowledge proofs of dataset properties (e.g. licensing,
 policy compliance) without revealing prompts/responses.
 
-If you have a proposal here, open an issue or draft PR against this section rather than
-against the eval harness directly — this needs discussion before it needs code.
+If you have a proposal for cross-miner mixing, open an issue or draft PR against this
+section rather than against the eval harness directly — it needs discussion before it
+needs code.
 
-Separately from SparkProof's trust mechanics, where validated datasets actually get
-*hosted* (this repo, a dedicated aggregation repo, or purely external HF dataset repos
-referenced by manifest) is still an open, independent question — SparkProof proves a
-dataset's integrity regardless of where it ends up living.
+Validated datasets live on Hugging Face and are indexed in-repo via `datasets/registry.jsonl`.
+SparkProof proves integrity regardless of where the HF repo is hosted; the registry is the
+canonical list of merged, verified datasets training miners may cite.
 
 ## What Does Not Score
 

@@ -16,11 +16,11 @@ was merged. Written by the eval bot at merge time — miners don't write here di
 
 **What's not tracked here: dataset provenance.** The ledger's schema (`eval/ledger.py`'s
 `LedgerEntry`) has no dataset field — it only records the run's eval delta, tier label,
-and (optionally) attestation. The dataset a merged run was trained on lives in the PR
-itself (a committed file, or an external link in the PR description — see
-`docs/miner-guide.md`'s *Sharing Your Dataset And Recipe*), not in this directory. If
-dataset-aggregation tooling gets built (see `CONTRIBUTING.md`'s *Open research* section),
-extending this ledger to reference a dataset per run would likely be part of it.
+and (optionally) attestation. The dataset a merged run was trained on is cited via
+`proof.bundle --dataset-url` pointing at a merged entry in
+[`datasets/registry.jsonl`](../datasets/registry.jsonl) (or a small committed file for
+non-Triton experiments). Cross-miner dataset mixing beyond the registry index is still
+open research (see `CONTRIBUTING.md`).
 
 This mirrors `sparkinfer-log`'s public run-log convention, kept inside this repo
 instead of a separate sibling repo.

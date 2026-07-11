@@ -32,7 +32,7 @@ seeded rerun, every row GPU-validated and release-gated, sealed with confidentia
 attestation, and cheap for anyone to re-verify from the published `proof/` bundle — not a
 trust-me CSV.
 
-**Built through SN74 on Gittensor.** Contributors submit PRs (datasets, recipes, eval
+**Built through SN74 on [Gittensor](https://gittensor.io/).** Contributors submit PRs (datasets, recipes, eval
 improvements); a deterministic harness scores marginal quality over the current frontier;
 SN74 rewards verified wins. This lives inside the existing SN74 subnet — not a separate
 subnet.
@@ -105,12 +105,13 @@ one miner permanently sitting on a secret checkpoint nobody else can build on. V
 improvement is what gets rewarded, so "copy the leader and add one optimization" is a
 completely valid — and expected — way to compete.
 
-> **Known gap:** `data/processed/` (generated trajectories / formatted datasets) is
-> git-ignored because these files are large. Until dataset-aggregation tooling exists (see
-> *Roadmap* below), publish the dataset you trained on externally — e.g. a Hugging Face
-> `datasets` repo, the same way `proof/publish.py` publishes checkpoint bundles — and link
-> it in your PR description. There's no automated dataset-hosting step yet; this is a
-> manual step on the miner's side for now.
+**Sharing training data:** `data/processed/` stays git-ignored (too large for git). For Triton
+datasets, use the **dataset track** — SparkProof on a Blackwell CC VM, then
+`sparkproof-publish-dataset`, then a text-only registry PR against
+[`datasets/registry.jsonl`](datasets/registry.jsonl). GitHub Actions verifies the Hugging
+Face `proof/` bundle, labels `dataset:xs`–`xl`, and merges at ≥25 verified rows. Build the
+registry line with `scripts/registry_line.sh` (see [`datasets/README.md`](datasets/README.md)).
+Training PRs cite a merged registry entry via `proof.bundle --dataset-url`.
 
 ## Quickstart
 
@@ -236,20 +237,11 @@ the eval basket is stable.
 `sparkinfer`'s benchmark and eval-trust pipeline automatically, closing the loop between
 model quality improvements here and serving-speed improvements there.
 
-**Phase 4 (research) — Dataset aggregation.** Today, sharing the dataset behind a
-submission is a manual step (see the *Known gap* callout above). The open problem is
-turning "a pile of miner-submitted trajectories" into a single **qualified dataset** that
-can be trusted and combined across contributors — under active design, not yet
-implemented:
-
-- **Split into two repos.** One repo for training recipes (what exists here today), a
-  separate repo purely for aggregating *validated* trajectory datasets, so dataset review
-  and recipe review can evolve independently.
-- **Trustless dataset generator.** A way to prove a submitted dataset was actually
-  produced by the claimed teacher (e.g. Fable 5) via its API, rather than trusting the
-  miner's claim — conceptually similar in spirit to `eval.attestation`'s GPU
-  confidential-computing proof, but for *data provenance* instead of *compute
-  provenance*. No concrete design exists yet; contributions/proposals welcome.
+**Phase 4 (research) — Cross-miner dataset mixing.** The **dataset track** already hosts
+verified per-miner datasets on Hugging Face with automated registry gating (see
+[`datasets/README.md`](datasets/README.md)). The open problem is composing multiple
+registry entries into a single training mix with provenance accounting — under active
+design, not yet implemented.
 
 ## Dataset warning (read before you submit)
 
