@@ -323,7 +323,7 @@
       </div>
     </div>
     <div class="callout">
-      <p><strong>Proof of training:</strong> a <em>weights-free</em> claim bundle — evaluation scores, training time, GPU claim, and a per-file hash manifest of the checkpoint, cryptographically bound to an RTX PRO 6000 CC attestation via its <code>claim_sha256</code> nonce. The validator verifies the proof from the published artifacts alone — attestation, nonce binding, hashes, training budget — with no retraining. Trained weights never leave the miner's machine, and the public recipe + dataset keep every merged win reproducible by anyone. Unattested submissions fall back to retraining from source.</p>
+      <p><strong>Proof of training:</strong> a <em>weights-free</em> claim bundle — evaluation scores, training time, GPU claim, and a per-file hash manifest of the checkpoint — cryptographically bound twice via its <code>claim_sha256</code>: into the NRAS-signed RTX PRO 6000 CC attestation nonce (the GPU), and into an Intel TDX quote's REPORTDATA whose MRTD measures the guest VM itself (the software environment). The validator verifies the proof from the published artifacts alone — attestations, nonce bindings, hashes, training budget — with no retraining. Trained weights never leave the miner's machine, and the public recipe + dataset keep every merged win reproducible by anyone. Unattested submissions fall back to retraining from source.</p>
     </div>
   </section>
 
