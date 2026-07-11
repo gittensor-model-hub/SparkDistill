@@ -16,10 +16,9 @@ permissions:
   issues: write
 
 concurrency:
-  # Serialize registry merges so two simultaneously-valid PRs cannot race the
-  # duplicate check. A stale PR must rebase and preserve the latest registry.
-  group: dataset-registry
-  cancel-in-progress: false
+  # Verify each PR independently; only merge-eligible runs contend on main.
+  group: dataset-registry-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   verify-and-merge:
