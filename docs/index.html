@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SPARKDISTILL — reasoning distillation for the SparkInfer runtime</title>
+<meta name="description" content="SPARKDISTILL turns frontier teacher models into small, fast student checkpoints via trajectory distillation and Axolotl fine-tuning, scored and rewarded through SN74 on Gittensor.">
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-alt: #f5f6f8;
+    --fg: #14161a;
+    --fg-muted: #55596690;
+    --fg-muted-solid: #55596b;
+    --border: #e3e5ea;
+    --accent: #b5460a;
+    --accent-fg: #ffffff;
+    --code-bg: #14161a;
+    --code-fg: #eef0f4;
+    --pill-bg: #f0eae2;
+    --shadow: 0 1px 2px rgba(20,22,26,0.06);
+  }
+  :root[data-theme="dark"] {
+    --bg: #101114;
+    --bg-alt: #17181c;
+    --fg: #eef0f4;
+    --fg-muted: #b7bac490;
+    --fg-muted-solid: #b7bac4;
+    --border: #2a2c32;
+    --accent: #ff7a3d;
+    --accent-fg: #14161a;
+    --code-bg: #0a0b0d;
+    --code-fg: #eef0f4;
+    --pill-bg: #23201c;
+    --shadow: 0 1px 2px rgba(0,0,0,0.4);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #101114;
+      --bg-alt: #17181c;
+      --fg: #eef0f4;
+      --fg-muted: #b7bac490;
+      --fg-muted-solid: #b7bac4;
+      --border: #2a2c32;
+      --accent: #ff7a3d;
+      --accent-fg: #14161a;
+      --code-bg: #0a0b0d;
+      --code-fg: #eef0f4;
+      --pill-bg: #23201c;
+      --shadow: 0 1px 2px rgba(0,0,0,0.4);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { color-scheme: light dark; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 0 24px; }
+  code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  code { background: var(--bg-alt); border: 1px solid var(--border); border-radius: 4px; padding: 0.1em 0.4em; font-size: 0.88em; }
+  pre { background: var(--code-bg); color: var(--code-fg); border-radius: 10px; padding: 18px 20px; overflow-x: auto; font-size: 0.86em; line-height: 1.55; }
+  pre code { background: none; border: none; padding: 0; color: inherit; }
+
+  header.site {
+    position: sticky; top: 0; z-index: 10;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+  }
+  header.site .wrap { display: flex; align-items: center; justify-content: space-between; padding-top: 14px; padding-bottom: 14px; }
+  .brand { font-weight: 700; letter-spacing: 0.02em; font-size: 1.05rem; color: var(--fg); }
+  .brand span { color: var(--accent); }
+  nav.links { display: flex; gap: 20px; font-size: 0.92rem; }
+  nav.links a { color: var(--fg-muted-solid); }
+  nav.links a:hover { color: var(--fg); text-decoration: none; }
+
+  .hero { padding: 64px 0 40px; text-align: center; }
+  .hero img.banner { max-width: 100%; height: auto; border-radius: 14px; border: 1px solid var(--border); box-shadow: var(--shadow); margin-bottom: 32px; }
+  .hero h1 { font-size: clamp(1.8rem, 4vw, 2.6rem); margin: 0 0 12px; letter-spacing: -0.01em; }
+  .hero p.tagline { font-size: 1.15rem; color: var(--fg-muted-solid); max-width: 620px; margin: 0 auto 28px; }
+  .cta-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn { display: inline-block; padding: 10px 20px; border-radius: 8px; font-weight: 600; font-size: 0.94rem; border: 1px solid var(--border); }
+  .btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+  .btn.primary:hover { text-decoration: none; filter: brightness(1.06); }
+  .btn.ghost { color: var(--fg); }
+  .btn.ghost:hover { text-decoration: none; background: var(--bg-alt); }
+
+  section { padding: 44px 0; border-top: 1px solid var(--border); }
+  section:first-of-type { border-top: none; }
+  h2 { font-size: 1.5rem; margin: 0 0 18px; letter-spacing: -0.01em; }
+  h3 { font-size: 1.05rem; margin: 24px 0 8px; }
+  p { color: var(--fg-muted-solid); }
+  .lede { color: var(--fg); font-size: 1.05rem; }
+
+  .grid-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-top: 20px; }
+  .card { background: var(--bg-alt); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; }
+  .card h3 { margin-top: 0; font-size: 0.98rem; }
+  .card p { font-size: 0.92rem; margin-bottom: 0; }
+
+  table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 0.92rem; }
+  .table-scroll { overflow-x: auto; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--fg-muted-solid); font-weight: 600; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.04em; }
+
+  ol.steps, ol.steps2 { padding-left: 1.2em; }
+  ol.steps li, ol.steps2 li { margin-bottom: 10px; }
+
+  .pill { display: inline-block; background: var(--pill-bg); border: 1px solid var(--border); border-radius: 999px; padding: 2px 10px; font-size: 0.78rem; font-weight: 600; color: var(--fg-muted-solid); }
+  .hero-badge { margin-bottom: 18px; color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--bg-alt)); }
+
+  .callout { background: var(--bg-alt); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 8px; padding: 16px 18px; font-size: 0.92rem; margin-top: 20px; }
+  .callout p { margin: 0; }
+
+  .roadmap-item { margin-bottom: 22px; }
+  .roadmap-item h3 { margin: 0 0 6px; }
+  .roadmap-item .pill { margin-bottom: 8px; }
+
+  footer { padding: 40px 0 60px; text-align: center; color: var(--fg-muted-solid); font-size: 0.88rem; }
+  footer a { color: var(--fg-muted-solid); }
+
+  @media (max-width: 560px) {
+    nav.links { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="brand">SP<span>⚡</span>RKDISTILL</div>
+    <nav class="links">
+      <a href="#why">Why</a>
+      <a href="#triton">Triton track</a>
+      <a href="#how">How it works</a>
+      <a href="#quickstart">Quickstart</a>
+      <a href="#roadmap">Roadmap</a>
+      <a href="https://github.com/gittensor-model-hub/SparkDistill">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap">
+  <section class="hero">
+    <img class="banner" src="images/banner.png" alt="SparkDistill banner">
+    <span class="pill hero-badge">World's first Triton-language-specialized LLM track — engineering faster AI engineering</span>
+    <h1>Continuously-improving student models for the SparkInfer runtime.</h1>
+    <p class="tagline">SPARKDISTILL turns frontier teacher models into small, fast student checkpoints — via trajectory distillation and Axolotl fine-tuning — that <code>sparkinfer</code> serves at the edge on consumer and edge Blackwell GPUs.</p>
+    <div class="cta-row">
+      <a class="btn primary" href="https://github.com/gittensor-model-hub/SparkDistill">View on GitHub</a>
+      <a class="btn ghost" href="https://github.com/gittensor-model-hub/SparkDistill/blob/main/docs/miner-guide.md">Miner guide</a>
+      <a class="btn ghost" href="https://gittensor.io/">Built on Gittensor</a>
+    </div>
+  </section>
+
+  <section id="triton">
+    <h2>Triton track</h2>
+    <p class="lede">A dedicated distillation track that turns <a href="https://github.com/gittensor-model-hub/SparkDistill/tree/main/tritonbench">TritonBench</a> into a training loop for a <strong>Triton-language-specialized LLM</strong> — a student model whose whole job is writing and optimizing Triton GPU kernels, so the AI engineering loop around kernel work gets faster end to end.</p>
+    <div class="grid-cards">
+      <div class="card">
+        <h3>Pinned to Triton 3.7.1</h3>
+        <p>Targets NVIDIA Blackwell only (workstation SM12x and datacenter SM10x profiles); older architectures are rejected at validation time.</p>
+      </div>
+      <div class="card">
+        <h3>Qwen3.5-4B student</h3>
+        <p>Distilled from GPT 5.6 Sol + Claude Fable 5 teacher trajectories into a dense student sized to iterate fast on Blackwell-class hardware.</p>
+      </div>
+      <div class="card">
+        <h3>Benchmarked on TritonBench</h3>
+        <p>Scored against 184 real-world operators (TritonBench-G) and 166 PyTorch-aligned tasks (TritonBench-T) from the <a href="https://arxiv.org/pdf/2502.14752">TritonBench (ACL 2025 Findings)</a> paper.</p>
+      </div>
+      <div class="card">
+        <h3>Served straight into Claude Code</h3>
+        <p>Exposed via an OpenAI-compatible API so the distilled kernel expert can sit behind an agentic CLI and write/optimize Triton kernels directly.</p>
+      </div>
+    </div>
+    <p><a href="https://github.com/gittensor-model-hub/SparkDistill/blob/main/tritonbench/PROJECT.md">Read the Triton-track architecture doc →</a></p>
+  </section>
+
+  <section id="why">
+    <h2>Why SPARKDISTILL</h2>
+    <p class="lede"><code>sparkinfer</code> makes inference fast; SPARKDISTILL makes the <em>model</em> worth serving fast. Its goal is <strong>reasoning distillation</strong>: teach a student model to reproduce a teacher's step-by-step reasoning process, not just its final answers.</p>
+    <div class="grid-cards">
+      <div class="card">
+        <h3>Trajectory generation</h3>
+        <p>Prompt a basket of teacher models on reasoning-heavy tasks (multi-step math, logic, proof-style code correctness), capturing chain-of-thought separately from the final response where the provider exposes one.</p>
+      </div>
+      <div class="card">
+        <h3>Reasoning-format SFT data</h3>
+        <p>Fold captured reasoning into the training target as a leading <code>&lt;think&gt;...&lt;/think&gt;</code> block — matching Qwen3's native chat template — so the student learns to reason, not just answer.</p>
+      </div>
+      <div class="card">
+        <h3>Distillation recipes</h3>
+        <p>Axolotl-based SFT/LoRA recipes tuned per student model and per phase, sized for the hardware SparkInfer already targets.</p>
+      </div>
+      <div class="card">
+        <h3>Quality eval</h3>
+        <p>A benchmark harness (BFCL, GSM8K, HumanEval, IFEval, MMLU-Pro, plus AIME and GPQA-Diamond) that scores a student checkpoint against its teacher and the current frontier.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="layout">
+    <h2>Layout &amp; scoring</h2>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Path</th><th>What</th></tr></thead>
+        <tbody>
+          <tr><td><code>teacher/</code></td><td>teacher-trajectory generation — Anthropic (Fable 5) and OpenAI (GPT 5.6) only</td></tr>
+          <tr><td><code>recipes/</code></td><td>Axolotl training recipes per student model / phase</td></tr>
+          <tr><td><code>eval/</code></td><td>quality benchmark harness + student-vs-frontier scoring + cheap proof verification</td></tr>
+          <tr><td><code>proof/</code></td><td>proof-of-training bundle packaging + Hugging Face publishing</td></tr>
+          <tr><td><code>runs/</code></td><td>immutable ledger of merged, verified runs</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:18px;"><strong>Scoring is quality-only.</strong> SN74 pays each merged PR for its verified marginal quality improvement over the current best ("frontier") checkpoint, labeled <strong>XL / L / M / S / XS</strong> by the deterministic eval loop. Tooling, bench, docs, and refactors are welcome but score 0 unless they produce a verified frontier improvement.</p>
+  </section>
+
+  <section id="how">
+    <h2>How a PR gets merged &amp; rewarded</h2>
+    <p class="lede"><strong>No trained weights are ever the merged artifact.</strong> A submission is a recipe + the dataset it was trained on — both fully reproducible from source — plus the eval numbers that resulted from running them.</p>
+    <ol class="steps">
+      <li>A miner picks (or generates) a dataset — teacher trajectories from <code>teacher/generate.py</code>, optionally reformatted for reasoning via <code>teacher/format.py</code> — and a training recipe (an Axolotl <code>sft.yaml</code> under <code>recipes/</code>).</li>
+      <li>They train and score locally against the current frontier (<code>scripts/eval.sh</code>).</li>
+      <li>If it beats the frontier, they open a PR containing the recipe file and the dataset (or a public link to it) plus their local eval numbers.</li>
+      <li>The evaluator retrains from that exact recipe + dataset on its own hardware and re-scores against the frontier — the source of truth, nothing is trusted on the miner's word.</li>
+      <li>If it clears the quality gate, it's merged and labeled <strong>XL / L / M / S / XS</strong> by the measured delta, and the new checkpoint becomes the frontier.</li>
+    </ol>
+    <div class="callout">
+      <p><strong>Why share the recipe and dataset instead of just the weights:</strong> whoever holds the frontier ("the king") is required to have a fully public recipe + dataset behind their merged checkpoint. Every other miner can fork the current best and try to beat it — "copy the leader and add one optimization" is a valid, expected way to compete.</p>
+    </div>
+  </section>
+
+  <section id="quickstart">
+    <h2>Quickstart</h2>
+    <pre><code># 1. install
+uv sync
+
+# 2. generate teacher trajectories (needs teacher API keys, see .env.example)
+scripts/generate_trajectories.sh --prompts data/prompts/phase1.jsonl --out data/processed/phase1_trajectories.jsonl
+
+# 3. fold captured reasoning into &lt;think&gt;-tagged SFT records (messages format)
+scripts/prepare_sft_data.sh --in data/processed/phase1_trajectories.jsonl --out data/processed/phase1_sft.jsonl --format messages
+
+# 4. train the Phase 1 student (Qwen3.5-4B) on those trajectories
+scripts/train.sh recipes/qwen3.5-4b-phase1/sft.yaml
+
+# 5. score the resulting checkpoint against the frontier
+scripts/eval.sh --checkpoint outputs/qwen3.5-4b-phase1 --compare-frontier</code></pre>
+  </section>
+
+  <section id="proof">
+    <h2>Proof of training</h2>
+    <p>A submission's eval claim can skip full retrain-verification if the miner proves it instead of just asserting it — a shortcut for the eval <em>numbers</em>, not a replacement for sharing the recipe + dataset.</p>
+    <ol class="steps2">
+      <li>Fine-tune locally and score against the current frontier (<code>scripts/eval.sh</code>).</li>
+      <li>If you beat the frontier, attest the GPU you trained/evaluated on — e.g. a Blackwell RTX PRO 6000 Server Edition CC node (<code>python -m eval.attestation</code>).</li>
+      <li>Package the checkpoint + eval scores into a bundle and publish it to Hugging Face (<code>python -m proof.bundle</code>, <code>python -m proof.publish</code>) — the resulting HF URL is your proof link.</li>
+      <li>Open a PR referencing the HF proof link (and attestation, if collected), plus the recipe + dataset link.</li>
+      <li>The evaluator cheaply re-verifies — a small held-out re-run of your claimed scores plus attestation validation, not a full retrain — and merges if it checks out (<code>python -m eval.verify</code>).</li>
+      <li>The merge is appended to the immutable <code>runs/ledger.jsonl</code> log, and the new checkpoint becomes the frontier.</li>
+    </ol>
+    <p>Unattested submissions still go through the slower path: full retrain-from-source verification.</p>
+  </section>
+
+  <section id="roadmap">
+    <h2>Roadmap</h2>
+    <div class="roadmap-item">
+      <span class="pill">Phase 1</span>
+      <h3>Qwen3.5-4B proof of concept</h3>
+      <p>Prove the trajectory-generation → Axolotl SFT → eval-harness loop end to end on a dense student model that's cheap to iterate on and fits comfortably on RTX PRO 6000 Blackwell-class hardware.</p>
+    </div>
+    <div class="roadmap-item">
+      <span class="pill">Phase 2</span>
+      <h3>Qwen3.6-35B-A3B</h3>
+      <p>Extend the pipeline to the MoE student model that matches SparkInfer's own MoE decode focus, once Phase 1's loop is proven and the eval basket is stable.</p>
+    </div>
+    <div class="roadmap-item">
+      <span class="pill">Phase 3</span>
+      <h3>Continuous distillation</h3>
+      <p>Feed verified frontier checkpoints back into SparkInfer's benchmark and eval-trust pipeline automatically, closing the loop between model quality and serving speed.</p>
+    </div>
+    <div class="roadmap-item">
+      <span class="pill">Phase 4 · research</span>
+      <h3>Dataset aggregation</h3>
+      <p>Turn a pile of miner-submitted trajectories into a single qualified dataset that can be trusted and combined across contributors — under active design, not yet implemented.</p>
+    </div>
+  </section>
+
+  <section id="get-involved">
+    <h2>Get involved</h2>
+    <p>If you are contributing for SN74 rewards, start with the <a href="https://github.com/gittensor-model-hub/SparkDistill/blob/main/docs/miner-guide.md">miner guide</a> — it explains what scores, what gets rejected, and the local commands to run before opening a PR. Or dive straight into the <a href="https://github.com/gittensor-model-hub/SparkDistill">source on GitHub</a>.</p>
+  </section>
+</div>
+
+<footer>
+  <div class="wrap">
+    MIT licensed &middot; <a href="https://github.com/gittensor-model-hub/SparkDistill/blob/main/LICENSE">LICENSE</a> &middot; <a href="https://gittensor.io/">Gittensor / SN74</a>
+  </div>
+</footer>
+
+</body>
+</html>
