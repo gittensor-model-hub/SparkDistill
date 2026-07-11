@@ -30,6 +30,9 @@ dev = [
 proof = [
     "nv-attestation-sdk==2.7.3",
     "huggingface_hub>=1.5.0",
+    # Validator-side Intel DCAP verification of TDX quotes (signature chain,
+    # PCK certs, QE identity, TCB status via Intel PCS).
+    "dcap-qvl==0.5.3",
 ]
 
 [build-system]

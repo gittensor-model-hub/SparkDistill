@@ -75,3 +75,55 @@ def test_tdx_quote_absent_on_non_tdx_host(tmp_path):
 
     # mkdir fails inside a nonexistent parent -> None, never raises.
     assert tdx_quote("ab" * 32, report_path=tmp_path / "no" / "tsm" / "node") is None
+
+
+def test_verify_tdx_quote_reports_missing_library(monkeypatch):
+    import builtins
+    import sys
+
+    from eval.attestation import verify_tdx_quote
+
+    monkeypatch.setitem(sys.modules, "dcap_qvl", None)
+    real_import = builtins.__import__
+
+    def no_dcap(name, *args, **kwargs):
+        if name == "dcap_qvl":
+            raise ImportError(name)
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.delitem(sys.modules, "dcap_qvl")
+    monkeypatch.setattr(builtins, "__import__", no_dcap)
+    result = verify_tdx_quote("AAAA")
+    assert result["verified"] is False
+    assert "not installed" in result["status"]
+
+
+def test_verify_tdx_quote_maps_status(monkeypatch):
+    import sys
+    import types
+
+    from eval.attestation import verify_tdx_quote
+
+    class Report:
+        def __init__(self, status, advisories):
+            self.status = status
+            self.advisory_ids = advisories
+
+    fake = types.ModuleType("dcap_qvl")
+
+    async def fake_verify(quote, pccs_url=None):
+        return Report("UpToDate", [])
+
+    fake.get_collateral_and_verify = fake_verify
+    monkeypatch.setitem(sys.modules, "dcap_qvl", fake)
+    result = verify_tdx_quote("AAAA")
+    assert result == {"verified": True, "status": "UpToDate", "advisory_ids": []}
+
+    async def stale_verify(quote, pccs_url=None):
+        return Report("OutOfDate", ["INTEL-SA-00837"])
+
+    fake.get_collateral_and_verify = stale_verify
+    result = verify_tdx_quote("AAAA")
+    assert result["verified"] is False
+    assert result["status"] == "OutOfDate"
+    assert result["advisory_ids"] == ["INTEL-SA-00837"]

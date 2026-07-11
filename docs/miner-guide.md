@@ -365,9 +365,12 @@ export SPARKDISTILL_TSM_REPORT_PATH=/sys/kernel/config/tsm/report/sparkdistill
 ```
 
 Without a provisioned node (or on non-TDX hosts) the attestation simply records
-`"tdx": null` — GPU claim binding remains the minimum bar. Note the validator
-currently checks the TDX *binding* (REPORTDATA == claim digest); full DCAP
-signature-chain verification of the quote is a planned validator upgrade.
+`"tdx": null` — GPU claim binding remains the minimum bar. The validator checks
+both the *binding* (REPORTDATA == claim digest, `tdx_bound`) and the quote's
+authenticity via full **Intel DCAP verification** (`tdx_signature`): ECDSA
+signature, PCK certificate chain to Intel's root CA, QE identity, and TCB
+status against live Intel PCS collateral — `"UpToDate"` with no advisories is
+the clean pass.
 
 Training-track claims are enforced too: `--train-hours` beyond the **5-hour wall-clock
 budget** is `eval:REJECT`, `--train-gpu` must be an **RTX PRO 6000** CC node, and when

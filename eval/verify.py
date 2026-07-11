@@ -162,6 +162,22 @@ def check_tdx_binding(bundle_dir: Path, attestation: dict | None) -> bool | None
     return str(attestation["tdx"].get("report_data") or "").lower() == expected
 
 
+def check_tdx_signature(attestation: dict | None, pccs_url: str | None = None) -> dict | None:
+    """DCAP-verify the attestation's TDX quote against Intel PCS.
+
+    Complements `check_tdx_binding` (which proves the quote commits to this
+    bundle): this proves the quote itself is genuine — ECDSA signature, PCK
+    chain to Intel's root CA, QE identity, and TCB status. Without it, a
+    fabricated `tdx` blob with a matching report_data would pass binding.
+    Returns None when no TDX quote is present.
+    """
+    if attestation is None or not attestation.get("tdx"):
+        return None
+    from eval.attestation import verify_tdx_quote
+
+    return verify_tdx_quote(attestation["tdx"].get("quote_b64") or "", pccs_url)
+
+
 def check_checkpoint_manifest(manifest: dict, checkpoint_path: Path) -> bool | None:
     """Compare a local checkpoint against the bundle's per-file sha256 manifest.
 
@@ -271,6 +287,7 @@ def verify_submission(
     # checkpoint_hash_match records local-reproduction fidelity.
     report["claim_bound"] = check_claim_binding(bundle_dir, attestation)
     report["tdx_bound"] = check_tdx_binding(bundle_dir, attestation)
+    report["tdx_signature"] = check_tdx_signature(attestation)
     report["checkpoint_hash_match"] = check_checkpoint_manifest(manifest, checkpoint_path)
     return report
 

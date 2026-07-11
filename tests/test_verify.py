@@ -169,3 +169,10 @@ def test_tdx_binding_matches_report_data(tmp_path):
     assert check_tdx_binding(bundle, unbound) is False
     assert check_tdx_binding(bundle, no_tdx) is None
     assert check_tdx_binding(bundle, None) is None
+
+
+def test_tdx_signature_absent_without_quote():
+    from eval.verify import check_tdx_signature
+
+    assert check_tdx_signature(None) is None
+    assert check_tdx_signature({"passed": True, "tdx": None}) is None
