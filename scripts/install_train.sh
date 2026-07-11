@@ -3,8 +3,8 @@
 #
 #   scripts/install_train.sh
 #
-# Qwen3.5 processors require torchvision. On Blackwell, FlashAttention is built
-# for SM120 only; the first source build can take several minutes.
+# Qwen3.5 processors require torchvision. Prefer the official FlashAttention 3
+# wheel (seconds); fall back to a source FlashAttention 2 build on Blackwell.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -22,21 +22,31 @@ uv pip install -q axolotl torchvision
 if [ "${SPARKDISTILL_SKIP_FLASH_ATTN:-0}" = "1" ]; then
   echo "  flash-attn: skipped (SPARKDISTILL_SKIP_FLASH_ATTN=1; training will use SDPA)"
 elif uv run python -c "import flash_attn" 2>/dev/null; then
-  echo "  flash-attn: installed"
+  uv run python -c "import flash_attn; print(f'  flash-attn: {flash_attn.__version__}')"
+elif uv run python -c "from transformers.utils import is_flash_attn_3_available; import sys; sys.exit(0 if is_flash_attn_3_available() else 1)" 2>/dev/null; then
+  echo "  flash-attn-3: installed"
 else
-  export CUDA_HOME="${CUDA_HOME:-/usr/local/cuda}"
-  export PATH="$CUDA_HOME/bin:$PATH"
-  if [ ! -x "$CUDA_HOME/bin/nvcc" ]; then
-    echo "  flash-attn: CUDA compiler not found at $CUDA_HOME/bin/nvcc (training will use SDPA)" >&2
+  cuda_tag="$(uv run python -c "import torch; v=torch.version.cuda or ''; print('cu' + v.replace('.', '')[:3] if v else 'cu130')")"
+  fa3_index="https://download.pytorch.org/whl/${cuda_tag}"
+  echo ">>> installing FlashAttention 3 wheel (${cuda_tag}, ~30s)"
+  if uv pip install -q "flash-attn-3" --index-url "$fa3_index" \
+    && uv run python -c "from transformers.utils import is_flash_attn_3_available; import sys; sys.exit(0 if is_flash_attn_3_available() else 1)" 2>/dev/null; then
+    echo "  flash-attn-3: installed from ${fa3_index}"
   else
-    echo ">>> building FlashAttention for Blackwell SM120 (first install takes several minutes)"
-    uv pip install -q ninja packaging wheel
-    build_jobs="${MAX_JOBS:-$(nproc)}"
-    echo "  CUDA arch: SM120; parallel jobs: $build_jobs ($(nproc) vCPUs available)"
-    FLASH_ATTN_CUDA_ARCHS="${FLASH_ATTN_CUDA_ARCHS:-120}" \
-      MAX_JOBS="$build_jobs" \
-      uv pip install "flash-attn==2.8.3.post1" --no-build-isolation
-    uv run python -c "import flash_attn; print(f'  flash-attn: {flash_attn.__version__}')"
+    export CUDA_HOME="${CUDA_HOME:-/usr/local/cuda}"
+    export PATH="$CUDA_HOME/bin:$PATH"
+    if [ ! -x "$CUDA_HOME/bin/nvcc" ]; then
+      echo "  flash-attn: CUDA compiler not found at $CUDA_HOME/bin/nvcc (training will use SDPA)" >&2
+    else
+      echo ">>> building FlashAttention 2 for Blackwell SM120 (first install takes several minutes)"
+      uv pip install -q ninja packaging wheel
+      build_jobs="${MAX_JOBS:-$(nproc)}"
+      echo "  CUDA arch: SM120; parallel jobs: $build_jobs ($(nproc) vCPUs available)"
+      FLASH_ATTN_CUDA_ARCHS="${FLASH_ATTN_CUDA_ARCHS:-120}" \
+        MAX_JOBS="$build_jobs" \
+        uv pip install "flash-attn==2.8.3.post1" --no-build-isolation
+      uv run python -c "import flash_attn; print(f'  flash-attn: {flash_attn.__version__}')"
+    fi
   fi
 fi
 

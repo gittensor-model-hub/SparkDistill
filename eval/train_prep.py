@@ -34,6 +34,15 @@ def _has_flash_attn() -> bool:
         return False
 
 
+def _has_flash_attn_3() -> bool:
+    try:
+        from transformers.utils import is_flash_attn_3_available
+
+        return bool(is_flash_attn_3_available())
+    except ImportError:
+        return False
+
+
 def _has_cut_cross_entropy() -> bool:
     try:
         import axolotl.integrations.cut_cross_entropy  # noqa: F401
@@ -93,8 +102,12 @@ def prepare_train_recipe(
 
     attn = cfg.get("attn_implementation")
     if attn == "flash_attention_2" and not _has_flash_attn():
-        cfg["attn_implementation"] = "sdpa"
-        notes.append("attn_implementation: sdpa (flash_attn not installed)")
+        if _has_flash_attn_3():
+            cfg["attn_implementation"] = "flash_attention_3"
+            notes.append("attn_implementation: flash_attention_3 (flash_attn_3 wheel)")
+        else:
+            cfg["attn_implementation"] = "sdpa"
+            notes.append("attn_implementation: sdpa (flash_attn not installed)")
 
     plugins = cfg.get("plugins")
     if isinstance(plugins, list) and plugins:

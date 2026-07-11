@@ -33,6 +33,7 @@ def test_count_jsonl_rows(tmp_path: Path):
 
 def test_prepare_train_recipe_resolves_paths_and_disables_packing(tmp_path: Path, monkeypatch):
     monkeypatch.setattr("eval.train_prep._has_flash_attn", lambda: False)
+    monkeypatch.setattr("eval.train_prep._has_flash_attn_3", lambda: False)
     monkeypatch.setattr("eval.train_prep._has_cut_cross_entropy", lambda: False)
     root = tmp_path / "distill"
     data = root / "data/processed/tiny.jsonl"
@@ -66,3 +67,29 @@ def test_prepare_train_recipe_resolves_paths_and_disables_packing(tmp_path: Path
     assert "plugins" not in prepared
     assert result["row_count"] == MIN_SAMPLE_PACKING_ROWS - 1
     assert any("sample_packing disabled" in note for note in result["notes"])
+
+
+def test_prepare_train_recipe_upgrades_to_flash_attention_3(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr("eval.train_prep._has_flash_attn", lambda: False)
+    monkeypatch.setattr("eval.train_prep._has_flash_attn_3", lambda: True)
+    monkeypatch.setattr("eval.train_prep._has_cut_cross_entropy", lambda: False)
+    root = tmp_path / "distill"
+    data = root / "data/processed/tiny.jsonl"
+    _write_jsonl(data, MIN_SAMPLE_PACKING_ROWS)
+    recipe = root / "recipes/demo/sft.yaml"
+    recipe.parent.mkdir(parents=True)
+    recipe.write_text(
+        yaml.safe_dump(
+            {
+                "datasets": [{"path": "data/processed/tiny.jsonl"}],
+                "attn_implementation": "flash_attention_2",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = prepare_train_recipe(recipe_path=recipe, distill_root=root)
+    prepared = yaml.safe_load(Path(result["prepared_recipe"]).read_text(encoding="utf-8"))
+
+    assert prepared["attn_implementation"] == "flash_attention_3"
+    assert any("flash_attention_3" in note for note in result["notes"])
