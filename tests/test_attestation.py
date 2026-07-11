@@ -127,3 +127,79 @@ def test_verify_tdx_quote_maps_status(monkeypatch):
     assert result["verified"] is False
     assert result["status"] == "OutOfDate"
     assert result["advisory_ids"] == ["INTEL-SA-00837"]
+
+
+def _es384_token_fixture():
+    from cryptography.hazmat.primitives.asymmetric import ec
+
+    key = ec.generate_private_key(ec.SECP384R1())
+    encode = lambda payload: jwt.encode(  # noqa: E731
+        payload, key, algorithm="ES384", headers={"kid": "nv-eat-kid-test"}
+    )
+    token = json.dumps(
+        [
+            ["JWT", jwt.encode({"sub": "overall"}, "k", algorithm="HS256")],
+            {
+                "REMOTE_GPU_CLAIMS": [
+                    ["JWT", encode({"iss": "https://nras.attestation.nvidia.com", "sub": "platform"})],
+                    {"GPU-0": encode({"iss": "https://nras.attestation.nvidia.com", "hwmodel": "GB20X"})},
+                ]
+            },
+        ]
+    )
+    return key, token
+
+
+def test_verify_gpu_token_accepts_valid_signatures(monkeypatch):
+    from eval.attestation import verify_gpu_token
+
+    key, token = _es384_token_fixture()
+
+    class FakeKey:
+        def __init__(self, k):
+            self.key = k.public_key()
+
+    class FakeJWKClient:
+        def __init__(self, url):
+            pass
+
+        def get_signing_key_from_jwt(self, encoded):
+            return FakeKey(key)
+
+    monkeypatch.setattr(jwt, "PyJWKClient", FakeJWKClient)
+    result = verify_gpu_token(token)
+    assert result["verified"] is True
+    assert result["tokens_checked"] == 2
+    assert result["issues"] == []
+
+
+def test_verify_gpu_token_rejects_wrong_key(monkeypatch):
+    from cryptography.hazmat.primitives.asymmetric import ec
+
+    from eval.attestation import verify_gpu_token
+
+    _, token = _es384_token_fixture()
+    other = ec.generate_private_key(ec.SECP384R1())
+
+    class FakeKey:
+        key = other.public_key()
+
+    class FakeJWKClient:
+        def __init__(self, url):
+            pass
+
+        def get_signing_key_from_jwt(self, encoded):
+            return FakeKey()
+
+    monkeypatch.setattr(jwt, "PyJWKClient", FakeJWKClient)
+    result = verify_gpu_token(token)
+    assert result["verified"] is False
+    assert result["tokens_checked"] == 0
+    assert len(result["issues"]) == 2
+
+
+def test_verify_gpu_token_garbage_is_unverified():
+    from eval.attestation import verify_gpu_token
+
+    result = verify_gpu_token("not json")
+    assert result["verified"] is False

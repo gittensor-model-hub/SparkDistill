@@ -176,3 +176,10 @@ def test_tdx_signature_absent_without_quote():
 
     assert check_tdx_signature(None) is None
     assert check_tdx_signature({"passed": True, "tdx": None}) is None
+
+
+def test_gpu_signature_absent_without_token():
+    from eval.verify import check_gpu_signature
+
+    assert check_gpu_signature(None) is None
+    assert check_gpu_signature({"passed": True, "token": ""}) is None

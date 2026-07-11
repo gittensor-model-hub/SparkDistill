@@ -31,6 +31,8 @@ DEFAULT_POLICY_PATH = Path(__file__).parent / "policies" / "gpu_remote_v3.json"
 DEFAULT_NRAS_GPU_URL = "https://nras.attestation.nvidia.com/v3/attest/gpu"
 DEFAULT_RIM_URL = "https://rim.attestation.nvidia.com/v1/rim/"
 DEFAULT_OCSP_URL = "https://ocsp.ndis.nvidia.com/"
+DEFAULT_NRAS_ISSUER = "https://nras.attestation.nvidia.com"
+DEFAULT_NRAS_JWKS_URL = "https://nras.attestation.nvidia.com/.well-known/jwks.json"
 
 
 @dataclass(frozen=True)
@@ -188,6 +190,50 @@ def tdx_quote(nonce_hex: str, report_path: Path | None = None) -> dict | None:
         "report_data": quote[_TDX_REPORT_DATA_OFFSET : _TDX_REPORT_DATA_OFFSET + 64].hex(),
         "mrtd": quote[_TDX_MRTD_OFFSET : _TDX_MRTD_OFFSET + 48].hex(),
     }
+
+
+def verify_gpu_token(token: str, jwks_url: str = DEFAULT_NRAS_JWKS_URL, issuer: str = DEFAULT_NRAS_ISSUER) -> dict:
+    """Verify the NRAS-signed JWTs in a GPU attestation token against NVIDIA's JWKS.
+
+    The EAT's platform and per-device tokens are ES384-signed by NRAS (`kid`
+    resolved from NVIDIA's published JWKS); signature, issuer, and expiry are
+    all enforced. The overall JWT is HS256 and SDK-local — it is intentionally
+    NOT counted as evidence. Without this check a validator would be trusting
+    the committed attestation JSON on the miner's word.
+
+    Returns {"verified": bool, "tokens_checked": int, "issues": [...]}.
+    """
+    import jwt
+
+    issues: list[str] = []
+    checked = 0
+    try:
+        parsed = json.loads(token)
+        client = jwt.PyJWKClient(jwks_url)
+        for section in parsed[1:]:
+            if not isinstance(section, dict):
+                continue
+            for entries in section.values():
+                if not isinstance(entries, list):
+                    continue
+                for entry in entries:
+                    signed_tokens: list[tuple[str, str]] = []
+                    if isinstance(entry, list) and len(entry) == 2 and entry[0] == "JWT":
+                        signed_tokens.append(("platform", entry[1]))
+                    elif isinstance(entry, dict):
+                        signed_tokens.extend(entry.items())
+                    for name, encoded in signed_tokens:
+                        try:
+                            key = client.get_signing_key_from_jwt(encoded)
+                            jwt.decode(encoded, key.key, algorithms=["ES384"], issuer=issuer)
+                            checked += 1
+                        except Exception as exc:
+                            issues.append(f"{name}: {exc}")
+    except Exception as exc:
+        issues.append(f"token unparseable: {exc}")
+    if checked == 0 and not issues:
+        issues.append("no NRAS-signed tokens found in attestation")
+    return {"verified": checked > 0 and not issues, "tokens_checked": checked, "issues": issues}
 
 
 def verify_tdx_quote(quote_b64: str, pccs_url: str | None = None) -> dict:

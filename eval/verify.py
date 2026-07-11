@@ -162,6 +162,20 @@ def check_tdx_binding(bundle_dir: Path, attestation: dict | None) -> bool | None
     return str(attestation["tdx"].get("report_data") or "").lower() == expected
 
 
+def check_gpu_signature(attestation: dict | None) -> dict | None:
+    """Verify the attestation's NRAS-signed GPU tokens against NVIDIA's JWKS.
+
+    The GPU counterpart of `check_tdx_signature`: without it, the committed
+    attestation JSON's `passed` flag and claims are taken on the miner's word.
+    Returns None when there is no attestation.
+    """
+    if attestation is None or not attestation.get("token"):
+        return None
+    from eval.attestation import verify_gpu_token
+
+    return verify_gpu_token(attestation["token"])
+
+
 def check_tdx_signature(attestation: dict | None, pccs_url: str | None = None) -> dict | None:
     """DCAP-verify the attestation's TDX quote against Intel PCS.
 
@@ -286,6 +300,7 @@ def verify_submission(
     # cryptographically commits to this bundle from a legacy unbound one, and
     # checkpoint_hash_match records local-reproduction fidelity.
     report["claim_bound"] = check_claim_binding(bundle_dir, attestation)
+    report["gpu_signature"] = check_gpu_signature(attestation)
     report["tdx_bound"] = check_tdx_binding(bundle_dir, attestation)
     report["tdx_signature"] = check_tdx_signature(attestation)
     report["checkpoint_hash_match"] = check_checkpoint_manifest(manifest, checkpoint_path)
