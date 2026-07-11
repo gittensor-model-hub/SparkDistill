@@ -127,6 +127,69 @@ def _decode_overall_claims(token: str) -> dict:
         return {}
 
 
+# TDX quote layout (Intel TDX DCAP quote v4): 48-byte header, then the 584-byte
+# TD report body whose final 64 bytes are REPORTDATA — where the claim digest goes.
+_TDX_QUOTE_HEADER_LEN = 48
+_TDX_BODY_LEN = 584
+_TDX_REPORT_DATA_OFFSET = _TDX_QUOTE_HEADER_LEN + _TDX_BODY_LEN - 64
+_TDX_MRTD_OFFSET = _TDX_QUOTE_HEADER_LEN + 16 + 48 + 48 + 8 + 8 + 8  # MRTD follows TCB/MRSEAM/MRSIGNERSEAM/attrs
+
+
+def tdx_report_data(nonce_hex: str) -> bytes:
+    """64-byte TDX REPORTDATA for a claim digest: sha256 bytes + zero padding."""
+    digest = bytes.fromhex(nonce_hex)
+    if len(digest) > 64:
+        raise ValueError("nonce too long for TDX report data (max 64 bytes)")
+    return digest.ljust(64, b"\x00")
+
+
+def tdx_quote(nonce_hex: str, report_path: Path | None = None) -> dict | None:
+    """Capture an Intel TDX quote binding `nonce_hex` via configfs-tsm, or None.
+
+    The VM userland (serving stack, harness) is only *declared* in a proof bundle;
+    a TDX quote adds the measured-VM half: MRTD/RTMRs cover the guest image and
+    kernel, signed by Intel, with the claim digest in REPORTDATA. Returns None on
+    hosts without TDX or without a provisioned report node.
+
+    The kernel's configfs-tsm report directory is root-owned; provision a
+    persistent node once per boot (needs sudo) and point
+    SPARKDISTILL_TSM_REPORT_PATH at it:
+
+        sudo chmod 0777 /sys/kernel/config/tsm/report
+        mkdir /sys/kernel/config/tsm/report/sparkdistill
+        sudo chmod 0666 /sys/kernel/config/tsm/report/sparkdistill/inblob
+        export SPARKDISTILL_TSM_REPORT_PATH=/sys/kernel/config/tsm/report/sparkdistill
+    """
+    import base64
+    import os
+
+    node = report_path or Path(os.environ.get("SPARKDISTILL_TSM_REPORT_PATH") or "/sys/kernel/config/tsm/report/sparkdistill")
+    created = False
+    try:
+        if not node.is_dir():
+            node.mkdir()  # works only as root; a pre-provisioned node skips this
+            created = True
+        (node / "inblob").write_bytes(tdx_report_data(nonce_hex))
+        quote = (node / "outblob").read_bytes()
+        provider = (node / "provider").read_text().strip() if (node / "provider").exists() else ""
+    except OSError:
+        return None
+    finally:
+        if created:
+            try:
+                node.rmdir()
+            except OSError:
+                pass
+    if len(quote) < _TDX_REPORT_DATA_OFFSET + 64:
+        return None
+    return {
+        "provider": provider,
+        "quote_b64": base64.b64encode(quote).decode(),
+        "report_data": quote[_TDX_REPORT_DATA_OFFSET : _TDX_REPORT_DATA_OFFSET + 64].hex(),
+        "mrtd": quote[_TDX_MRTD_OFFSET : _TDX_MRTD_OFFSET + 48].hex(),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--environment", default="REMOTE", choices=["LOCAL", "REMOTE", "TEST"])
@@ -144,14 +207,25 @@ def main(argv: list[str] | None = None) -> int:
         environment=args.environment, policy_path=args.policy, service_key=args.service_key, nonce=args.nonce
     )
 
+    # Best-effort measured-VM evidence: present on TDX guests with a provisioned
+    # configfs-tsm node, null elsewhere (GPU attestation alone still decides passed).
+    tdx = tdx_quote(args.nonce) if args.nonce else None
+
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(
         json.dumps(
-            {"passed": result.passed, "environment": result.environment, "token": result.token, "claims": result.claims},
+            {
+                "passed": result.passed,
+                "environment": result.environment,
+                "token": result.token,
+                "claims": result.claims,
+                "tdx": tdx,
+            },
             indent=2,
         )
     )
-    print(f"attestation {'PASSED' if result.passed else 'FAILED'} ({result.environment})", file=sys.stderr)
+    tdx_note = "with TDX quote" if tdx else "no TDX quote"
+    print(f"attestation {'PASSED' if result.passed else 'FAILED'} ({result.environment}, {tdx_note})", file=sys.stderr)
     return 0 if result.passed else 1
 
 

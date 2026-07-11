@@ -39,3 +39,39 @@ def test_device_claims_corroborate_training_gpu():
 
 def test_garbage_token_decodes_to_empty():
     assert _decode_overall_claims("not json") == {}
+
+
+def test_tdx_report_data_pads_digest():
+    from eval.attestation import tdx_report_data
+
+    digest = "ab" * 32
+    data = tdx_report_data(digest)
+    assert len(data) == 64
+    assert data[:32] == bytes.fromhex(digest)
+    assert data[32:] == b"\x00" * 32
+
+
+def test_tdx_quote_via_provisioned_node(tmp_path):
+    from eval.attestation import _TDX_REPORT_DATA_OFFSET, tdx_quote, tdx_report_data
+
+    digest = "cd" * 32
+    node = tmp_path / "report"
+    node.mkdir()
+    (node / "provider").write_text("tdx_guest\n")
+    # Emulate the kernel: outblob holds a quote embedding the report data at the
+    # v4 offset (in reality it is regenerated on every inblob write).
+    fake_quote = b"\x00" * _TDX_REPORT_DATA_OFFSET + tdx_report_data(digest) + b"\x00" * 128
+    (node / "outblob").write_bytes(fake_quote)
+
+    result = tdx_quote(digest, report_path=node)
+    assert result is not None
+    assert result["provider"] == "tdx_guest"
+    assert result["report_data"] == tdx_report_data(digest).hex()
+    assert (node / "inblob").read_bytes() == tdx_report_data(digest)
+
+
+def test_tdx_quote_absent_on_non_tdx_host(tmp_path):
+    from eval.attestation import tdx_quote
+
+    # mkdir fails inside a nonexistent parent -> None, never raises.
+    assert tdx_quote("ab" * 32, report_path=tmp_path / "no" / "tsm" / "node") is None

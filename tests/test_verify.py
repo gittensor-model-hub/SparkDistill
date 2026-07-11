@@ -147,3 +147,25 @@ def test_no_frontier_yields_baseline_label(tmp_path, monkeypatch):
     # With a frontier, normal tier scoring applies unchanged.
     scored = v.verify_submission(bundle, frontier={"gsm8k": 0.5})
     assert scored["label"] == "eval:XL"
+
+
+def test_tdx_binding_matches_report_data(tmp_path):
+    import json
+
+    from eval.attestation import tdx_report_data
+    from eval.verify import check_tdx_binding
+    from proof.bundle import claim_sha256
+
+    bundle = tmp_path / "bundle"
+    bundle.mkdir()
+    (bundle / "manifest.json").write_text(json.dumps({"run_id": "r1"}))
+    (bundle / "eval_scores.json").write_text(json.dumps({"scores": {"gsm8k": 0.6}}))
+    digest = claim_sha256(bundle)
+
+    bound = {"passed": True, "tdx": {"report_data": tdx_report_data(digest).hex()}}
+    unbound = {"passed": True, "tdx": {"report_data": "ff" * 64}}
+    no_tdx = {"passed": True, "tdx": None}
+    assert check_tdx_binding(bundle, bound) is True
+    assert check_tdx_binding(bundle, unbound) is False
+    assert check_tdx_binding(bundle, no_tdx) is None
+    assert check_tdx_binding(bundle, None) is None

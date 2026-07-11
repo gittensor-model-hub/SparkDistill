@@ -142,6 +142,26 @@ def check_claim_binding(bundle_dir: Path, attestation: dict | None) -> bool | No
     return any(str(nonce).lower().removeprefix("0x") == expected for nonce in nonces if nonce)
 
 
+def check_tdx_binding(bundle_dir: Path, attestation: dict | None) -> bool | None:
+    """Whether the attestation's Intel TDX quote commits to this exact bundle.
+
+    The TDX quote's 64-byte REPORTDATA must be the bundle's `claim_sha256`
+    (zero-padded) — the measured-VM counterpart of `check_claim_binding`'s GPU
+    nonce. Returns None when no TDX quote was captured (non-TDX host or
+    unprovisioned configfs-tsm node); GPU binding remains the minimum bar.
+
+    Honest scope: this checks the binding, not the quote's Intel signature
+    chain — full DCAP/Trust Authority verification is the validator follow-up.
+    """
+    if attestation is None or not attestation.get("tdx"):
+        return None
+    from eval.attestation import tdx_report_data
+    from proof.bundle import claim_sha256
+
+    expected = tdx_report_data(claim_sha256(bundle_dir)).hex()
+    return str(attestation["tdx"].get("report_data") or "").lower() == expected
+
+
 def check_checkpoint_manifest(manifest: dict, checkpoint_path: Path) -> bool | None:
     """Compare a local checkpoint against the bundle's per-file sha256 manifest.
 
@@ -250,6 +270,7 @@ def verify_submission(
     # cryptographically commits to this bundle from a legacy unbound one, and
     # checkpoint_hash_match records local-reproduction fidelity.
     report["claim_bound"] = check_claim_binding(bundle_dir, attestation)
+    report["tdx_bound"] = check_tdx_binding(bundle_dir, attestation)
     report["checkpoint_hash_match"] = check_checkpoint_manifest(manifest, checkpoint_path)
     return report
 

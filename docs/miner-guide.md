@@ -345,6 +345,30 @@ your numbers are comparable with the validator's re-run — `scripts/install_ser
 installs it in a dedicated venv, and the eval configs use greedy decoding
 (`temperature: 0.0`) for the same reason. Do not change either.
 
+### Intel TDX measured-VM proof (optional, strongest tier)
+
+GPU CC attestation proves the GPU/driver; it does not measure the VM your serving
+stack and harness ran in. On a TDX guest (Targon CC VMs are), `eval.attestation`
+additionally captures an **Intel TDX quote** with the same `claim_sha256` in its
+64-byte REPORTDATA — the quote's MRTD/RTMRs measure the guest image and kernel,
+signed by Intel, so the claim is bound to both the GPU *and* the measured VM.
+`eval.verify` reports this as `tdx_bound`.
+
+The kernel's configfs-tsm interface is root-owned; provision a persistent report
+node **once per boot** (needs sudo), then attest as usual:
+
+```bash
+sudo chmod 0777 /sys/kernel/config/tsm/report
+mkdir /sys/kernel/config/tsm/report/sparkdistill
+sudo chmod 0666 /sys/kernel/config/tsm/report/sparkdistill/inblob
+export SPARKDISTILL_TSM_REPORT_PATH=/sys/kernel/config/tsm/report/sparkdistill
+```
+
+Without a provisioned node (or on non-TDX hosts) the attestation simply records
+`"tdx": null` — GPU claim binding remains the minimum bar. Note the validator
+currently checks the TDX *binding* (REPORTDATA == claim digest); full DCAP
+signature-chain verification of the quote is a planned validator upgrade.
+
 Training-track claims are enforced too: `--train-hours` beyond the **5-hour wall-clock
 budget** is `eval:REJECT`, `--train-gpu` must be an **RTX PRO 6000** CC node, and when
 you attach a CC attestation, its attested hardware model must corroborate the claimed
