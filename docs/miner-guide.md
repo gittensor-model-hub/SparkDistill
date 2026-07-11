@@ -3,10 +3,51 @@
 This guide is for SN74 miners and contributors who want to earn rewards by improving
 SparkDistill. SparkDistill's goal is **reasoning distillation**: the student should learn
 to reproduce the teacher's step-by-step reasoning, not just its final answers. The rule is
-simple: rewards come from verified checkpoint quality improvements, not from claims,
-formatting, or duplicated ideas.
+simple: rewards come from verified improvements, not from claims, formatting, or
+duplicated ideas.
 
-## What Scores
+There are **two mining tracks**, each with its own labels and rewards:
+
+1. **Dataset track** (`dataset:s/m/l`) — run [SparkProof](https://github.com/gittensor-model-hub/SparkProof)
+   on a Blackwell CC VM to generate verified Triton training data, publish it to Hugging
+   Face, and open a text-only registry PR here. See *Dataset Track* below.
+2. **Training track** (`eval:xs/s/m/l/xl`) — train the student on merged datasets with an
+   improved recipe, beat the frontier eval, and prove it (RTX PRO 6000 CC attestation,
+   ≤ 5h wall-clock). The rest of this guide covers this track.
+
+The same person can mine both: your own merged dataset is the natural raw material for
+your training runs — but every merged dataset is public, so a better dataset only keeps
+you ahead as long as you also train well.
+
+## Dataset Track (`dataset:s/m/l`)
+
+The full flow, end to end:
+
+1. **Generate** on a Blackwell RTX PRO 6000 CC VM with an unmodified SparkProof checkout:
+   `scripts/run_triton_pipeline.sh` (teacher calls go through an approved gateway to the
+   pinned teachers — GPT 5.6 Sol / Fable 5 at `xhigh` — and every kernel is validated on
+   the GPU).
+2. **Publish** with `sparkproof-publish-dataset --bundle <dir> --repo-id <you>/<repo>`.
+   The release gate (decontamination + provenance) must pass; the publisher uploads the
+   dataset rows **and** the proof artifacts under `proof/` in the same HF repo.
+3. **Open a text-only PR** here appending one line to `datasets/registry.jsonl` with your
+   HF URL and the `trajectories_sha256` from `dataset_manifest.json` — see
+   [`datasets/README.md`](../datasets/README.md). No dataset files are committed.
+4. **The validator** runs `python -m eval.dataset_verify --hf-repo <you>/<repo>
+   --claimed-sha256 <hash> --sparkproof-root ../SparkProof`, which checks GPU CC
+   attestation, the release gate, the row hash, and full SparkProof policy (unmodified
+   request hashes, pinned teachers, merkle root). Pass → merged with a size label,
+   rewarded by SN74 gittensor:
+
+| label | verified rows |
+|---|---|
+| `dataset:l` | >= 10000 |
+| `dataset:m` | >= 1000 |
+| `dataset:s` | >= 100 |
+| `dataset:none` | merged, below reward threshold |
+| `dataset:REJECT` | attestation, decontamination, hash, or policy failure |
+
+## Training Track: What Scores
 
 A PR can score when it does all of the following:
 
@@ -114,15 +155,16 @@ In practice today:
 
 - Small recipe changes: just include the changed `sft.yaml` (or new recipe file) in your
   PR as normal.
-- Datasets: `data/processed/` is git-ignored (these files are large), so there's no
-  automated way to attach a dataset to a PR yet. Publish the dataset you trained on
-  externally — e.g. a Hugging Face `datasets` repo, the same pattern `proof.publish` uses
-  for checkpoints — and link it in your PR description.
+- Datasets: `data/processed/` is git-ignored (these files are large), so datasets are
+  never committed. The preferred path is to train on a dataset already merged through
+  the **dataset track** (`datasets/registry.jsonl`) and cite its HF URL via
+  `proof.bundle --dataset-url`. If you generated your own data, run it through the
+  dataset track first — that gets it verified, labeled, and rewarded on its own, and
+  makes your training PR trivially reproducible.
 
-This dataset-sharing step is manual and somewhat clunky right now; aggregating datasets
-across many miners into something more structured is an open research problem (see
-`CONTRIBUTING.md`'s *Open research: dataset aggregation* section) — not yet solved, but
-sharing a link today is still required.
+Aggregating datasets across many miners into something more structured than the registry
+is still an open research problem (see `CONTRIBUTING.md`'s *Open research: dataset
+aggregation* section), but linking a verified registry entry is the expected baseline.
 
 ## Proof Of Training (Skip Full Retrain-Verification)
 
@@ -140,9 +182,11 @@ uv sync --extra proof
 #    Server Edition confidential-computing node
 python -m eval.attestation --out runs/<run-id>/attestation.json
 
-# 2. package checkpoint + eval scores into a bundle, and publish it to Hugging Face
+# 2. package checkpoint + eval scores + training claims into a bundle, publish it to HF
 python -m proof.bundle --checkpoint outputs/<your-checkpoint> --scores eval/results/candidate.json \
-    --run-id <run-id> --out proof/_bundles/<run-id>
+    --run-id <run-id> --out proof/_bundles/<run-id> \
+    --train-hours 4.2 --train-gpu "NVIDIA RTX PRO 6000 Blackwell" \
+    --dataset-url https://huggingface.co/datasets/<user>/<merged-dataset>
 python -m proof.publish --bundle proof/_bundles/<run-id> --repo-id <your-hf-username>/sparkdistill-<run-id>
 ```
 
@@ -151,6 +195,13 @@ PR. The evaluator runs `eval.verify`: a small held-out re-run of your claimed sc
 (not the full basket) plus attestation validation if you provided it. If your claim
 doesn't hold up within tolerance, the PR is rejected outright — a proof bundle that
 misrepresents its scores is treated as worse than no bundle at all, not just "unverified."
+
+Training-track claims are enforced too: `--train-hours` beyond the **5-hour wall-clock
+budget** is `eval:REJECT`, `--train-gpu` must be an **RTX PRO 6000** CC node, and when
+you attach a CC attestation, its attested hardware model must corroborate the claimed
+GPU (a mismatched attestation is worse than none). `--dataset-url` should point at a
+dataset merged through the dataset track (`datasets/registry.jsonl`), which is what
+makes the training result reproducible by anyone.
 
 | label | meaning |
 |---|---|

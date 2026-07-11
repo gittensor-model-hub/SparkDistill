@@ -23,6 +23,40 @@ from pathlib import Path
 from eval.harness import run_harness
 from eval.score import score
 
+# Training-track budget (see docs/miner-guide.md): a proof-of-training claim must have
+# been produced within this wall-clock budget on the required CC GPU.
+MAX_TRAIN_HOURS = 5.0
+REQUIRED_TRAIN_GPU = "RTX PRO 6000"
+
+
+def check_training_claims(
+    manifest: dict,
+    attestation: dict | None,
+    max_train_hours: float = MAX_TRAIN_HOURS,
+    required_gpu: str = REQUIRED_TRAIN_GPU,
+) -> list[str]:
+    """Validate the bundle's training-track claims (train_hours / train_gpu).
+
+    Older bundles without these fields are not failed here — they simply don't
+    qualify for the training track and fall back to full retrain-verification.
+    """
+    issues: list[str] = []
+    train_hours = manifest.get("train_hours")
+    if train_hours is not None and float(train_hours) > max_train_hours:
+        issues.append(f"train_hours {train_hours} exceeds the {max_train_hours}h budget")
+
+    train_gpu = manifest.get("train_gpu")
+    if train_gpu is not None and required_gpu.lower() not in str(train_gpu).lower():
+        issues.append(f"train_gpu {train_gpu!r} is not a {required_gpu} CC node")
+
+    # When CC attestation is provided, the attested hardware model must corroborate
+    # the claimed GPU — the claim alone is just text.
+    if attestation and train_gpu is not None:
+        claims_blob = json.dumps(attestation.get("claims") or {}).lower()
+        if claims_blob != "{}" and "pro 6000" not in claims_blob and "gb20" not in claims_blob:
+            issues.append("attestation claims do not corroborate the claimed RTX PRO 6000 GPU")
+    return issues
+
 
 def check_claim(claimed: dict[str, float], rerun: dict[str, float], tolerance_pct: float = 2.0) -> list[str]:
     """Return the benchmark keys where the claimed score diverges from the cheap
@@ -50,6 +84,16 @@ def verify_submission(
 
     if attestation is not None and not attestation.get("passed"):
         return {"verified": False, "reason": "attestation_failed", "label": "eval:REJECT", "run_id": manifest.get("run_id")}
+
+    training_issues = check_training_claims(manifest, attestation)
+    if training_issues:
+        return {
+            "verified": False,
+            "reason": "training_claims_failed",
+            "issues": training_issues,
+            "label": "eval:REJECT",
+            "run_id": manifest.get("run_id"),
+        }
 
     rerun = run_harness(str(checkpoint_path), sorted(claimed), Path("eval/results/_verify"), limit=limit)
     mismatches = check_claim(claimed, rerun, tolerance_pct)
