@@ -125,3 +125,25 @@ def test_checkpoint_manifest_match_and_mismatch(tmp_path):
     (ckpt / "w.bin").write_text("tampered")
     assert check_checkpoint_manifest(manifest, ckpt) is False
     assert check_checkpoint_manifest({}, ckpt) is None
+
+
+def test_no_frontier_yields_baseline_label(tmp_path, monkeypatch):
+    import json
+
+    import eval.verify as v
+
+    bundle = tmp_path / "bundle"
+    (bundle / "checkpoint").mkdir(parents=True)
+    (bundle / "checkpoint" / "w.bin").write_text("w")
+    (bundle / "manifest.json").write_text(json.dumps({"run_id": "r1"}))
+    (bundle / "eval_scores.json").write_text(json.dumps({"scores": {"gsm8k": 0.6}}))
+    monkeypatch.setattr(v, "run_harness", lambda *a, **k: {"gsm8k": 0.6})
+
+    report = v.verify_submission(bundle, frontier=None)
+    assert report["verified"] is True
+    assert report["label"] == "eval:BASELINE"
+    assert report["per_benchmark"]["gsm8k"] == {"candidate": 0.6, "frontier": None}
+
+    # With a frontier, normal tier scoring applies unchanged.
+    scored = v.verify_submission(bundle, frontier={"gsm8k": 0.5})
+    assert scored["label"] == "eval:XL"

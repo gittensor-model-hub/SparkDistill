@@ -160,7 +160,7 @@ def check_checkpoint_manifest(manifest: dict, checkpoint_path: Path) -> bool | N
 
 def verify_submission(
     bundle_dir: Path,
-    frontier: dict[str, float],
+    frontier: dict[str, float] | None,
     limit: int = 20,
     tolerance_pct: float = 2.0,
     attestation: dict | None = None,
@@ -168,6 +168,13 @@ def verify_submission(
     registry_path: Path = REGISTRY_PATH,
     checkpoint: Path | None = None,
 ) -> dict:
+    """Verify a proof bundle; `frontier=None` is the BASELINE case.
+
+    When no frontier exists yet (first verified run on a student/phase, per
+    `.gittensor/weights.json`), every proof and claim check still runs, but
+    instead of tier scoring the submission is labeled `eval:BASELINE` — its
+    scores then seed `runs/frontier.json` for the next submission to beat.
+    """
     manifest = json.loads((bundle_dir / "manifest.json").read_text())
     claimed = json.loads((bundle_dir / "eval_scores.json").read_text())["scores"]
 
@@ -226,7 +233,16 @@ def verify_submission(
             "run_id": manifest.get("run_id"),
         }
 
-    report = score(claimed, frontier)
+    if frontier:
+        report = score(claimed, frontier)
+    else:
+        report = {
+            "label": "eval:BASELINE",
+            "best_benchmark": None,
+            "best_pct_delta": None,
+            "regressions": [],
+            "per_benchmark": {key: {"candidate": claimed[key], "frontier": None} for key in claimed},
+        }
     report["verified"] = True
     report["reason"] = None
     report["run_id"] = manifest.get("run_id")
@@ -252,7 +268,13 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--bundle-repo", default=None, help="HF hub repo id to download the proof bundle from")
     parser.add_argument("--bundle-path", type=Path, default=None, help="local bundle dir (alternative to --bundle-repo)")
-    parser.add_argument("--frontier", type=Path, required=True, help="scores json from eval.harness for the frontier")
+    parser.add_argument(
+        "--frontier",
+        type=Path,
+        default=Path("runs/frontier.json"),
+        help="frontier scores json (default: the canonical runs/frontier.json; "
+        "a missing file means no frontier exists yet -> eval:BASELINE)",
+    )
     parser.add_argument("--attestation", type=Path, default=None, help="attestation json from eval.attestation")
     parser.add_argument("--limit", type=int, default=20, help="examples per benchmark for the cheap re-run")
     parser.add_argument("--tolerance-pct", type=float, default=2.0)
@@ -266,7 +288,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     bundle_dir = _resolve_bundle_dir(args.bundle_repo, args.bundle_path)
-    frontier = json.loads(args.frontier.read_text())["scores"]
+    frontier = json.loads(args.frontier.read_text())["scores"] if args.frontier.exists() else None
     attestation = json.loads(args.attestation.read_text()) if args.attestation else None
 
     report = verify_submission(

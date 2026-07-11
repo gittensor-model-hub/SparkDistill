@@ -6,6 +6,11 @@ was merged. Written by the eval bot at merge time — miners don't write here di
 - **`ledger.jsonl`** — append-only, one JSON line per merged PR (see `eval/ledger.py`).
   Never edited or reordered; a bad entry is corrected by appending a new one, not by
   rewriting history.
+- **`frontier.json`** — the canonical current-frontier scores: what the next
+  submission must beat. `eval.verify` reads it by default; updated (overwritten,
+  not appended) at merge time whenever a run takes the frontier. When it doesn't
+  exist yet for a new student/phase, the first verified run is labeled
+  `eval:BASELINE` and its scores seed this file.
 - **`<run-id>/`** — one directory per merged run, holding the artifacts the ledger
   entry references:
   - `result.json` — the `eval.score` report (tier label, per-benchmark deltas).
