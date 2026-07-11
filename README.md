@@ -164,7 +164,7 @@ uv run sparkproof-verify --bundle /path/to/proof --online   # + NVIDIA NRAS JWKS
 Registry PRs are gated automatically by
 [`.github/workflows/dataset_registry.yml`](.github/workflows/dataset_registry.yml) — see
 [`datasets/README.md`](datasets/README.md) for the miner flow and label thresholds
-(`dataset:s/m/l` merge, `dataset:none` below threshold, `dataset:REJECT` closed).
+(`dataset:xs/s/m/l/xl` merge, `dataset:none` below threshold, `dataset:REJECT` closed).
 
 ### What offline verification enforces
 

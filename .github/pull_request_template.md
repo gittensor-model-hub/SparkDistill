@@ -10,7 +10,7 @@ Select the one track this PR belongs to.
 > Dataset PRs must append exactly one line to `datasets/registry.jsonl` and must
 > not change any other file. The dataset workflow reads the checked box above,
 > verifies the Hugging Face `proof/` bundle, assigns a `dataset:*` label, and
-> merges only submissions with at least 100 verified rows.
+> merges only submissions with at least 25 verified rows (`dataset:xs` or above).
 
 ## Dataset submission
 
@@ -24,7 +24,7 @@ Complete this section only when **Dataset track submission** is checked.
 Registry line:
 
 ```json
-{"miner": "<github-handle>", "hf_url": "https://huggingface.co/datasets/<org>/<repo>", "trajectories_sha256": "<64-character hash from dataset_manifest.json>", "rows_total": 100, "dataset_version": "triton-distill-v0.2"}
+{"miner": "<github-handle>", "hf_url": "https://huggingface.co/datasets/<org>/<repo>", "trajectories_sha256": "<64-character hash from dataset_manifest.json>", "rows_total": 25, "dataset_version": "triton-distill-v0.2"}
 ```
 
 ### Dataset checklist
@@ -34,7 +34,7 @@ Registry line:
 - [ ] The Hugging Face repository contains the complete `proof/` directory.
 - [ ] The submitted rows are training data, not `test`, `eval`, or `held_out` data.
 - [ ] The dataset does not contain TritonBench or other protected evaluation material.
-- [ ] I understand that fewer than 100 verified rows receives `dataset:none` and is not merged.
+- [ ] I understand that fewer than 25 verified rows receives `dataset:none` and is not merged.
 
 ## Training/evaluation improvement
 

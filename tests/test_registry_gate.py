@@ -69,8 +69,8 @@ def test_registry_must_only_append_to_latest_base():
     assert any("append-only" in issue for issue in issues)
 
 
-def test_reward_and_merge_eligibility_require_dataset_s_or_above():
-    for label in ("dataset:s", "dataset:m", "dataset:l"):
+def test_reward_and_merge_eligibility_require_dataset_xs_or_above():
+    for label in ("dataset:xs", "dataset:s", "dataset:m", "dataset:l", "dataset:xl"):
         report = {"verified": True, "label": label}
         assert reward_eligible(report)
         assert merge_eligible(report)
@@ -131,13 +131,13 @@ def test_verified_sub_threshold_dataset_is_not_merge_eligible(monkeypatch):
         lambda *args, **kwargs: {
             "verified": True,
             "label": "dataset:none",
-            "rows_total": 99,
+            "rows_total": 24,
             "issues": [],
         },
     )
     report = gate_registry_pr(
         base_registry_text="",
-        head_registry_text=json.dumps(_entry(rows_total=99)) + "\n",
+        head_registry_text=json.dumps(_entry(rows_total=24)) + "\n",
         sparkproof_root=Path("."),
         pr_body="- [x] **Dataset track submission**",
         changed_paths=["datasets/registry.jsonl"],
@@ -146,7 +146,30 @@ def test_verified_sub_threshold_dataset_is_not_merge_eligible(monkeypatch):
     assert report["reward_eligible"] is False
     assert report["merge_eligible"] is False
     assert report["label"] == "dataset:none"
-    assert any("100 verified rows" in issue for issue in report["issues"])
+    assert any("25 verified rows" in issue for issue in report["issues"])
+
+
+def test_verified_dataset_xs_is_merge_eligible(monkeypatch):
+    monkeypatch.setattr(
+        registry_gate,
+        "gate_registry_submission",
+        lambda *args, **kwargs: {
+            "verified": True,
+            "label": "dataset:xs",
+            "rows_total": 25,
+            "issues": [],
+        },
+    )
+    report = gate_registry_pr(
+        base_registry_text="",
+        head_registry_text=json.dumps(_entry(rows_total=25)) + "\n",
+        sparkproof_root=Path("."),
+        pr_body="- [x] **Dataset track submission**",
+        changed_paths=["datasets/registry.jsonl"],
+    )
+    assert report["reward_eligible"] is True
+    assert report["merge_eligible"] is True
+    assert report["issues"] == []
 
 
 def test_verified_dataset_s_is_merge_eligible(monkeypatch):
@@ -156,13 +179,13 @@ def test_verified_dataset_s_is_merge_eligible(monkeypatch):
         lambda *args, **kwargs: {
             "verified": True,
             "label": "dataset:s",
-            "rows_total": 100,
+            "rows_total": 50,
             "issues": [],
         },
     )
     report = gate_registry_pr(
         base_registry_text="",
-        head_registry_text=json.dumps(_entry(rows_total=100)) + "\n",
+        head_registry_text=json.dumps(_entry(rows_total=50)) + "\n",
         sparkproof_root=Path("."),
         pr_body="- [x] **Dataset track submission**",
         changed_paths=["datasets/registry.jsonl"],

@@ -26,7 +26,7 @@ exact gated rows.
 Registry PRs are gated automatically by `.github/workflows/dataset_registry.yml`.
 The workflow reads the dataset-track checkbox, rejects changes outside
 `datasets/registry.jsonl`, verifies the proof, replaces any stale `dataset:*` label with
-the computed result, and merges only submissions that reach `dataset:s` or above.
+the computed result, and merges only submissions that reach `dataset:xs` or above.
 Rejected PRs are labeled `dataset:REJECT` and closed automatically. Failed
 or sub-threshold PRs remain open.
 
@@ -53,10 +53,12 @@ python -m eval.dataset_verify --hf-repo <user>/<repo> \
 
 | label | verified rows |
 |---|---|
-| `dataset:l` | >= 10000 |
-| `dataset:m` | >= 1000 |
-| `dataset:s` | >= 100 |
-| `dataset:none` | < 100 (proof may be valid, but not merged/rewarded) |
+| `dataset:xl` | >= 150 |
+| `dataset:l` | >= 100 |
+| `dataset:m` | >= 75 |
+| `dataset:s` | >= 50 |
+| `dataset:xs` | >= 25 |
+| `dataset:none` | < 25 (proof may be valid, but not merged/rewarded) |
 | `dataset:REJECT` | attestation, release-gate, hash, or policy failure |
 
 Merged datasets become fair game for the training track: any training miner may cite a
@@ -102,7 +104,7 @@ python -m eval.dataset_verify \
   --claimed-sha256 a746fa812fb098737cded713daf0f58b8ff59e485c9bdf8fd94f6b5cc1d5c846 \
   --sparkproof-root ../SparkProof \
   --out eval/results/dataset_report.json
-# → verified=true, label=dataset:none (2 rows < 100 reward threshold)
+# → verified=true, label=dataset:none (2 rows < 25 reward threshold)
 ```
 
 **CC VM gotchas observed during the smoke test:**

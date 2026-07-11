@@ -8,7 +8,7 @@ duplicated ideas.
 
 There are **two mining tracks**, each with its own labels and rewards:
 
-1. **Dataset track** (`dataset:s/m/l`) — run [SparkProof](https://github.com/gittensor-model-hub/SparkProof)
+1. **Dataset track** (`dataset:xs/s/m/l/xl`) — run [SparkProof](https://github.com/gittensor-model-hub/SparkProof)
    on a Blackwell CC VM to generate verified Triton training data, publish it to Hugging
    Face, and open a text-only registry PR here. See *Dataset Track* below.
 2. **Training track** (`eval:xs/s/m/l/xl`) — train the student on merged datasets with an
@@ -19,7 +19,7 @@ The same person can mine both: your own merged dataset is the natural raw materi
 your training runs — but every merged dataset is public, so a better dataset only keeps
 you ahead as long as you also train well.
 
-## Dataset Track (`dataset:s/m/l`)
+## Dataset Track (`dataset:xs/s/m/l/xl`)
 
 The full flow, end to end:
 
@@ -39,20 +39,22 @@ The full flow, end to end:
    --claimed-sha256 <hash> --sparkproof-root ../SparkProof`, which checks GPU CC
    attestation, the release gate, the row hash, and full SparkProof policy (unmodified
    request hashes, pinned teachers, merkle root). The workflow applies the computed
-   `dataset:*` label and merges only at the `dataset:s` threshold or above:
+   `dataset:*` label and merges only at the `dataset:xs` threshold (25 rows) or above:
 
 | label | verified rows |
 |---|---|
-| `dataset:l` | >= 10000 |
-| `dataset:m` | >= 1000 |
-| `dataset:s` | >= 100 |
-| `dataset:none` | proof valid but below 100 rows; not merged or rewarded |
+| `dataset:xl` | >= 150 |
+| `dataset:l` | >= 100 |
+| `dataset:m` | >= 75 |
+| `dataset:s` | >= 50 |
+| `dataset:xs` | >= 25 |
+| `dataset:none` | proof valid but below 25 rows; not merged or rewarded |
 | `dataset:REJECT` | attestation, decontamination, hash, or policy failure |
 
 **Verified smoke test (2026-07-11):** 2 rows published to
 [gittensor-model-hub/sparkproof-triton-v0](https://huggingface.co/datasets/gittensor-model-hub/sparkproof-triton-v0),
-`eval.dataset_verify` returned `verified=true` / `dataset:none` (below the 100-row
-`dataset:s` threshold). No duplicate prompts, task IDs, or responses. Full commands and
+`eval.dataset_verify` returned `verified=true` / `dataset:none` (below the 25-row
+`dataset:xs` threshold). No duplicate prompts, task IDs, or responses. Full commands and
 the pinned `trajectories_sha256` are in [`datasets/README.md`](../datasets/README.md).
 
 **Before you generate on a CC VM:** sibling `SparkDistill/tritonbench/` must be present
@@ -71,7 +73,7 @@ proofs (`dataset:none`) stay open for miners to grow and resubmit.
 
 This distinction is important because the word `eval` is used in two different ways:
 
-- `dataset:s/m/l` rewards miners for contributing **training data** that passed
+- `dataset:xs/s/m/l/xl` rewards miners for contributing **training data** that passed
   SparkProof generation, GPU validation, decontamination, attestation, and registry
   verification.
 - `eval:XS/S/M/L/XL` rewards a **training recipe or checkpoint improvement** measured by

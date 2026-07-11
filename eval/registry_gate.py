@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from eval.dataset_verify import verify_dataset_submission
+from eval.dataset_verify import MERGE_THRESHOLD_ROWS, REWARDED_DATASET_LABELS, verify_dataset_submission
 
 REGISTRY_PATH = Path("datasets/registry.jsonl")
 REQUIRED_FIELDS = ("miner", "hf_url", "trajectories_sha256", "rows_total", "dataset_version")
@@ -25,14 +25,13 @@ _DATASET_TRACK_CHECKBOX_RE = re.compile(
     r"^\s*-\s*\[[xX]\]\s+\*\*Dataset track submission\*\*\s*$",
     re.MULTILINE,
 )
-DATASET_LABELS = frozenset(
-    {"dataset:l", "dataset:m", "dataset:s", "dataset:none", "dataset:REJECT"}
-)
-REWARDED_DATASET_LABELS = frozenset({"dataset:l", "dataset:m", "dataset:s"})
+DATASET_LABELS = REWARDED_DATASET_LABELS | frozenset({"dataset:none", "dataset:REJECT"})
 _LABEL_COLORS = {
+    "dataset:xl": "1d76db",
     "dataset:l": "0e8a16",
     "dataset:m": "2cbe4e",
     "dataset:s": "7bd88f",
+    "dataset:xs": "c5def5",
     "dataset:none": "d4c5f9",
     "dataset:REJECT": "b60205",
 }
@@ -99,7 +98,7 @@ def validate_changed_paths(changed_paths: list[str] | None) -> list[str]:
 
 
 def reward_eligible(report: dict[str, Any]) -> bool:
-    """A verified dataset earns a reward only at the 100-row `dataset:s` floor or above."""
+    """A verified dataset earns a reward at the `dataset:xs` floor (25 rows) or above."""
     return bool(report.get("verified")) and report.get("label") in REWARDED_DATASET_LABELS
 
 
@@ -344,8 +343,8 @@ def gate_registry_pr(
     issues = list(report.get("issues", []))
     if report.get("verified") and not eligible:
         issues.append(
-            "dataset proof is valid but fewer than 100 verified rows does not meet "
-            "the dataset:s merge/reward threshold"
+            f"dataset proof is valid but fewer than {MERGE_THRESHOLD_ROWS} verified rows does not meet "
+            "the dataset:xs merge/reward threshold"
         )
     return {
         "verified": report.get("verified", False),

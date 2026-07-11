@@ -18,10 +18,12 @@ artifacts), and opens a text-only PR here linking that HF repo plus the bundle's
 
    | label | rows |
    |---|---|
-   | `dataset:l` | >= 10000 |
-   | `dataset:m` | >= 1000 |
-   | `dataset:s` | >= 100 |
-   | `dataset:none` | < 100 (proof may verify, but below merge/reward threshold) |
+   | `dataset:xl` | >= 150 |
+   | `dataset:l` | >= 100 |
+   | `dataset:m` | >= 75 |
+   | `dataset:s` | >= 50 |
+   | `dataset:xs` | >= 25 |
+   | `dataset:none` | < 25 (proof may verify, but below merge/reward threshold) |
    | `dataset:REJECT` | any check above failed |
 
     python -m eval.dataset_verify --hf-repo <user>/sparkproof-triton-v0 \\
@@ -40,10 +42,14 @@ from pathlib import Path
 
 # (min_rows, label) — first match wins, checked largest-to-smallest.
 _SIZE_BANDS = [
-    (10_000, "dataset:l"),
-    (1_000, "dataset:m"),
-    (100, "dataset:s"),
+    (150, "dataset:xl"),
+    (100, "dataset:l"),
+    (75, "dataset:m"),
+    (50, "dataset:s"),
+    (25, "dataset:xs"),
 ]
+MERGE_THRESHOLD_ROWS = _SIZE_BANDS[-1][0]
+REWARDED_DATASET_LABELS = frozenset(label for _, label in _SIZE_BANDS)
 
 REQUIRED_PROOF_FILES = (
     "manifest.json",

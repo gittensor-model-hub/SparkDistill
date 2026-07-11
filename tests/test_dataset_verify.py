@@ -37,10 +37,13 @@ def _write_proof_dir(tmp_path, *, rows=3, attested=True, gate_passed=True, tampe
 
 
 def test_size_label_bands():
-    assert size_label(15_000) == "dataset:l"
-    assert size_label(2_000) == "dataset:m"
-    assert size_label(150) == "dataset:s"
-    assert size_label(99) == "dataset:none"
+    assert size_label(200) == "dataset:xl"
+    assert size_label(150) == "dataset:xl"
+    assert size_label(100) == "dataset:l"
+    assert size_label(75) == "dataset:m"
+    assert size_label(50) == "dataset:s"
+    assert size_label(25) == "dataset:xs"
+    assert size_label(24) == "dataset:none"
 
 
 def test_valid_proof_dir_passes(tmp_path):
