@@ -47,6 +47,16 @@ The full flow, end to end:
 | `dataset:none` | merged, below reward threshold |
 | `dataset:REJECT` | attestation, decontamination, hash, or policy failure |
 
+**Verified smoke test (2026-07-11):** 2 rows published to
+[gittensor-model-hub/sparkproof-triton-v0](https://huggingface.co/datasets/gittensor-model-hub/sparkproof-triton-v0),
+`eval.dataset_verify` returned `verified=true` / `dataset:none` (below the 100-row
+`dataset:s` threshold). No duplicate prompts, task IDs, or responses. Full commands and
+the pinned `trajectories_sha256` are in [`datasets/README.md`](../datasets/README.md).
+
+**Before you generate on a CC VM:** sibling `SparkDistill/tritonbench/` must be present
+(gitignored — sync it beside SparkProof or set `SPARKPROOF_TRITONBENCH_PROBLEMS`). Without
+it, decontamination aborts. Set `HF_TOKEN` in `.env` before `--publish`.
+
 ## Training Track: What Scores
 
 A PR can score when it does all of the following:
@@ -237,25 +247,38 @@ Merged proof-of-training runs are appended to [`runs/ledger.jsonl`](../runs/ledg
 
 ### Triton / SparkProof path (Blackwell CC VM — recommended)
 
-Run from **SparkProof** on the CC VM (sibling **SparkDistill** repo required):
+Run from **SparkProof** on the CC VM (sibling **SparkDistill** repo required — including
+the gitignored `SparkDistill/tritonbench/` tree for decontamination):
 
 ```bash
 cd SparkProof
-cp .env.example .env   # OPENROUTER_API_KEY
+cp .env.example .env   # YUNWU_API_KEY or OPENROUTER_API_KEY; HF_TOKEN for publish
 
 scripts/install.sh              # first boot only
-scripts/miner_run.sh --limit 2            # smoke test
-scripts/miner_run.sh --run-id my-run-001  # full bundle → verify → SFT
+scripts/cc_check.sh           # Blackwell + Python.h + GPU CC attestation
 
-# optional: train after SFT
-scripts/miner_run.sh --run-id my-run-001 --train
+# smoke: generate + prove + verify (no HF)
+scripts/run_triton_pipeline.sh --limit 2
+
+# smoke + publish (verified 2026-07-11 — see datasets/README.md)
+scripts/run_triton_pipeline.sh --run-id triton-cc-hf-001 --limit 2 \
+  --release-gate --publish gittensor-model-hub/sparkproof-triton-v0
+
+# validator re-check from SparkDistill (any machine)
+cd ../SparkDistill
+python -m eval.dataset_verify --hf-repo gittensor-model-hub/sparkproof-triton-v0 \
+  --claimed-sha256 <from dataset_manifest.json> --sparkproof-root ../SparkProof \
+  --out eval/results/dataset_report.json
 ```
 
-Then eval from SparkDistill:
+Then eval from SparkDistill (training track, once a student checkpoint exists):
 
 ```bash
 cd ../SparkDistill
 scripts/eval.sh --checkpoint outputs/qwen3.5-4b-phase1 --compare-frontier
+# Triton domain score (requires vLLM or --endpoint):
+uv run python -m eval.triton_bench --checkpoint outputs/qwen3.5-4b-phase1 --serve \
+  --quick --out eval/results/triton.json
 ```
 
 ### Legacy / local teacher path (no SparkProof)
