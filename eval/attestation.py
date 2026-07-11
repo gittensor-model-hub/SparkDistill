@@ -190,6 +190,38 @@ def tdx_quote(nonce_hex: str, report_path: Path | None = None) -> dict | None:
     }
 
 
+def verify_tdx_quote(quote_b64: str, pccs_url: str | None = None) -> dict:
+    """Verify a TDX quote's Intel signature chain via DCAP (dcap-qvl + Intel PCS).
+
+    Validates the quote's ECDSA signature, PCK certificate chain up to Intel's
+    root CA, QE identity, and platform TCB status against live PCS collateral.
+    Returns {"verified": bool, "status": str, "advisory_ids": [...]} —
+    `status "UpToDate"` with no advisories is the clean pass; stale-TCB statuses
+    are surfaced for validator policy rather than silently accepted.
+
+    Requires `dcap-qvl` (`uv sync --extra proof`) and network access to Intel
+    PCS (or a PCCS mirror via `pccs_url`).
+    """
+    import asyncio
+    import base64
+
+    try:
+        import dcap_qvl
+    except ImportError:
+        return {"verified": False, "status": "dcap-qvl not installed", "advisory_ids": []}
+
+    try:
+        quote = base64.b64decode(quote_b64)
+        report = asyncio.run(dcap_qvl.get_collateral_and_verify(quote, pccs_url))
+    except Exception as exc:
+        return {"verified": False, "status": f"verification error: {exc}", "advisory_ids": []}
+    return {
+        "verified": report.status == "UpToDate" and not report.advisory_ids,
+        "status": report.status,
+        "advisory_ids": list(report.advisory_ids),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--environment", default="REMOTE", choices=["LOCAL", "REMOTE", "TEST"])
