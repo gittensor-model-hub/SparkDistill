@@ -83,6 +83,16 @@ def build_bundle(
     `dataset_url` are the training-track claims (see docs/miner-guide.md);
     `eval.verify` enforces the wall-clock budget and GPU requirement against them.
     """
+    # Fail loudly on a missing/typo'd checkpoint path. On the default proof-only
+    # path nothing else reads the checkpoint contents, so without this check a
+    # wrong --checkpoint yields an *empty* checkpoint_manifest and a vacuous
+    # claim_sha256 that still looks well-formed.
+    if not checkpoint_dir.is_dir():
+        raise NotADirectoryError(
+            f"checkpoint directory {checkpoint_dir} does not exist; refusing to build a "
+            "proof bundle whose checkpoint_manifest would be empty"
+        )
+
     out_dir.mkdir(parents=True, exist_ok=True)
     if include_checkpoint:
         shutil.copytree(checkpoint_dir, out_dir / "checkpoint", dirs_exist_ok=True)
@@ -92,7 +102,13 @@ def build_bundle(
 
     created_at = datetime.now(UTC).isoformat()
     manifest: dict = {"run_id": run_id, "base_model": base_model, "created_at": created_at}
-    manifest["checkpoint_manifest"] = checkpoint_manifest(checkpoint_dir)
+    ckpt_manifest = checkpoint_manifest(checkpoint_dir)
+    if not ckpt_manifest:
+        raise ValueError(
+            f"checkpoint directory {checkpoint_dir} contains no files; the checkpoint_manifest "
+            "would be empty and the proof claim vacuous"
+        )
+    manifest["checkpoint_manifest"] = ckpt_manifest
     if train_hours is not None:
         manifest["train_hours"] = train_hours
     if train_gpu is not None:

@@ -1,6 +1,8 @@
 import hashlib
 import json
 
+import pytest
+
 from proof.bundle import build_bundle, checkpoint_manifest, claim_sha256
 
 
@@ -86,6 +88,41 @@ def test_build_bundle_records_training_claims(tmp_path):
     assert manifest["train_hours"] == 4.2
     assert manifest["train_gpu"] == "NVIDIA RTX PRO 6000 Blackwell"
     assert manifest["dataset_url"] == "https://huggingface.co/datasets/miner/sparkproof-triton-v0"
+
+
+def test_build_bundle_rejects_missing_checkpoint(tmp_path):
+    # A typo'd / wrong --checkpoint must fail loudly, not silently emit an empty
+    # checkpoint_manifest and a vacuous claim_sha256.
+    scores_path = tmp_path / "candidate.json"
+    scores_path.write_text(json.dumps({"scores": {"gsm8k": 0.88}}))
+
+    with pytest.raises(NotADirectoryError):
+        build_bundle(
+            tmp_path / "does-not-exist",
+            scores_path,
+            tmp_path / "bundle",
+            run_id="run-x",
+            base_model="Qwen/Qwen3.5-4B",
+        )
+    # Nothing should be written for an invalid checkpoint.
+    assert not (tmp_path / "bundle" / "manifest.json").exists()
+
+
+def test_build_bundle_rejects_empty_checkpoint_dir(tmp_path):
+    # An existing but empty checkpoint directory is equally vacuous.
+    checkpoint_dir = tmp_path / "checkpoint"
+    checkpoint_dir.mkdir()
+    scores_path = tmp_path / "candidate.json"
+    scores_path.write_text(json.dumps({"scores": {"gsm8k": 0.88}}))
+
+    with pytest.raises(ValueError):
+        build_bundle(
+            checkpoint_dir,
+            scores_path,
+            tmp_path / "bundle",
+            run_id="run-x",
+            base_model="Qwen/Qwen3.5-4B",
+        )
 
 
 def test_build_bundle_records_mix_manifest(tmp_path):
