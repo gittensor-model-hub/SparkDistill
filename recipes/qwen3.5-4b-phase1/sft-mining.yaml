@@ -42,12 +42,17 @@ lora_target_modules:
 
 gradient_accumulation_steps: 2
 micro_batch_size: 1
-num_epochs: 5
+# 25-row mining set: 5 epochs at 1e-4 over-trains a 4B student and risks
+# catastrophic forgetting of base reasoning for no domain gain (frontier
+# triton exec-pass is already 0%). Gentler fine-tune preserves general-basket
+# quality while retaining Triton syntax — the recipe README already advises
+# "prefer 1-2 epochs unless the held-out composite keeps improving."
+num_epochs: 2
 optimizer: adamw_torch
 lr_scheduler: cosine
-learning_rate: 1.0e-4
+learning_rate: 5.0e-5
 warmup_ratio: 0.05
-weight_decay: 0.0
+weight_decay: 0.01
 
 bf16: true
 tf32: true
