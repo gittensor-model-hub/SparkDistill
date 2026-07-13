@@ -255,6 +255,7 @@ benchmark-specific labels:
 | `regression-mmlu-pro` | MMLU-Pro accuracy regressed |
 | `regression-aime24` | AIME accuracy regressed |
 | `regression-gpqa-diamond` | GPQA-Diamond accuracy regressed |
+| `regression-triton` | TritonBench composite regressed (Triton-track recipes) |
 
 If no benchmark improves by at least the eval threshold and any guarded benchmark
 regresses, the PR is rejected and may be auto-closed.

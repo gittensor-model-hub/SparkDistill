@@ -65,7 +65,7 @@ def score(candidate: dict[str, float], frontier: dict[str, float]) -> dict:
         "label": f"eval:{label}",
         "best_benchmark": best_key,
         "best_pct_delta": None if best_key is None else best_pct,
-        "regressions": [f"regression-{key}" for key in regressions],
+        "regressions": [f"regression-{BENCHMARKS[key].label_slug}" for key in regressions],
         "per_benchmark": per_benchmark,
     }
 

@@ -1,4 +1,39 @@
+from eval.benchmarks import BENCHMARKS
 from eval.score import score
+
+# The regression labels documented in docs/miner-guide.md. Kept here as the source of
+# truth so a benchmark key/label drift (issue #65) fails CI instead of shipping a label
+# the docs never declared.
+DOCUMENTED_REGRESSION_LABELS = {
+    "regression-bfcl",
+    "regression-gsm8k",
+    "regression-humaneval",
+    "regression-ifeval",
+    "regression-mmlu-pro",
+    "regression-aime24",
+    "regression-gpqa-diamond",
+    "regression-triton",
+}
+
+
+def test_every_benchmark_regression_label_is_documented():
+    emitted = {f"regression-{b.label_slug}" for b in BENCHMARKS.values()}
+    assert emitted == DOCUMENTED_REGRESSION_LABELS
+
+
+def test_regression_labels_use_hyphenated_slugs_not_lm_eval_keys():
+    for b in BENCHMARKS.values():
+        assert "_" not in b.label_slug, f"{b.key} label_slug leaks an lm-eval key: {b.label_slug}"
+
+
+def test_score_emits_documented_slug_for_underscored_keys():
+    # mmlu_pro and gpqa_diamond_cot_zeroshot keys must surface as the hyphenated labels.
+    candidate = {"mmlu_pro": 70.0, "gpqa_diamond_cot_zeroshot": 40.0}
+    frontier = {"mmlu_pro": 80.0, "gpqa_diamond_cot_zeroshot": 50.0}
+    report = score(candidate, frontier)
+    assert "regression-mmlu-pro" in report["regressions"]
+    assert "regression-gpqa-diamond" in report["regressions"]
+    assert set(report["regressions"]) <= DOCUMENTED_REGRESSION_LABELS
 
 
 def test_score_improvement_gets_expected_tier():

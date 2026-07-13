@@ -27,6 +27,11 @@ from pathlib import Path
 @dataclass(frozen=True)
 class Benchmark:
     key: str
+    # User-facing slug for the `regression-<slug>` PR label. Kept separate from `key`
+    # because `key` mirrors the lm-eval task name (underscores, filter suffixes like
+    # `gpqa_diamond_cot_zeroshot`), while labels use the hyphenated taxonomy documented
+    # in docs/miner-guide.md. Coupling the two leaks lm-eval internals into PR labels.
+    label_slug: str
     lm_eval_task: str
     metric: str
     regression_floor_pct: float  # max allowed drop vs. frontier before a regression-* label fires
@@ -38,12 +43,12 @@ class Benchmark:
 
 
 BENCHMARKS: dict[str, Benchmark] = {
-    "bfcl": Benchmark(key="bfcl", lm_eval_task="bfcl", metric="acc", regression_floor_pct=1.0),
-    "gsm8k": Benchmark(key="gsm8k", lm_eval_task="gsm8k", metric="exact_match", regression_floor_pct=1.0),
-    "humaneval": Benchmark(key="humaneval", lm_eval_task="humaneval", metric="pass@1", regression_floor_pct=1.0),
-    "ifeval": Benchmark(key="ifeval", lm_eval_task="ifeval", metric="inst_level_strict_acc", regression_floor_pct=1.0),
-    "mmlu_pro": Benchmark(key="mmlu_pro", lm_eval_task="mmlu_pro", metric="acc", regression_floor_pct=1.0),
-    "aime24": Benchmark(key="aime24", lm_eval_task="aime24", metric="exact_match", regression_floor_pct=2.0),
+    "bfcl": Benchmark(key="bfcl", label_slug="bfcl", lm_eval_task="bfcl", metric="acc", regression_floor_pct=1.0),
+    "gsm8k": Benchmark(key="gsm8k", label_slug="gsm8k", lm_eval_task="gsm8k", metric="exact_match", regression_floor_pct=1.0),
+    "humaneval": Benchmark(key="humaneval", label_slug="humaneval", lm_eval_task="humaneval", metric="pass@1", regression_floor_pct=1.0),
+    "ifeval": Benchmark(key="ifeval", label_slug="ifeval", lm_eval_task="ifeval", metric="inst_level_strict_acc", regression_floor_pct=1.0),
+    "mmlu_pro": Benchmark(key="mmlu_pro", label_slug="mmlu-pro", lm_eval_task="mmlu_pro", metric="acc", regression_floor_pct=1.0),
+    "aime24": Benchmark(key="aime24", label_slug="aime24", lm_eval_task="aime24", metric="exact_match", regression_floor_pct=2.0),
     # lm-eval applies strict/flexible-extract filters on top of this task's base
     # "exact_match" metric; depending on the installed lm-eval version the results.json
     # key may come back suffixed as "exact_match,flexible-extract" instead of bare
@@ -51,6 +56,7 @@ BENCHMARKS: dict[str, Benchmark] = {
     # key blindly, and adjust here if `run_benchmark` KeyErrors on it.
     "gpqa_diamond_cot_zeroshot": Benchmark(
         key="gpqa_diamond_cot_zeroshot",
+        label_slug="gpqa-diamond",
         lm_eval_task="gpqa_diamond_cot_zeroshot",
         metric="exact_match",
         regression_floor_pct=2.0,
@@ -61,7 +67,7 @@ BENCHMARKS: dict[str, Benchmark] = {
     # claim_tolerance_pct: observed honest cross-server drift of 2.1pp on the current
     # 3-problem quick set — tighten back toward the 2pp default as problems grow.
     "triton": Benchmark(
-        key="triton", lm_eval_task="", metric="avg_composite", regression_floor_pct=2.0, claim_tolerance_pct=5.0
+        key="triton", label_slug="triton", lm_eval_task="", metric="avg_composite", regression_floor_pct=2.0, claim_tolerance_pct=5.0
     ),
 }
 
