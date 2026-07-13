@@ -86,6 +86,8 @@ def prepare_train_recipe(
 
     datasets = cfg.get("datasets")
     if isinstance(datasets, list):
+        total_rows = 0
+        counted_sources = 0
         for entry in datasets:
             if not isinstance(entry, dict):
                 continue
@@ -94,8 +96,16 @@ def prepare_train_recipe(
                 entry["path"] = _resolve_path(data_path, root)
             data_path = entry.get("path")
             if isinstance(data_path, str) and data_path.endswith(".jsonl"):
-                row_count = count_jsonl_rows(Path(data_path))
-                notes.append(f"dataset rows: {row_count}")
+                rows = count_jsonl_rows(Path(data_path))
+                total_rows += rows
+                counted_sources += 1
+                notes.append(f"dataset rows: {rows}")
+        if counted_sources:
+            # Axolotl concatenates all datasets, so the multipack guard below must
+            # look at the combined row count, not just the last shard's.
+            row_count = total_rows
+            if counted_sources > 1:
+                notes.append(f"dataset rows (total): {total_rows}")
 
     if row_count is not None and row_count < MIN_SAMPLE_PACKING_ROWS:
         if cfg.get("sample_packing"):
