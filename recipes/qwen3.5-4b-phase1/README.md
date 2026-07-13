@@ -36,6 +36,13 @@ The pipeline runs in two stages:
 `sft.yaml` trains on that second file via Axolotl `type: chat_template` and
 `roles_to_train: ["assistant"]` (assistant-only loss).
 
+Optionally clean the raw trajectories between those two stages with
+`teacher/filter.py` (`scripts/filter_trajectories.sh`): it drops empty,
+malformed, and refusal rows — and, opt-in, over-length or duplicate-prompt
+rows — before formatting. It is conservative by default (only structurally
+broken rows and refusals), so a plain run never discards a legitimate short
+answer.
+
 ### Reasoning-capture limitation
 
 Not every teacher can produce a `reasoning` value: `AnthropicTeacher` enables
@@ -65,8 +72,13 @@ crashes).
 ```bash
 scripts/generate_trajectories.sh --prompts data/prompts/phase1.jsonl --out data/processed/phase1_trajectories.jsonl
 
-scripts/prepare_sft_data.sh \
+# optional: drop empty/malformed/refusal rows before formatting
+scripts/filter_trajectories.sh \
   --in data/processed/phase1_trajectories.jsonl \
+  --out data/processed/phase1_trajectories.filtered.jsonl
+
+scripts/prepare_sft_data.sh \
+  --in data/processed/phase1_trajectories.filtered.jsonl \
   --out data/processed/phase1_sft.jsonl \
   --format messages
 
@@ -125,9 +137,10 @@ At `sequence_len: 8192`, multiply wall time by ~1.5–2× if packing length appr
 
 ## Known gaps (contributions welcome, see `CONTRIBUTING.md`)
 
-- No data-quality filtering pass on raw teacher trajectories yet (e.g.
-  length/format/refusal filtering) — recipe currently trains on whatever
-  `teacher/generate.py` emits.
+- `teacher/filter.py` covers structural, length, refusal, and exact-prompt
+  filtering, but there is no *semantic* quality pass yet (e.g. scoring answer
+  correctness or reasoning quality) — a filtered mix still trains on whatever
+  survives those rules.
 - **`CutCrossEntropyPlugin`** — remove from `sft.yaml` if your Axolotl build lacks it.
 - **Linear attention modules** (`linear_attn.*`) — add to `lora_target_modules` only
   if you need to adapt Gated DeltaNet paths; start with standard attn + MLP.
