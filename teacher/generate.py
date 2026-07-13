@@ -32,14 +32,17 @@ def _iter_prompts(path: Path, limit: int | None) -> Iterator[dict]:
 def generate_trajectories(
     prompts_path: Path,
     providers: list[str],
-    model: str | None,
     max_tokens: int,
     temperature: float,
     limit: int | None,
     concurrency: int,
     thinking_budget: int | None,
 ) -> Iterator[Trajectory]:
-    teachers = [get_teacher(name, model=model) for name in providers]
+    # Each provider is pinned to a single teacher model, so `--model` is ignored
+    # (see main()'s argument help). Forwarding it here would raise from get_teacher
+    # whenever it doesn't match a provider's pin — and with the default two-provider
+    # basket no single value can match both, so any --model would abort the run.
+    teachers = [get_teacher(name) for name in providers]
     prompts = list(_iter_prompts(prompts_path, limit))
 
     def _run(teacher, record: dict) -> Trajectory:
@@ -98,7 +101,6 @@ def main(argv: list[str] | None = None) -> int:
         for trajectory in generate_trajectories(
             args.prompts,
             providers,
-            args.model,
             args.max_tokens,
             args.temperature,
             args.limit,
