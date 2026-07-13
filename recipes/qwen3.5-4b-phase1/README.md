@@ -43,7 +43,9 @@ Claude Fable 5's extended thinking and captures the `thinking` block — but GPT
 via `OpenAICompatibleTeacher` may expose no capturable reasoning tokens over chat
 completions. Trajectories from such teachers fall back to training on the response
 alone (no `<think>` block). Weight the `--provider` mix toward
-`anthropic` if reasoning-capture rate matters for a given run.
+`anthropic` if reasoning-capture rate matters for a given run — measure the actual
+rate (overall and per provider) on a generated set with
+`teacher/report.py` (`scripts/report_trajectories.sh`).
 
 ## Canonical mining dataset (HF)
 
