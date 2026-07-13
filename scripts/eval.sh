@@ -26,7 +26,11 @@ if [ -z "$checkpoint" ]; then
 fi
 
 candidate_scores="eval/results/candidate.json"
-uv run python -m eval.harness --checkpoint "$checkpoint" --out "$candidate_scores" "${extra_args[@]:-}"
+if [ "${#extra_args[@]}" -gt 0 ]; then
+  uv run python -m eval.harness --checkpoint "$checkpoint" --out "$candidate_scores" "${extra_args[@]}"
+else
+  uv run python -m eval.harness --checkpoint "$checkpoint" --out "$candidate_scores"
+fi
 
 if [ "$compare_frontier" = true ]; then
   if [ ! -f "$frontier_scores" ]; then
