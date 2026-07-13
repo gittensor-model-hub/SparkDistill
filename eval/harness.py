@@ -40,6 +40,18 @@ def main(argv: list[str] | None = None) -> int:
     benchmarks = args.benchmarks or sorted(BENCHMARKS)
     scores = run_harness(args.checkpoint, benchmarks, args.work_dir, limit=args.limit)
 
+    # run_harness keeps only each benchmark's single headline float, but the triton
+    # adapter writes richer sub-metrics to <work_dir>/triton.json — notably
+    # triton_quick, the quick-subset composite eval.verify compares its level-1-only
+    # re-run against. Without triton_quick in the claim, eval.verify falls back to
+    # comparing a full-run composite against that quick re-run and rejects honest
+    # triton claims. Merge the sidecar sub-metrics back in so the claim is verifiable
+    # like-for-like; these extra keys are ignored by eval.score/eval.verify, which
+    # only iterate registered BENCHMARKS.
+    if "triton" in benchmarks:
+        triton_detail = json.loads((args.work_dir / "triton.json").read_text())
+        scores = {**triton_detail.get("scores", {}), **scores}
+
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps({"checkpoint": args.checkpoint, "scores": scores}, indent=2))
     print(f"wrote scores for {args.checkpoint} to {args.out}", file=sys.stderr)
