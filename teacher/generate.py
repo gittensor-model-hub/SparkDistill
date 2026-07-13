@@ -19,14 +19,16 @@ from teacher.providers import ANTHROPIC_TEACHER_MODEL, OPENAI_TEACHER_MODEL, Tra
 
 
 def _iter_prompts(path: Path, limit: int | None) -> Iterator[dict]:
+    yielded = 0
     with path.open() as f:
-        for i, line in enumerate(f):
+        for line in f:
             line = line.strip()
             if not line:
                 continue
-            if limit is not None and i >= limit:
+            if limit is not None and yielded >= limit:
                 break
             yield json.loads(line)
+            yielded += 1
 
 
 def generate_trajectories(
