@@ -23,7 +23,10 @@ from typing import Any
 def _assistant_content(trajectory: dict[str, Any]) -> str:
     reasoning = trajectory.get("reasoning")
     response = trajectory["response"].strip()
-    if reasoning:
+    # Whitespace-only reasoning carries no content: fall back to the bare
+    # response like the empty-string case, instead of emitting a degenerate
+    # empty `<think></think>` wrapper the student would learn to reproduce.
+    if reasoning and reasoning.strip():
         return f"<think>\n{reasoning.strip()}\n</think>\n\n{response}"
     return response
 

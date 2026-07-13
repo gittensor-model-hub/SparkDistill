@@ -33,6 +33,25 @@ def test_to_sft_record_falls_back_when_reasoning_is_empty_string():
     assert record["response"] == "4"
 
 
+def test_to_sft_record_falls_back_when_reasoning_is_whitespace_only():
+    trajectory = {"prompt": "What is 2 + 2?", "response": "4", "reasoning": "   \n  "}
+
+    record = to_sft_record(trajectory)
+
+    assert record["response"] == "4"
+
+
+def test_to_messages_record_falls_back_when_reasoning_is_whitespace_only():
+    from teacher.format import to_messages_record
+
+    trajectory = {"prompt": "What is 2 + 2?", "response": "4", "reasoning": "  \t "}
+
+    record = to_messages_record(trajectory)
+
+    assert record["messages"][-1]["content"] == "4"
+    assert "<think>" not in record["messages"][-1]["content"]
+
+
 def test_to_messages_record_uses_qwen3_chat_roles():
     from teacher.format import to_messages_record
 
