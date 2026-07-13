@@ -1,5 +1,8 @@
+import fnmatch
 import hashlib
 import json
+import shutil
+import types
 from pathlib import Path
 
 import pytest
@@ -8,6 +11,7 @@ from eval.mix_registry import (
     MIX_VERSION,
     load_registry,
     mix_registry_datasets,
+    resolve_proof_dir,
     select_registry_entries,
     verify_mix_manifest,
 )
@@ -154,6 +158,46 @@ def test_verify_mix_manifest_rejects_unknown_component(tmp_path: Path):
     report = verify_mix_manifest(manifest_path, registry_path=registry_path)
     assert report["verified"] is False
     assert any("not in registry" in issue for issue in report["issues"])
+
+
+def _fake_hf_module(source_proof: Path):
+    """Fake huggingface_hub whose snapshot_download honors allow_patterns like the real one."""
+
+    def snapshot_download(repo_id, repo_type=None, allow_patterns=None, cache_dir=None):
+        dest = source_proof.parent / "downloaded"
+        (dest / "proof").mkdir(parents=True, exist_ok=True)
+        for f in source_proof.glob("*"):
+            rel = f"proof/{f.name}"
+            if allow_patterns and not any(fnmatch.fnmatch(rel, pat) for pat in allow_patterns):
+                continue
+            shutil.copy(f, dest / "proof" / f.name)
+        return str(dest)
+
+    module = types.ModuleType("huggingface_hub")
+    module.snapshot_download = snapshot_download
+    return module
+
+
+def test_resolve_proof_dir_downloads_full_bundle(tmp_path: Path, monkeypatch):
+    # The default (no download_proof) path must fetch the whole proof/ dir so that
+    # check_proof_dir sees the full bundle, not just trajectories + dataset_manifest.
+    proof, _ = _write_proof_dir(tmp_path, rows=2)
+    # Derive the sha from the on-disk bytes so the bundle is internally consistent
+    # regardless of the platform's newline translation.
+    sha = hashlib.sha256((proof / "trajectories.jsonl").read_bytes()).hexdigest()
+    manifest = json.loads((proof / "dataset_manifest.json").read_text(encoding="utf-8"))
+    manifest["trajectories_sha256"] = sha
+    (proof / "dataset_manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    monkeypatch.setitem(__import__("sys").modules, "huggingface_hub", _fake_hf_module(proof))
+
+    entry = _registry_entry("alice", sha, rows=2)
+    resolved = resolve_proof_dir(entry)
+
+    # Files check_proof_dir requires that the old 2-file allow_patterns would have dropped.
+    assert (resolved / "manifest.json").exists()
+    assert (resolved / "gpu_attestation.json").exists()
+    assert (resolved / "novelty_report.json").exists()
+    assert (resolved / "trajectories.jsonl").exists()
 
 
 def test_load_registry_validates_entries(tmp_path: Path):

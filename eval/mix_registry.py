@@ -247,7 +247,10 @@ def resolve_proof_dir(
             snapshot_download(
                 repo_id=repo,
                 repo_type="dataset",
-                allow_patterns=["proof/trajectories.jsonl", "proof/dataset_manifest.json"],
+                # Fetch the whole proof/ dir: check_proof_dir below requires the full
+                # bundle (all REQUIRED_PROOF_FILES + novelty_report.json), not just the
+                # trajectories/manifest pair. Matches eval.dataset_verify._resolve_proof_dir.
+                allow_patterns=["proof/*"],
                 cache_dir=cache_dir,
             )
         )
