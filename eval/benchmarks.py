@@ -14,7 +14,11 @@ The `triton` entry is the exception: it is the domain-expertise signal for the
 Triton track and runs through the vendored TritonBench harness (`eval.triton_bench`)
 instead of lm-eval — each generated kernel is compiled and executed on the GPU. The
 general basket can't measure kernel skill; it keeps its regression-guard role while
-`triton` carries the improvement signal for Triton-focused recipes."""
+`triton` carries the improvement signal for Triton-focused recipes.
+
+Score-unit convention: every benchmark score in this pipeline is a fraction in [0, 1]
+(an accuracy / pass-rate / composite), never a 0-100 percentage. `assert_fraction_scores`
+enforces this at ingestion — see its docstring for why the distinction is load-bearing."""
 
 from __future__ import annotations
 
@@ -70,6 +74,24 @@ BENCHMARKS: dict[str, Benchmark] = {
         key="triton", label_slug="triton", lm_eval_task="", metric="avg_composite", regression_floor_pct=2.0, claim_tolerance_pct=5.0
     ),
 }
+
+
+def assert_fraction_scores(scores: dict[str, float], source: str) -> None:
+    """Enforce the pipeline-wide score-unit convention: every metric is a **fraction in
+    `[0, 1]`**, never a `0`–`100` percentage.
+
+    This is the invariant `runs/frontier.json` and the lm-eval / TritonBench adapters
+    already follow, but it was implicit. `eval.verify.check_claim` converts a claim/re-run
+    gap to percentage points with a hardcoded `* 100.0`, so a percentage-unit score would
+    silently make its tolerance 100x too tight and reject honest submissions. Fail loudly
+    at ingestion instead of scoring the wrong unit. See docs/miner-guide.md (proof-bundle
+    score format)."""
+    out_of_range = {key: value for key, value in scores.items() if not 0.0 <= float(value) <= 1.0}
+    if out_of_range:
+        raise ValueError(
+            f"{source} scores must be fractions in [0, 1], got {out_of_range}; "
+            "eval scores are accuracies / pass-rates, not 0-100 percentages"
+        )
 
 
 def run_benchmark(benchmark: Benchmark, model_path: str, output_dir: Path, limit: int | None = None) -> float:

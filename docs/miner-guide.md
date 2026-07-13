@@ -332,6 +332,11 @@ python -m eval.attestation --nonce <claim_sha256> --out runs/<run-id>/attestatio
 python -m proof.publish --bundle proof/_bundles/<run-id> --repo-id <your-hf-username>/sparkdistill-<run-id>
 ```
 
+**Score units:** every benchmark score in `candidate.json` / the bundle is a **fraction in
+`[0, 1]`** (an accuracy / pass-rate / composite), matching `runs/frontier.json` — never a
+`0`–`100` percentage. `eval.harness` already emits fractions; if you hand-assemble scores,
+keep them in `[0, 1]` or verification rejects the claim outright.
+
 Put the printed Hugging Face URL — and, if you ran it, your attestation.json — in your
 PR. The validator runs `eval.verify`: it reproduces your checkpoint locally from the
 recipe + dataset (`--checkpoint <local-dir>`), does a small held-out re-run of your

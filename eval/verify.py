@@ -22,7 +22,7 @@ import sys
 from contextlib import contextmanager
 from pathlib import Path
 
-from eval.benchmarks import BENCHMARKS
+from eval.benchmarks import BENCHMARKS, assert_fraction_scores
 from eval.dataset_verify import _sha256_file
 from eval.harness import run_harness
 from eval.mix_registry import REGISTRY_PATH, verify_mix_manifest
@@ -94,7 +94,12 @@ def check_claim(claimed: dict[str, float], rerun: dict[str, float], tolerance_pc
     compared against the claim's `triton_quick` (the same problem subset) when
     present — a full-run composite covers harder levels and would mismatch an
     honest claim systematically.
+
+    Both score maps must be fractions in [0, 1]; the `* 100.0` below turns the gap into
+    percentage points, so a 0-100 percentage would make the tolerance 100x too tight.
     """
+    assert_fraction_scores(claimed, "claimed (eval_scores.json)")
+    assert_fraction_scores(rerun, "re-run (harness)")
     mismatches = []
     for key, rerun_value in rerun.items():
         claimed_value = claimed.get(key)

@@ -48,6 +48,15 @@ def test_check_claim_beyond_tolerance_flags_mismatch():
     assert check_claim(claimed, rerun, tolerance_pct=2.0) == ["gsm8k"]
 
 
+def test_check_claim_rejects_percentage_unit_scores():
+    # The `* 100.0` pp conversion assumes fractions; a 0-100 percentage would make the
+    # tolerance 100x too tight and reject honest submissions (issue #72). Fail loudly.
+    import pytest
+
+    with pytest.raises(ValueError, match=r"fractions in \[0, 1\]"):
+        check_claim({"gsm8k": 88.0}, {"gsm8k": 86.0}, tolerance_pct=2.0)
+
+
 def test_check_claim_ignores_benchmarks_not_claimed():
     claimed = {"gsm8k": 0.88}
     rerun = {"gsm8k": 0.88, "humaneval": 0.10}

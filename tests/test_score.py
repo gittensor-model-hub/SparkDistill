@@ -28,8 +28,8 @@ def test_regression_labels_use_hyphenated_slugs_not_lm_eval_keys():
 
 def test_score_emits_documented_slug_for_underscored_keys():
     # mmlu_pro and gpqa_diamond_cot_zeroshot keys must surface as the hyphenated labels.
-    candidate = {"mmlu_pro": 70.0, "gpqa_diamond_cot_zeroshot": 40.0}
-    frontier = {"mmlu_pro": 80.0, "gpqa_diamond_cot_zeroshot": 50.0}
+    candidate = {"mmlu_pro": 0.70, "gpqa_diamond_cot_zeroshot": 0.40}
+    frontier = {"mmlu_pro": 0.80, "gpqa_diamond_cot_zeroshot": 0.50}
     report = score(candidate, frontier)
     assert "regression-mmlu-pro" in report["regressions"]
     assert "regression-gpqa-diamond" in report["regressions"]
@@ -37,24 +37,33 @@ def test_score_emits_documented_slug_for_underscored_keys():
 
 
 def test_score_improvement_gets_expected_tier():
-    candidate = {"gsm8k": 88.0, "humaneval": 80.0}
-    frontier = {"gsm8k": 80.0, "humaneval": 80.0}
+    # Scores are fractions in [0, 1] (issue #72), matching runs/frontier.json.
+    candidate = {"gsm8k": 0.90, "humaneval": 0.80}
+    frontier = {"gsm8k": 0.80, "humaneval": 0.80}
     report = score(candidate, frontier)
-    assert report["label"] == "eval:L"  # (88-80)/80 = 10.0% -> L band
+    assert report["label"] == "eval:L"  # (0.90-0.80)/0.80 = 12.5% -> L band
     assert report["best_benchmark"] == "gsm8k"
     assert report["regressions"] == []
 
 
 def test_score_rejects_on_regression_beyond_floor():
-    candidate = {"gsm8k": 88.0, "humaneval": 70.0}
-    frontier = {"gsm8k": 80.0, "humaneval": 80.0}
+    candidate = {"gsm8k": 0.88, "humaneval": 0.70}
+    frontier = {"gsm8k": 0.80, "humaneval": 0.80}
     report = score(candidate, frontier)
     assert report["label"] == "eval:REJECT"
     assert "regression-humaneval" in report["regressions"]
 
 
 def test_score_none_below_minimum_tier():
-    candidate = {"gsm8k": 80.5}
-    frontier = {"gsm8k": 80.0}
+    candidate = {"gsm8k": 0.805}
+    frontier = {"gsm8k": 0.80}
     report = score(candidate, frontier)
     assert report["label"] == "eval:none"
+
+
+def test_score_rejects_percentage_unit_scores():
+    # Guarding the convention: 0-100 percentages must fail loudly, not silently mis-tier.
+    import pytest
+
+    with pytest.raises(ValueError, match=r"fractions in \[0, 1\]"):
+        score({"gsm8k": 88.0}, {"gsm8k": 80.0})
