@@ -56,7 +56,12 @@ def export_mining_sft(
             messages = row.get("messages")
             if not isinstance(messages, list) or not messages:
                 raise ValueError(f"{repo} row missing non-empty messages list")
-            handle.write(json.dumps({"messages": messages}, ensure_ascii=False) + "\n")
+            record: dict[str, Any] = {"messages": messages}
+            metadata = row.get("metadata")
+            if metadata:
+                record["metadata"] = metadata
+            # Must match mix_registry mining_sft.jsonl serialization for sft_sha256 pin checks.
+            handle.write(json.dumps(record, separators=(",", ":")) + "\n")
             rows_written += 1
 
     if rows_written == 0:

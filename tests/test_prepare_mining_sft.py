@@ -15,10 +15,13 @@ def _stub_remote_manifest():
     }
 
 
-def test_export_mining_sft_writes_messages_only(tmp_path: Path, monkeypatch):
+def test_export_mining_sft_writes_canonical_jsonl_format(tmp_path: Path, monkeypatch):
     rows = [
         {"messages": [{"role": "user", "content": "a"}, {"role": "assistant", "content": "b"}]},
-        {"messages": [{"role": "user", "content": "c"}, {"role": "assistant", "content": "d"}], "metadata": {"x": 1}},
+        {
+            "messages": [{"role": "user", "content": "c"}, {"role": "assistant", "content": "d"}],
+            "metadata": {"mix_source_miner": "alice"},
+        },
     ]
 
     class _Split:
@@ -55,8 +58,9 @@ def test_export_mining_sft_writes_messages_only(tmp_path: Path, monkeypatch):
     first = json.loads(lines[0])
     second = json.loads(lines[1])
     assert "metadata" not in first
-    assert "metadata" not in second
+    assert second["metadata"]["mix_source_miner"] == "alice"
     assert first["messages"][0]["content"] == "a"
+    assert lines[0] == json.dumps(first, separators=(",", ":"))
 
     mix_manifest = json.loads((tmp_path / "mix_manifest.json").read_text(encoding="utf-8"))
     assert mix_manifest["sft_sha256"] == "a" * 64
