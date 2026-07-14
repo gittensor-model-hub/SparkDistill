@@ -1,14 +1,25 @@
 # Axolotl SFT — Phase 1 student: Qwen3.5-4B (canonical mining mix only).
 #
-# Production training-track submissions must use the pinned canonical dataset:
-#   scripts/prepare_mining_sft.sh
-#   scripts/train.sh recipes/qwen3.5-4b-phase1/sft.yaml
+# Track-A variant of recipes/qwen3.5-4b-phase1/sft.yaml. Same pinned canonical
+# dataset (sft_sha256 335849b1…c02ce) — recipe knobs only.
 #
-# Local teacher trajectories (phase1_sft.jsonl) are for dev smoke tests only and
-# are rejected by the training-track CI gate.
+# Rationale vs. baseline (frontier PR #40 = eval:BASELINE; triton exec/correctness = 0.0):
+#   * sequence_len 4096 -> 8192 : recipe README notes teacher traces are NOT
+#       length-filtered/truncated; 4096 was cutting off reasoning + kernel bodies.
+#       Capturing full <think> + Triton code is the single biggest lever on the
+#       triton composite (where exec pass rate is pinned at 0).
+#   * lora_r/alpha 64/128 -> 128/256 : more capacity for kernel-code reasoning.
+#   * num_epochs 2 -> 3 : more passes over the tiny (133-row) mix.
+#   * learning_rate 1.0e-4 -> 7.0e-5 + weight_decay 0.0 -> 0.01 : with bigger rank
+#       and an extra epoch on 133 rows, regularize to protect the gsm8k floor (1%).
+#   * micro_batch_size 2 -> 1, grad_accum 4 -> 8 : fit 8192 seq on a 32 GB 5090
+#       while keeping effective batch = 8 (identical optimization signal).
+#   * seed pinned : validators retrain from recipe+dataset — win must be reproducible.
 
 base_model: Qwen/Qwen3.5-4B
 trust_remote_code: true
+
+seed: 42
 
 chat_template: qwen3_5
 roles_to_train: ["assistant"]
@@ -22,14 +33,13 @@ dataset_prepared_path: data/prepared/qwen3.5-4b-phase1
 val_set_size: 0.02
 output_dir: outputs/qwen3.5-4b-phase1
 
-sequence_len: 4096
-sample_packing: true
+sequence_len: 8192
+sample_packing: false          # 133-row mix; train.sh disables packing on small jsonl anyway
 pad_to_sequence_len: true
 
-# BF16 LoRA fits comfortably on RTX PRO 6000 Blackwell (96 GB) for 4B dense.
 adapter: lora
-lora_r: 64
-lora_alpha: 128
+lora_r: 128
+lora_alpha: 256
 lora_dropout: 0.05
 lora_target_modules:
   - q_proj
@@ -40,21 +50,21 @@ lora_target_modules:
   - up_proj
   - down_proj
 
-gradient_accumulation_steps: 4
-micro_batch_size: 2
-num_epochs: 2
+gradient_accumulation_steps: 8
+micro_batch_size: 1
+num_epochs: 3
 optimizer: adamw_torch
 lr_scheduler: cosine
-learning_rate: 1.0e-4
-warmup_ratio: 0.03
-weight_decay: 0.0
+learning_rate: 7.0e-5
+warmup_ratio: 0.05
+weight_decay: 0.01
 
 bf16: true
 tf32: true
 gradient_checkpointing: true
 gradient_checkpointing_kwargs:
   use_reentrant: false
-attn_implementation: flash_attention_2
+attn_implementation: flash_attention_2   # train.sh falls back to SDPA on Blackwell (SM>=10)
 
 evals_per_epoch: 4
 saves_per_epoch: 2
