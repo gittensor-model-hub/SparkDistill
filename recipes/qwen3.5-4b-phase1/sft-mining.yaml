@@ -49,6 +49,14 @@ learning_rate: 1.0e-4
 warmup_ratio: 0.05
 weight_decay: 0.0
 
+# NEFTune (Jain et al., ICLR 2024): add uniform noise to the embedding forward
+# pass during training only. On small SFT sets it is a well-established, near
+# zero-cost regularizer that improves generalization and instruction-following
+# (IFEval-style) while guarding the general basket against the rote memorization
+# a 25-row mix at 5 epochs is prone to. Inference is unaffected (noise is
+# training-only), so it cannot regress the served checkpoint's decoding.
+neftune_noise_alpha: 5
+
 bf16: true
 tf32: true
 gradient_checkpointing: true
