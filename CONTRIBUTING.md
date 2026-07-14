@@ -79,9 +79,17 @@ in git.
    Build the line with `scripts/registry_line.sh --bundle <dir> --miner <handle> --repo-id <org>/<repo>`.
 4. Registry CI verifies the bundle and merges at `dataset:xs` (≥25 verified rows).
 
-Training PRs cite a merged registry `hf_url` with `proof.bundle --dataset-url`. A PR whose
-recipe can't be reproduced because the dataset was never shared or verified should be treated
-as incomplete, even if local eval numbers look good.
+Training PRs train on the **single pinned canonical mining dataset** only. Cite
+[`datasets/canonical.json`](datasets/canonical.json) in your PR body (`hf_url` +
+`mix_manifest.sft_sha256`) and set `proof.bundle --dataset-url` to the same URL. Recipes
+must reference `data/processed/sparkproof-mining_sft.jsonl` — prepare it locally with
+`scripts/prepare_mining_sft.sh` (verifies the Hugging Face pin). Training-track PRs that
+add local generators (`eval/gen_*.py`), private blends, or non-canonical recipe paths are
+rejected by CI. New rows enter through the dataset track first; registry merges refresh
+the pin on `main` automatically.
+
+A PR whose recipe can't be reproduced because it uses unpublished or non-canonical data
+should be treated as incomplete, even if local eval numbers look good.
 
 ## Proof of training (optional fast path for eval verification)
 
@@ -145,18 +153,22 @@ verification behavior are held for manual review — this protects the eval loop
 being tuned to inflate scores rather than to improve real quality. In particular, only
 the eval bot appends to `runs/ledger.jsonl` — it is not an append-anything log.
 
-## Canonical mining dataset
+## Canonical mining dataset (training track)
 
-Registry CI aggregates all merged datasets into one Hugging Face repo before each merge
-(default [`gittensor-model-hub/sparkproof-mining`](https://huggingface.co/datasets/gittensor-model-hub/sparkproof-mining)).
-Training PRs should cite that URL via `proof.bundle --dataset-url`. Local re-mix:
+Registry CI aggregates all merged datasets into one Hugging Face repo
+([`gittensor-model-hub/sparkproof-mining`](https://huggingface.co/datasets/gittensor-model-hub/sparkproof-mining)).
+The active pin lives in [`datasets/canonical.json`](datasets/canonical.json) and is refreshed
+on `main` after each registry merge.
+
+**Training-track rule:** every miner trains on exactly this pinned dataset. Prepare locally:
 
 ```bash
-scripts/mix_registry.sh mix --registry datasets/registry.jsonl --all \
-  --out data/processed/mix_sft.jsonl \
-  --manifest-out data/processed/mix_manifest.json \
-  --sparkproof-root ../SparkProof
+scripts/prepare_mining_sft.sh
+# writes data/processed/sparkproof-mining_sft.jsonl after verifying the HF pin
 ```
+
+Do not re-mix registry rows into a private training file for competition PRs. To add new
+rows, run SparkProof and open a dataset-track registry PR first.
 
 ## SparkProof: Blackwell-verified Triton datasets
 

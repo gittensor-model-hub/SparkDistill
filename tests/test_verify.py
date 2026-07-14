@@ -150,11 +150,14 @@ def test_no_frontier_yields_baseline_label(tmp_path, monkeypatch):
     import json
 
     import eval.verify as v
+    from eval.canonical_dataset import canonical_hf_url
 
     bundle = tmp_path / "bundle"
     (bundle / "checkpoint").mkdir(parents=True)
     (bundle / "checkpoint" / "w.bin").write_text("w")
-    (bundle / "manifest.json").write_text(json.dumps({"run_id": "r1"}))
+    (bundle / "manifest.json").write_text(
+        json.dumps({"run_id": "r1", "dataset_url": canonical_hf_url()})
+    )
     (bundle / "eval_scores.json").write_text(json.dumps({"scores": {"gsm8k": 0.6}}))
     monkeypatch.setattr(v, "run_harness", lambda *a, **k: {"gsm8k": 0.6})
 

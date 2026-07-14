@@ -23,6 +23,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from eval.benchmarks import BENCHMARKS, assert_fraction_scores
+from eval.canonical_dataset import canonical_hf_url, canonical_sft_sha256
 from eval.dataset_verify import _sha256_file
 from eval.harness import run_harness
 from eval.mix_registry import REGISTRY_PATH, verify_mix_manifest
@@ -60,6 +61,43 @@ def check_training_claims(
         claims_blob = json.dumps(attestation.get("claims") or {}).lower()
         if claims_blob != "{}" and "pro 6000" not in claims_blob and "gb20" not in claims_blob:
             issues.append("attestation claims do not corroborate the claimed RTX PRO 6000 GPU")
+    return issues
+
+
+def check_canonical_dataset_claim(manifest: dict, *, bundle_dir: Path | None = None) -> list[str]:
+    """Training-track bundles must cite the pinned canonical mining dataset."""
+    issues: list[str] = []
+    dataset_url = manifest.get("dataset_url")
+    try:
+        expected_url = canonical_hf_url().rstrip("/")
+    except (FileNotFoundError, ValueError):
+        return issues
+
+    if not dataset_url:
+        issues.append(
+            f"training bundle must set dataset_url to the canonical mining dataset ({expected_url})"
+        )
+        return issues
+
+    if str(dataset_url).rstrip("/") != expected_url:
+        issues.append(
+            f"dataset_url must be canonical {expected_url}, got {dataset_url!r}; "
+            "training-track submissions may not use private or synthetic datasets"
+        )
+
+    if bundle_dir is not None:
+        mix_path = bundle_dir / "mix_manifest.json"
+        if mix_path.exists():
+            mix_data = json.loads(mix_path.read_text(encoding="utf-8"))
+            remote_sft_sha = mix_data.get("sft_sha256")
+            try:
+                expected_sft_sha = canonical_sft_sha256()
+            except ValueError:
+                return issues
+            if remote_sft_sha != expected_sft_sha:
+                issues.append(
+                    "bundle mix_manifest.sft_sha256 does not match datasets/canonical.json pin"
+                )
     return issues
 
 
@@ -274,6 +312,16 @@ def verify_submission(
             "verified": False,
             "reason": "mix_provenance_failed",
             "issues": mix_issues,
+            "label": "eval:REJECT",
+            "run_id": manifest.get("run_id"),
+        }
+
+    canonical_issues = check_canonical_dataset_claim(manifest, bundle_dir=bundle_dir)
+    if canonical_issues:
+        return {
+            "verified": False,
+            "reason": "canonical_dataset_failed",
+            "issues": canonical_issues,
             "label": "eval:REJECT",
             "run_id": manifest.get("run_id"),
         }

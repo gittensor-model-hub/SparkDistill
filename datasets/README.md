@@ -71,13 +71,16 @@ python -m eval.dataset_verify --hf-repo <user>/<repo> \
 | `dataset:none` | < 25 (proof may be valid, but not merged/rewarded) |
 | `dataset:REJECT` | attestation, release-gate, hash, or policy failure |
 
-Merged datasets become fair game for the training track: any training miner may cite a
-registry entry's `hf_url` as the dataset behind a proof-of-training PR, or combine
-multiple entries with `scripts/mix_registry.sh` (see *Cross-miner mixing* below).
+Merged datasets feed the **single canonical mining dataset** used by every training-track
+PR. After each registry merge, CI refreshes [`canonical.json`](canonical.json) with the
+pinned `mix_manifest.sft_sha256` and row count.
 
-## Canonical mining dataset
+## Canonical mining dataset (training track)
 
-**Default HF repo:** [`gittensor-model-hub/sparkproof-mining`](https://huggingface.co/datasets/gittensor-model-hub/sparkproof-mining)
+**HF repo:** [`gittensor-model-hub/sparkproof-mining`](https://huggingface.co/datasets/gittensor-model-hub/sparkproof-mining)
+
+**In-repo pin:** [`canonical.json`](canonical.json) — `repo_id`, `hf_url`,
+`training_dataset_path`, and `mix_manifest.sft_sha256`.
 
 Before a registry PR merges, CI:
 
@@ -86,8 +89,16 @@ Before a registry PR merges, CI:
 3. Publishes the union to the mining dataset repo (`train` split + `mix_manifest.json`)
 4. Merges the PR only if publish succeeds
 
-Training miners should point recipes at this URL (or pass it to `proof.bundle --dataset-url`).
-Override the target repo with `SPARKDISTILL_MINING_DATASET_REPO` in CI or locally.
+On `main`, `.github/workflows/update_canonical_pin.yml` refreshes `canonical.json` from
+Hugging Face so local `scripts/prepare_mining_sft.sh` and training-track CI share the same
+pin.
+
+**Training-track rule:** recipes must use `data/processed/sparkproof-mining_sft.jsonl`
+only. Prepare with `scripts/prepare_mining_sft.sh` (verifies HF matches `canonical.json`).
+PRs that add local generators, private blends, or alternate recipe paths are rejected by
+`eval.training_track_gate`. Proof bundles must set `dataset_url` to the canonical `hf_url`.
+
+Override the mining publish target with `SPARKDISTILL_MINING_DATASET_REPO` in CI or locally.
 
 Local dry-run without HF upload:
 
@@ -95,25 +106,16 @@ Local dry-run without HF upload:
 uv run python -m eval.registry_gate ... --skip-mining-publish
 ```
 
-## Cross-miner mixing (local)
+Refresh the pin manually after a mining republish:
 
 ```bash
-scripts/mix_registry.sh mix \
-  --registry datasets/registry.jsonl \
-  --sha256 <sha-a> --sha256 <sha-b> \
-  --out data/processed/mix_sft.jsonl \
-  --manifest-out data/processed/mix_manifest.json \
-  --sparkproof-root ../SparkProof
+scripts/update_canonical_pin.sh
 ```
 
-`mix_manifest.json` records every component miner, `hf_url`, and `trajectories_sha256`.
-Verify before training:
+## Cross-miner mixing (maintainer / registry CI only)
 
-```bash
-scripts/mix_registry.sh verify \
-  --manifest data/processed/mix_manifest.json \
-  --sft data/processed/mix_sft.jsonl
-```
+Registry aggregation uses `scripts/mix_registry.sh` internally. **Training miners must not**
+build private mixes for competition PRs — train on the canonical snapshot above instead.
 
 - **`registry.jsonl`** — append-only, one line per merged dataset PR. Never edited or
   reordered; corrections are appended, not rewritten (same convention as

@@ -1,13 +1,11 @@
-# Axolotl SFT — Phase 1 student: Qwen3.5-4B
+# Axolotl SFT — Phase 1 student: Qwen3.5-4B (canonical mining mix only).
 #
-# Requires Axolotl Qwen3.5 support (chat_template: qwen3_5):
-#   https://github.com/axolotl-ai-cloud/axolotl/tree/main/examples/qwen3.5
+# Production training-track submissions must use the pinned canonical dataset:
+#   scripts/prepare_mining_sft.sh
+#   scripts/train.sh recipes/qwen3.5-4b-phase1/sft.yaml
 #
-# Data:
-#   teacher/generate.py -> phase1_trajectories.jsonl
-#   teacher/format.py --format messages -> phase1_sft.jsonl
-#
-# Usage: scripts/train.sh recipes/qwen3.5-4b-phase1/sft.yaml
+# Local teacher trajectories (phase1_sft.jsonl) are for dev smoke tests only and
+# are rejected by the training-track CI gate.
 
 base_model: Qwen/Qwen3.5-4B
 trust_remote_code: true
@@ -16,7 +14,7 @@ chat_template: qwen3_5
 roles_to_train: ["assistant"]
 
 datasets:
-  - path: data/processed/phase1_sft.jsonl
+  - path: data/processed/sparkproof-mining_sft.jsonl
     type: chat_template
     field_messages: messages
 

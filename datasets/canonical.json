@@ -1,0 +1,10 @@
+{
+  "repo_id": "gittensor-model-hub/sparkproof-mining",
+  "hf_url": "https://huggingface.co/datasets/gittensor-model-hub/sparkproof-mining",
+  "training_dataset_path": "data/processed/sparkproof-mining_sft.jsonl",
+  "mix_manifest": {
+    "mix_id": "mining-gittensor-model-hub-sparkproof-mining",
+    "rows_total": 17,
+    "sft_sha256": "0f9b379e1564c8c658ded4ed66ad8f705d0874bbfc4e1c82c43f996fba167cf5"
+  }
+}

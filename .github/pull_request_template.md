@@ -40,10 +40,24 @@ Registry line:
 
 Complete this section only when **Training/evaluation improvement** is checked.
 
-- Dataset URL / registry entry:
+Training-track PRs compete on **recipe and hyperparameter changes only**. Every miner
+trains on the same pinned canonical dataset — no local generators, private blends, or
+alternate `data/processed/` paths.
+
+- Canonical dataset URL (required): `https://huggingface.co/datasets/gittensor-model-hub/sparkproof-mining`
+- Pinned `sft_sha256` (required, from [`datasets/canonical.json`](datasets/canonical.json)):
 - Recipe changed:
 - Frontier benchmark delta:
 - Proof-bundle URL (optional):
+
+### Training checklist
+
+- [ ] My recipe uses only `data/processed/sparkproof-mining_sft.jsonl` (from `scripts/prepare_mining_sft.sh`).
+- [ ] I did **not** add or modify `eval/gen_*.py`, `scripts/prepare_triton*.sh`, or `datasets/registry.jsonl`.
+- [ ] New training rows were contributed through the **dataset track** first (SparkProof + registry PR).
+- [ ] My PR body cites the canonical dataset URL and pinned `sft_sha256` above.
+
+CI applies `training:valid` or `training:REJECT` and may auto-close rejected training PRs.
 
 ## Summary
 

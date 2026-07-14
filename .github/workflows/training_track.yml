@@ -1,0 +1,66 @@
+name: Training track gate
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, edited]
+    paths-ignore:
+      - "datasets/registry.jsonl"
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: training-track-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  verify-training-track:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout trusted SparkDistill base
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          fetch-depth: 0
+
+      - name: Read untrusted submission without executing it
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          git fetch --no-tags origin \
+            "${BASE_REF}:refs/remotes/origin/training-base"
+          git fetch --no-tags origin \
+            "pull/${PR_NUMBER}/head:refs/remotes/origin/training-pr-head"
+          jq -r '.pull_request.body // ""' "$GITHUB_EVENT_PATH" > /tmp/pr_body.md
+          MERGE_BASE="$(git merge-base \
+            refs/remotes/origin/training-base \
+            refs/remotes/origin/training-pr-head)"
+          git diff --name-only \
+            "${MERGE_BASE}" \
+            refs/remotes/origin/training-pr-head > /tmp/changed_paths.txt
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install SparkDistill
+        run: uv sync --extra dev --frozen
+
+      - name: Verify training-track policy
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          uv run python -m eval.training_track_gate \
+            --head-ref refs/remotes/origin/training-pr-head \
+            --out eval/results/training_track_gate_report.json \
+            --pr-body-file /tmp/pr_body.md \
+            --changed-paths-file /tmp/changed_paths.txt \
+            --apply-label \
+            --close-on-reject \
+            --pr-number ${{ github.event.pull_request.number }}

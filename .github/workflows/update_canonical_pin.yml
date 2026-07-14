@@ -1,0 +1,47 @@
+name: Update canonical dataset pin
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - datasets/registry.jsonl
+
+permissions:
+  contents: write
+
+jobs:
+  refresh-pin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install SparkDistill
+        run: uv sync --extra dev --frozen
+
+      - name: Refresh datasets/canonical.json from HF
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: scripts/update_canonical_pin.sh
+
+      - name: Commit pin update
+        run: |
+          if git diff --quiet datasets/canonical.json; then
+            echo "canonical pin already up to date"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add datasets/canonical.json
+          git commit -m "$(cat <<'EOF'
+Refresh canonical mining dataset pin after registry update.
+
+EOF
+)"
+          git push

@@ -1,0 +1,159 @@
+"""Pinned canonical mining dataset for fair training-track competition."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any
+
+from eval.dataset_verify import _sha256_file
+from eval.mining_dataset import DEFAULT_MINING_DATASET_REPO, MINING_MANIFEST_PATH
+
+CANONICAL_PATH = Path("datasets/canonical.json")
+CANONICAL_TRAINING_DATASET_PATH = "data/processed/sparkproof-mining_sft.jsonl"
+
+
+def load_canonical(path: Path = CANONICAL_PATH) -> dict[str, Any]:
+    if not path.exists():
+        raise FileNotFoundError(f"missing canonical dataset pin: {path}")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError(f"{path} must contain a JSON object")
+    return data
+
+
+def canonical_hf_url(path: Path = CANONICAL_PATH) -> str:
+    return str(load_canonical(path)["hf_url"])
+
+
+def canonical_repo_id(path: Path = CANONICAL_PATH) -> str:
+    return str(load_canonical(path).get("repo_id") or DEFAULT_MINING_DATASET_REPO)
+
+
+def canonical_sft_sha256(path: Path = CANONICAL_PATH) -> str:
+    manifest = load_canonical(path).get("mix_manifest") or {}
+    value = manifest.get("sft_sha256")
+    if not isinstance(value, str) or len(value) != 64:
+        raise ValueError(f"{path} mix_manifest.sft_sha256 must be a 64-char hex digest")
+    return value
+
+
+def fetch_remote_mix_manifest(
+    *,
+    repo_id: str | None = None,
+    hf_token: str | None = None,
+) -> dict[str, Any]:
+    from huggingface_hub import hf_hub_download
+
+    repo = (repo_id or canonical_repo_id()).strip()
+    manifest_path = hf_hub_download(
+        repo_id=repo,
+        repo_type="dataset",
+        filename=MINING_MANIFEST_PATH,
+        token=hf_token,
+    )
+    manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+    if not isinstance(manifest, dict):
+        raise ValueError(f"{repo}/{MINING_MANIFEST_PATH} must be a JSON object")
+    return manifest
+
+
+def verify_remote_matches_pin(
+    *,
+    repo_id: str | None = None,
+    hf_token: str | None = None,
+    pin_path: Path = CANONICAL_PATH,
+) -> list[str]:
+    """Return issues when the live HF canonical dataset does not match datasets/canonical.json."""
+    issues: list[str] = []
+    pin = load_canonical(pin_path)
+    expected_repo = str(pin.get("repo_id") or DEFAULT_MINING_DATASET_REPO)
+    repo = (repo_id or expected_repo).strip()
+    if repo != expected_repo:
+        issues.append(f"repo_id {repo!r} does not match pinned {expected_repo!r}")
+
+    try:
+        remote = fetch_remote_mix_manifest(repo_id=repo, hf_token=hf_token)
+    except Exception as exc:
+        return issues + [f"failed to download {repo}/{MINING_MANIFEST_PATH}: {exc}"]
+
+    pinned_manifest = pin.get("mix_manifest") or {}
+    remote_sft_sha = remote.get("sft_sha256")
+    expected_sft_sha = pinned_manifest.get("sft_sha256")
+    if expected_sft_sha and remote_sft_sha != expected_sft_sha:
+        issues.append(
+            "canonical pin is stale: HF mix_manifest.sft_sha256 "
+            f"{remote_sft_sha!r} != pinned {expected_sft_sha!r}; "
+            "run scripts/update_canonical_pin.sh after the mining dataset is republished"
+        )
+
+    expected_rows = pinned_manifest.get("rows_total")
+    remote_rows = remote.get("rows_total")
+    if expected_rows is not None and remote_rows != expected_rows:
+        issues.append(
+            f"canonical rows_total mismatch: HF has {remote_rows!r}, pin has {expected_rows!r}"
+        )
+    return issues
+
+
+def write_pin_from_remote(
+    *,
+    repo_id: str | None = None,
+    hf_token: str | None = None,
+    out_path: Path = CANONICAL_PATH,
+) -> dict[str, Any]:
+    """Refresh datasets/canonical.json from the live HF mining dataset manifest."""
+    repo = (repo_id or DEFAULT_MINING_DATASET_REPO).strip()
+    remote = fetch_remote_mix_manifest(repo_id=repo, hf_token=hf_token)
+    sft_sha = remote.get("sft_sha256")
+    if not isinstance(sft_sha, str) or len(sft_sha) != 64:
+        raise ValueError(f"{repo} mix_manifest missing sft_sha256")
+
+    payload = {
+        "repo_id": repo,
+        "hf_url": f"https://huggingface.co/datasets/{repo}",
+        "training_dataset_path": CANONICAL_TRAINING_DATASET_PATH,
+        "mix_manifest": {
+            "mix_id": remote.get("mix_id"),
+            "rows_total": remote.get("rows_total"),
+            "sft_sha256": sft_sha,
+        },
+    }
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    return payload
+
+
+def assert_recipe_uses_canonical_dataset(recipe: dict[str, Any]) -> list[str]:
+    """Training recipes may only point at the canonical mining export path."""
+    issues: list[str] = []
+    datasets = recipe.get("datasets")
+    if not isinstance(datasets, list) or not datasets:
+        return issues
+
+    allowed = {CANONICAL_TRAINING_DATASET_PATH}
+    for index, entry in enumerate(datasets):
+        if not isinstance(entry, dict):
+            continue
+        data_path = entry.get("path")
+        if not isinstance(data_path, str) or not data_path.strip():
+            continue
+        normalized = data_path.strip()
+        if normalized not in allowed:
+            issues.append(
+                f"datasets[{index}].path must be {CANONICAL_TRAINING_DATASET_PATH!r} "
+                f"(canonical mining mix only), got {normalized!r}"
+            )
+    return issues
+
+
+def sha256_matches_canonical_export(export_path: Path, pin_path: Path = CANONICAL_PATH) -> list[str]:
+    if not export_path.exists():
+        return [f"missing canonical export {export_path}"]
+    actual = _sha256_file(export_path)
+    expected = canonical_sft_sha256(pin_path)
+    if actual != expected:
+        return [
+            f"{export_path} sha256 {actual} does not match pinned canonical sft_sha256 {expected}"
+        ]
+    return []

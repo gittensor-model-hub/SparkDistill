@@ -10,6 +10,8 @@ from typing import Any
 
 import yaml
 
+from eval.canonical_dataset import assert_recipe_uses_canonical_dataset
+
 # Axolotl multipack sampler fails on very small mixes (observed at 17 rows).
 MIN_SAMPLE_PACKING_ROWS = 32
 
@@ -77,6 +79,13 @@ def prepare_train_recipe(
     cfg: dict[str, Any] = yaml.safe_load(recipe_path.read_text(encoding="utf-8"))
     if not isinstance(cfg, dict):
         raise ValueError(f"{recipe_path} must contain a YAML mapping")
+
+    canonical_issues = assert_recipe_uses_canonical_dataset(cfg)
+    if canonical_issues:
+        raise ValueError(
+            "training recipes must use the pinned canonical mining dataset only: "
+            + "; ".join(canonical_issues)
+        )
 
     notes: list[str] = []
     row_count: int | None = None

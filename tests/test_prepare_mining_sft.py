@@ -20,14 +20,20 @@ def test_export_mining_sft_writes_messages_only(tmp_path: Path, monkeypatch):
             return len(rows)
 
     def _fake_load_dataset(repo_id, split, token=None):
-        assert repo_id == "org/mining"
+        assert repo_id == "gittensor-model-hub/sparkproof-mining"
         assert split == "train"
         return _Split()
 
     monkeypatch.setattr("datasets.load_dataset", _fake_load_dataset)
+    monkeypatch.setattr("eval.prepare_mining_sft.verify_remote_matches_pin", lambda **kwargs: [])
 
     out = tmp_path / "mining.jsonl"
-    result = export_mining_sft(out_path=out, repo_id="org/mining", hf_token="tok")
+    result = export_mining_sft(
+        out_path=out,
+        repo_id="gittensor-model-hub/sparkproof-mining",
+        hf_token="tok",
+        verify_pin=False,
+    )
     assert result["rows_written"] == 2
 
     lines = out.read_text(encoding="utf-8").strip().splitlines()
