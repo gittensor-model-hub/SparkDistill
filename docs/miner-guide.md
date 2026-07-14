@@ -478,7 +478,7 @@ A good PR includes:
 - Local eval numbers, including which benchmarks moved and by how much.
 - Any expected benchmark-specific effect: `bfcl`, `gsm8k`, `humaneval`, `ifeval`,
   `mmlu-pro`, `aime24`, or `gpqa-diamond`.
-- If you're using the proof-of-training fast path: your Hugging Face proof-bundle URL
+- Proof-bundle URL (required): published Hugging Face model repo from `proof.publish`
   (and attestation.json, if collected). This is in addition to, not instead of, the
   dataset link above.
 

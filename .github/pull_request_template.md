@@ -48,14 +48,14 @@ alternate `data/processed/` paths.
 - Pinned `sft_sha256` (required, from [`datasets/canonical.json`](datasets/canonical.json)):
 - Recipe changed:
 - Frontier benchmark delta:
-- Proof-bundle URL (optional):
+- Proof-bundle URL (required): `https://huggingface.co/<user>/sparkdistill-<run-id>`
 
 ### Training checklist
 
 - [ ] My recipe uses only `data/processed/sparkproof-mining_sft.jsonl` (from `scripts/prepare_mining_sft.sh`).
 - [ ] I did **not** add or modify `eval/gen_*.py`, `scripts/prepare_triton*.sh`, or `datasets/registry.jsonl`.
 - [ ] New training rows were contributed through the **dataset track** first (SparkProof + registry PR).
-- [ ] My PR body cites the canonical dataset URL and pinned `sft_sha256` above.
+- [ ] My PR cites a published Hugging Face proof-bundle URL with canonical `dataset_url` and `mix_manifest.json`.
 
 CI applies `training:valid` or `training:REJECT` and may auto-close rejected training PRs.
 

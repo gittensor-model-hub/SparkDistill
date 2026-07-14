@@ -14,8 +14,24 @@ from eval.training_track_gate import (
     is_training_track_pr,
     validate_changed_paths,
     validate_pr_body_canonical_pin,
+    validate_pr_body_proof_bundle,
     validate_recipe_paths_in_ref,
 )
+
+_VALID_PROOF_BUNDLE_URL = (
+    "https://huggingface.co/gittensor-model-hub/sparkdistill-2026-07-11-qwen3.5-4b-mining-001"
+)
+
+
+def _training_pr_body(*, proof_bundle_url: str | None = _VALID_PROOF_BUNDLE_URL) -> str:
+    pin = load_canonical()
+    proof_line = proof_bundle_url or "pending"
+    return (
+        "- [x] **Training/evaluation improvement**\n"
+        f"- Canonical dataset URL: {pin['hf_url']}\n"
+        f"- Pinned sft_sha256: `{pin['mix_manifest']['sft_sha256']}`\n"
+        f"- Proof-bundle URL: {proof_line}\n"
+    )
 
 
 def test_load_canonical_pin():
@@ -52,8 +68,33 @@ def test_validate_pr_body_requires_canonical_citation():
     body = (
         f"Dataset URL: {pin['hf_url']}\n"
         f"sha `{pin['mix_manifest']['sft_sha256']}`\n"
+        f"Proof-bundle URL: {_VALID_PROOF_BUNDLE_URL}\n"
     )
     assert validate_pr_body_canonical_pin(body) == []
+
+
+def test_validate_pr_body_rejects_missing_proof_bundle():
+    pin = load_canonical()
+    body = (
+        f"Dataset URL: {pin['hf_url']}\n"
+        f"sha `{pin['mix_manifest']['sft_sha256']}`\n"
+        "Proof-bundle URL: pending after local train + eval\n"
+    )
+    issues = validate_pr_body_proof_bundle(body)
+    assert issues
+    assert any("pending" in issue.lower() or "published" in issue.lower() for issue in issues)
+
+
+def test_gate_training_pr_rejects_missing_proof_bundle(tmp_path: Path):
+    report = gate_training_pr(
+        head_ref="HEAD",
+        changed_paths=["recipes/qwen3.5-4b-phase1/sft-mining.yaml"],
+        pr_body=_training_pr_body(proof_bundle_url="pending after local train + eval"),
+        verify_hf_pin=False,
+        verify_proof_bundle=False,
+    )
+    assert report["label"] == "training:REJECT"
+    assert any("Proof-bundle" in issue for issue in report["issues"])
 
 
 def test_gate_training_pr_rejects_local_generator(tmp_path: Path):
@@ -70,8 +111,9 @@ def test_gate_training_pr_rejects_local_generator(tmp_path: Path):
     report = gate_training_pr(
         head_ref="HEAD",
         changed_paths=["eval/gen_triton_kernels.py", recipe.as_posix()],
-        pr_body="- [x] **Training/evaluation improvement**",
+        pr_body=_training_pr_body(),
         verify_hf_pin=False,
+        verify_proof_bundle=False,
     )
     assert report["label"] == "training:REJECT"
     assert not report["verified"]

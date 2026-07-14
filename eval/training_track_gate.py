@@ -28,6 +28,7 @@ from eval.canonical_dataset import (
     load_canonical,
     verify_remote_matches_pin,
 )
+from eval.verify import check_canonical_dataset_claim
 
 _TRAINING_TRACK_CHECKBOX_RE = re.compile(
     r"^\s*-\s*\[[xX]\]\s+\*{0,2}Training/evaluation improvement\*{0,2}\s*$",
@@ -38,6 +39,17 @@ _DATASET_TRACK_CHECKBOX_RE = re.compile(
     re.MULTILINE,
 )
 _CANONICAL_SHA_IN_BODY_RE = re.compile(r"`([0-9a-f]{64})`")
+_PROOF_BUNDLE_LINE_RE = re.compile(
+    r"^\s*(?:[-*]\s*)?Proof[- ]bundle URL(?:\s*\([^)]*\))?\s*:\s*(.+?)\s*$",
+    re.MULTILINE | re.IGNORECASE,
+)
+_HF_MODEL_REPO_URL_RE = re.compile(
+    r"https://huggingface\.co/(?!datasets/)([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)"
+)
+_PROOF_BUNDLE_PLACEHOLDER_RE = re.compile(
+    r"^(?:n/a|na|none|pending(?:\s+after.*)?|tbd|todo|optional|-|\.)$",
+    re.IGNORECASE,
+)
 _FORBIDDEN_CHANGED_GLOBS = (
     "eval/gen_*.py",
     "scripts/prepare_triton*.sh",
@@ -144,6 +156,104 @@ def validate_pr_body_canonical_pin(pr_body: str | None) -> list[str]:
     return issues
 
 
+def parse_proof_bundle_hf_repo(pr_body: str | None) -> str | None:
+    """Return org/repo for the cited Hugging Face proof bundle model repo, if any."""
+    body = pr_body or ""
+    field_match = _PROOF_BUNDLE_LINE_RE.search(body)
+    if field_match:
+        value = field_match.group(1).strip().strip("`")
+        if value and not _PROOF_BUNDLE_PLACEHOLDER_RE.match(value):
+            repo_match = _HF_MODEL_REPO_URL_RE.search(value)
+            if repo_match:
+                return repo_match.group(1)
+    return None
+
+
+def validate_pr_body_proof_bundle(pr_body: str | None) -> list[str]:
+    """Training-track PRs must publish and cite a Hugging Face proof bundle."""
+    if not pr_body:
+        return ["training-track PR body must cite a Hugging Face proof-bundle URL"]
+
+    issues: list[str] = []
+    field_match = _PROOF_BUNDLE_LINE_RE.search(pr_body)
+    if not field_match:
+        issues.append(
+            "PR body must include a Proof-bundle URL field with a published "
+            "https://huggingface.co/<user>/<repo> model repo link"
+        )
+        return issues
+
+    value = field_match.group(1).strip().strip("`")
+    if not value or _PROOF_BUNDLE_PLACEHOLDER_RE.match(value):
+        issues.append(
+            "Proof-bundle URL must be a published Hugging Face model repo URL "
+            "(not pending, n/a, or empty)"
+        )
+        return issues
+
+    if not parse_proof_bundle_hf_repo(pr_body):
+        issues.append(
+            "Proof-bundle URL must be a Hugging Face model repo "
+            "(https://huggingface.co/<user>/<repo>), not a datasets URL"
+        )
+    return issues
+
+
+def verify_remote_proof_bundle(
+    repo_id: str,
+    *,
+    hf_token: str | None = None,
+) -> list[str]:
+    """Download the cited bundle manifest and verify canonical dataset claims."""
+    from huggingface_hub import hf_hub_download
+
+    issues: list[str] = []
+    try:
+        manifest_path = hf_hub_download(
+            repo_id=repo_id,
+            repo_type="model",
+            filename="manifest.json",
+            token=hf_token,
+        )
+        manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+    except Exception as exc:
+        return [f"failed to download proof bundle manifest from {repo_id}: {exc}"]
+
+    if not isinstance(manifest, dict):
+        return [f"{repo_id}/manifest.json must be a JSON object"]
+
+    issues.extend(check_canonical_dataset_claim(manifest))
+
+    try:
+        mix_manifest_path = hf_hub_download(
+            repo_id=repo_id,
+            repo_type="model",
+            filename="mix_manifest.json",
+            token=hf_token,
+        )
+        mix_data = json.loads(Path(mix_manifest_path).read_text(encoding="utf-8"))
+        remote_sft_sha = mix_data.get("sft_sha256")
+        expected_sft_sha = canonical_sft_sha256()
+        if remote_sft_sha != expected_sft_sha:
+            issues.append(
+                "proof bundle mix_manifest.sft_sha256 does not match datasets/canonical.json pin"
+            )
+    except Exception:
+        pass
+
+    try:
+        hf_hub_download(
+            repo_id=repo_id,
+            repo_type="model",
+            filename="eval_scores.json",
+            token=hf_token,
+        )
+    except Exception as exc:
+        issues.append(f"proof bundle missing eval_scores.json on {repo_id}: {exc}")
+
+    return issues
+
+
 def should_enforce_training_gate(
     pr_body: str | None,
     changed_paths: list[str] | None,
@@ -164,6 +274,7 @@ def gate_training_pr(
     changed_paths: list[str] | None,
     pr_body: str | None,
     verify_hf_pin: bool = True,
+    verify_proof_bundle: bool = True,
     hf_token: str | None = None,
 ) -> dict[str, Any]:
     if not should_enforce_training_gate(pr_body, changed_paths):
@@ -184,9 +295,15 @@ def gate_training_pr(
     issues.extend(validate_recipe_paths_in_ref(head_ref, recipe_paths))
 
     issues.extend(validate_pr_body_canonical_pin(pr_body))
+    issues.extend(validate_pr_body_proof_bundle(pr_body))
 
     if verify_hf_pin:
         issues.extend(verify_remote_matches_pin(hf_token=hf_token))
+
+    if verify_proof_bundle:
+        repo_id = parse_proof_bundle_hf_repo(pr_body)
+        if repo_id is not None:
+            issues.extend(verify_remote_proof_bundle(repo_id, hf_token=hf_token))
 
     label = "training:valid" if not issues else "training:REJECT"
     return {
@@ -255,6 +372,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--pr-body-file", type=Path, default=None)
     parser.add_argument("--changed-paths-file", type=Path, default=None)
     parser.add_argument("--skip-hf-pin-check", action="store_true")
+    parser.add_argument("--skip-proof-bundle-check", action="store_true")
     parser.add_argument("--apply-label", action="store_true")
     parser.add_argument("--close-on-reject", action="store_true")
     parser.add_argument("--pr-number", type=int, default=None)
@@ -274,6 +392,7 @@ def main(argv: list[str] | None = None) -> int:
         changed_paths=changed_paths,
         pr_body=pr_body,
         verify_hf_pin=not args.skip_hf_pin_check,
+        verify_proof_bundle=not args.skip_proof_bundle_check,
         hf_token=os.environ.get("HF_TOKEN"),
     )
     args.out.parent.mkdir(parents=True, exist_ok=True)
