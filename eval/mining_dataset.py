@@ -28,10 +28,13 @@ def mining_dataset_repo() -> str:
 def mining_dedupe_mode() -> str:
     """Cross-miner dedupe when building sparkproof-mining.
 
-    ``exact`` keeps near-duplicate rows (only identical prompts are dropped).
-    ``near`` also drops structurally similar rows and can remove most of a large
-    submission when mixed with an earlier registry line. Override with
-    ``SPARKDISTILL_MINING_DEDUPE`` (``exact``, ``near``, or ``none``).
+    Row **quality** is enforced upstream by SparkProof (release gate, decontamination,
+    per-row GPU validation). Mix-time dedupe only removes redundant copies.
+
+    Default ``exact``: drop identical prompts / assistant-code only — keeps
+    structurally similar but distinct verified rows. ``near`` also drops similar
+    tasks and can over-shrink large submissions. ``none`` is for local debugging.
+    Override with ``SPARKDISTILL_MINING_DEDUPE``.
     """
     value = os.environ.get("SPARKDISTILL_MINING_DEDUPE", DEFAULT_MINING_DEDUPE).strip().lower()
     if value not in {"exact", "near", "none"}:

@@ -90,10 +90,11 @@ Before a registry PR merges, CI:
 4. Merges the PR only if publish succeeds
 
 Registry aggregation uses `SPARKDISTILL_MINING_DEDUPE` when republishing sparkproof-mining
-(default **`exact`**: drop only identical prompts; keep near-duplicate rows). The older
-`near` mode also dropped structurally similar rows and could shrink large submissions
-when mixed with earlier registry lines. Set `SPARKDISTILL_MINING_DEDUPE=none` only for
-local debugging.
+(default **`exact`**). **Quality** is enforced by SparkProof before merge (release gate,
+decontamination, GPU validation, `sparkproof-verify`). **Dedupe** only removes redundant
+copies at mix time — `exact` drops identical prompts; the older `near` mode also dropped
+structurally similar rows and shrank nghetienhiep's 161-row submission to 77 when mixed
+with speedy00. Set `SPARKDISTILL_MINING_DEDUPE=none` only for local debugging.
 
 After each eligible registry merge, CI refreshes [`canonical.json`](canonical.json) from
 the live HF `mix_manifest.json` (also triggered by `.github/workflows/update_canonical_pin.yml`).

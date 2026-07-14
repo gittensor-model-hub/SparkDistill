@@ -58,6 +58,7 @@ class MixResult:
     rows_total: int
     components: list[MixComponent]
     dedupe: dict[str, int] = field(default_factory=dict)
+    dedupe_mode: DedupeMode = "exact"
 
     def to_manifest(self) -> dict[str, Any]:
         return {
@@ -67,6 +68,7 @@ class MixResult:
             "sft_format": "messages",
             "sft_sha256": _sha256_file(self.sft_path),
             "rows_total": self.rows_total,
+            "dedupe_mode": self.dedupe_mode,
             "dedupe": self.dedupe,
             "components": [
                 {
@@ -337,6 +339,7 @@ def mix_registry_datasets(
         rows_total=rows_written,
         components=components,
         dedupe=dedupe_counts,
+        dedupe_mode=dedupe,
     )
     manifest_path.write_text(json.dumps(result.to_manifest(), indent=2) + "\n", encoding="utf-8")
     return result
