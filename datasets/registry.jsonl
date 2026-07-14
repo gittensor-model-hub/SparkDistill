@@ -1,1 +1,2 @@
 {"miner":"speedy00","hf_url":"https://huggingface.co/datasets/speedy00/sparkproof-miner-25-v1","trajectories_sha256":"d96cbe4d43ad5e44bdee45633b41b330cb44f90d7aba35ee730d83d4639a80e9","rows_total":25,"dataset_version":"triton-distill-v0.2"}
+{"miner":"magicrails","hf_url":"https://huggingface.co/datasets/ssnowman/sparkproof-pipeline-20260714-053142","trajectories_sha256":"5dacb8a19cb99d2ed4c8788cc5cc93f3655cd6f416b8e608762ea491591065bc","rows_total":2,"dataset_version":"triton-distill-v0.2"}
