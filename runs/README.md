@@ -6,11 +6,15 @@ was merged. Written by the eval bot at merge time — miners don't write here di
 - **`ledger.jsonl`** — append-only, one JSON line per merged PR (see `eval/ledger.py`).
   Never edited or reordered; a bad entry is corrected by appending a new one, not by
   rewriting history.
-- **`frontier.json`** — the canonical current-frontier scores: what the next
-  submission must beat. `eval.verify` reads it by default; updated (overwritten,
-  not appended) at merge time whenever a run takes the frontier. When it doesn't
-  exist yet for a new student/phase, the first verified run is labeled
-  `eval:BASELINE` and its scores seed this file.
+- **`frontiers.json`** — per-GPU-architecture frontier buckets (`blackwell`,
+  `hopper`). TritonBench composites are hardware-sensitive, so each architecture
+  keeps its own scores — a Hopper run is never tiered against Blackwell numbers.
+  `eval.verify` resolves the bundle's architecture from `gpu_architecture` or
+  `train_gpu` and loads the matching bucket (empty bucket → `eval:BASELINE`).
+  Updated (overwritten, not appended) at merge time when a run raises a benchmark
+  high within that architecture.
+- **`frontier.json`** — legacy single-file Blackwell frontier kept for backward
+  compatibility; `eval.frontiers` falls back to it when `frontiers.json` is absent.
 - **`<run-id>/`** — one directory per merged run, holding the artifacts the ledger
   entry references:
   - `result.json` — the `eval.score` report (tier label, per-benchmark deltas).

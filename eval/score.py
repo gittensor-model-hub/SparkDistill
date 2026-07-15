@@ -26,7 +26,8 @@ from eval.frontier import (
     regression_floor_pct,
     triton_pct_delta,
 )
-from eval.gpu_architecture import DEFAULT_GPU_ARCHITECTURE, GpuArchitecture, tier_benchmark_for_arch
+from eval.frontiers import load_frontier_scores
+from eval.gpu_architecture import DEFAULT_GPU_ARCHITECTURE, GPU_ARCHITECTURES, GpuArchitecture, tier_benchmark_for_arch
 
 # (lower_bound_pct, label) — first match wins, checked highest-to-lowest.
 _TIER_BANDS = [
@@ -101,19 +102,52 @@ def score(
         "frontier_updates": frontier_updates,
         "frontier_scores": merged_frontier,
         "gsm8k_regression_floor_pct": regression_floor_pct("gsm8k", triton_pct=triton_pct),
+        "gpu_architecture": gpu_architecture,
     }
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--candidate", type=Path, required=True, help="scores json from eval.harness for the candidate")
-    parser.add_argument("--frontier", type=Path, required=True, help="scores json from eval.harness for the frontier")
+    frontier_group = parser.add_mutually_exclusive_group(required=True)
+    frontier_group.add_argument(
+        "--frontier",
+        type=Path,
+        help="flat scores json from eval.harness for a specific frontier checkpoint",
+    )
+    frontier_group.add_argument(
+        "--frontiers",
+        type=Path,
+        default=None,
+        help="per-architecture frontier file (default bucket: runs/frontiers.json)",
+    )
+    parser.add_argument(
+        "--gpu-architecture",
+        choices=GPU_ARCHITECTURES,
+        default=None,
+        help="architecture bucket when using --frontiers (default: candidate gpu_architecture or blackwell)",
+    )
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(argv)
 
-    candidate = json.loads(args.candidate.read_text())["scores"]
-    frontier = json.loads(args.frontier.read_text())["scores"]
-    report = score(candidate, frontier)
+    candidate_payload = json.loads(args.candidate.read_text())
+    candidate = candidate_payload["scores"]
+    gpu_architecture = args.gpu_architecture or candidate_payload.get("gpu_architecture") or DEFAULT_GPU_ARCHITECTURE
+
+    if args.frontier is not None:
+        frontier = json.loads(args.frontier.read_text())["scores"]
+    else:
+        frontiers_path = args.frontiers or Path("runs/frontiers.json")
+        frontier = load_frontier_scores(gpu_architecture, path=frontiers_path)
+        if frontier is None:
+            print(
+                f"no frontier scores for {gpu_architecture!r} in {frontiers_path} — "
+                "first verified run on this architecture would be eval:BASELINE",
+                file=sys.stderr,
+            )
+            return 1
+
+    report = score(candidate, frontier, gpu_architecture=gpu_architecture)
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(report, indent=2))
