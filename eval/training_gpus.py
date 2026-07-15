@@ -44,7 +44,12 @@ def attestation_corroborates_training_gpu(train_gpu: str, attestation: dict | No
     if any(token in gpu for token in ("h100", "gh100")):
         return "h100" in claims_blob or "gh100" in claims_blob
     if any(token in gpu for token in ("h200", "gh200")):
-        return "h200" in claims_blob or "gh200" in claims_blob
+        # H200 is the same GH100 die as H100 (upgraded HBM3e only) — NVIDIA's
+        # hwmodel attestation claim reports the die, not the memory SKU, so a
+        # genuine H200 node attests as "GH100" too. Confirmed live: a real H200
+        # training submission's attestation reported hwmodel="GH100" and was
+        # wrongly rejected here before this fix (gittensor-model-hub/SparkDistill#120).
+        return any(token in claims_blob for token in ("h200", "gh200", "gh100"))
     if any(token in gpu for token in ("b200", "b300", "gb200")):
         return any(token in claims_blob for token in ("b200", "b300", "gb200", "gb102"))
     if "pro 6000" in gpu or "gb20" in gpu:

@@ -108,6 +108,14 @@ def test_training_claims_attestation_must_corroborate_gpu():
     h100_attestation = {"passed": True, "claims": {"hwmodel": "NVIDIA H100 SXM"}}
     assert check_training_claims(h100_manifest, h100_attestation) == []
 
+    # H200 is the same GH100 die as H100 (upgraded HBM3e only) — NVIDIA's hwmodel
+    # attestation claim reports the die, not the memory SKU. Confirmed live on a
+    # real H200 submission (gittensor-model-hub/SparkDistill#120): hwmodel="GH100",
+    # which this must corroborate rather than reject.
+    h200_manifest = {"train_hours": 4.2, "train_gpu": "NVIDIA H200"}
+    h200_attestation = {"passed": True, "claims": {"hwmodel": "GH100"}}
+    assert check_training_claims(h200_manifest, h200_attestation) == []
+
 
 def test_proof_only_bundle_requires_local_checkpoint(tmp_path):
     import json

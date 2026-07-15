@@ -51,6 +51,9 @@ _PROOF_BUNDLE_PLACEHOLDER_RE = re.compile(
     r"^(?:n/a|na|none|pending(?:\s+after.*)?|tbd|todo|optional|-|\.)$",
     re.IGNORECASE,
 )
+# attestation.json lives in the PR itself (runs/<run_id>/attestation.json), never on HF —
+# the proof bundle only carries claim-bound artifacts, not the attestation that binds them.
+_ATTESTATION_PATH_RE = re.compile(r"^runs/[^/]+/attestation\.json$")
 _FORBIDDEN_CHANGED_GLOBS = (
     "eval/gen_*.py",
     "scripts/prepare_triton*.sh",
@@ -323,6 +326,73 @@ def verify_remote_proof_bundle(
     return issues
 
 
+def find_attestation_path(changed_paths: list[str] | None) -> str | None:
+    for path in changed_paths or []:
+        if _ATTESTATION_PATH_RE.match(path):
+            return path
+    return None
+
+
+def verify_remote_proof_bundle_scores(
+    repo_id: str,
+    *,
+    head_ref: str,
+    changed_paths: list[str] | None,
+    hf_token: str | None = None,
+) -> list[str]:
+    """Re-run eval.verify's no-GPU attested checks against the cited proof bundle.
+
+    This is the exact CPU-only check a validator otherwise has to run by hand:
+    claim_sha256/TDX binding, GPU-attestation JWKS signature, and recomputing any
+    attested gsm8k/triton samples from their own bundled responses. It catches
+    claim/attested-sample mismatches and GPU-corroboration issues (e.g. an H200
+    run whose attestation reports hwmodel=GH100, the same die as H100) at PR time
+    instead of only when a human happens to check manually — that gap is what let
+    gittensor-model-hub/SparkDistill#120 sit with a stale gsm8k claim until review.
+
+    Never needs a GPU: proof bundles are weights-free (no checkpoint on HF), so
+    any claimed benchmark that isn't covered by an attested sample always ends in
+    verify_submission's "checkpoint_required" reason rather than an actual harness
+    re-run — that reason is intentionally not gated here, since it just means part
+    of the claim is deferred to off-CI validator verification, not that anything
+    checkable here failed.
+    """
+    from huggingface_hub import snapshot_download
+
+    from eval.frontiers import load_frontier_scores
+    from eval.verify import resolve_bundle_gpu_architecture, verify_submission
+
+    attestation = None
+    attestation_path = find_attestation_path(changed_paths)
+    if attestation_path is not None:
+        text = _git_show(head_ref, attestation_path)
+        if text:
+            try:
+                attestation = json.loads(text)
+            except json.JSONDecodeError:
+                return [f"{attestation_path}: invalid JSON"]
+
+    try:
+        bundle_dir = Path(snapshot_download(repo_id=repo_id, repo_type="model", token=hf_token))
+    except Exception as exc:
+        return [f"failed to download proof bundle from {repo_id} for score verification: {exc}"]
+
+    if not (bundle_dir / "manifest.json").exists() or not (bundle_dir / "eval_scores.json").exists():
+        return []  # already flagged by verify_remote_proof_bundle
+
+    manifest = json.loads((bundle_dir / "manifest.json").read_text(encoding="utf-8"))
+    frontier = load_frontier_scores(resolve_bundle_gpu_architecture(manifest))
+
+    report = verify_submission(bundle_dir, frontier, attestation=attestation)
+    if report.get("verified") or report.get("reason") == "checkpoint_required":
+        return []
+    detail = report.get("issues") or report.get("mismatches") or []
+    reason = report.get("reason") or "verification failed"
+    if detail:
+        return [f"eval.verify {reason}: {issue}" for issue in detail]
+    return [f"eval.verify: {reason}"]
+
+
 def should_enforce_training_gate(
     pr_body: str | None,
     changed_paths: list[str] | None,
@@ -378,13 +448,21 @@ def gate_training_pr(
     if verify_proof_bundle:
         repo_id = parse_proof_bundle_hf_repo(pr_body)
         if repo_id is not None:
-            issues.extend(
-                verify_remote_proof_bundle(
-                    repo_id,
-                    hf_token=hf_token,
-                    acceptable_sft_shas=acceptable_sft_shas,
-                )
+            bundle_issues = verify_remote_proof_bundle(
+                repo_id,
+                hf_token=hf_token,
+                acceptable_sft_shas=acceptable_sft_shas,
             )
+            issues.extend(bundle_issues)
+            if not bundle_issues:
+                issues.extend(
+                    verify_remote_proof_bundle_scores(
+                        repo_id,
+                        head_ref=head_ref,
+                        changed_paths=changed_paths,
+                        hf_token=hf_token,
+                    )
+                )
 
     label = "training:valid" if not issues else "training:REJECT"
     return {
