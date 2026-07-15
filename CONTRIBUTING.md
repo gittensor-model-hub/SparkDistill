@@ -182,8 +182,17 @@ rows, run SparkProof and open a dataset-track registry PR first.
 - Seals manifest + Merkle root + **GPU CC attestation** (`gpu_attestation.json`)
   + **Intel TDX measured-VM quote** (`gpu_attestation.tdx`, production required)
 
-Run SparkProof **on the Blackwell CC VM** (SSH) — no Polaris. Teacher calls use OpenRouter
+Run SparkProof **on the Blackwell or Hopper CC VM inside an Intel TDX guest** (SSH) — no Polaris. Teacher calls use OpenRouter
 with **`reasoning.effort: xhigh`** on `anthropic/claude-fable-5` and `openai/gpt-5.6-sol`.
+
+Provision TDX once per boot (see [`datasets/README.md`](datasets/README.md#intel-tdx-production-required-on-new-bundles)):
+
+```bash
+sudo chmod 0777 /sys/kernel/config/tsm/report
+mkdir /sys/kernel/config/tsm/report/sparkproof
+sudo chmod 0666 /sys/kernel/config/tsm/report/sparkproof/inblob
+export SPARKPROOF_TSM_REPORT_PATH=/sys/kernel/config/tsm/report/sparkproof
+```
 
 The key insight: SparkProof does not try to prove that Claude or GPT *itself* executed
 honestly — commercial APIs don't expose signed inference attestations, so that's not
@@ -195,7 +204,8 @@ on Blackwell** for compile/execute validation.
 **What `sparkproof-2` cryptographically proves:** teacher outputs were captured via the
 approved OpenRouter gateway; each kept sample passed Triton validation **on the attested
 Blackwell GPU**; the verified dataset manifest and Merkle root were not modified afterward;
-GPU CC attestation binds the validation run to confidential-computing hardware.
+GPU CC attestation binds the validation run to confidential-computing hardware; **Intel TDX**
+(`gpu_attestation.tdx`) binds the measured VM that ran SparkProof to the same dataset nonce.
 
 **What it explicitly does not prove (and says so):** that Anthropic/OpenAI/OpenRouter
 internally executed the model honestly, or that OpenRouter routed to the correct provider.

@@ -31,7 +31,7 @@ Registry line:
 ### Dataset checklist
 
 - [ ] I generated this dataset with an unmodified, pinned SparkProof checkout.
-- [ ] The release gate and production `sparkproof-verify` pass.
+- [ ] The release gate and production `sparkproof-verify` pass (including `gpu_attestation.tdx` on TDX guests).
 - [ ] The Hugging Face repository contains the complete `proof/` directory.
 - [ ] The submitted rows are training data, not `test`, `eval`, or `held_out` data.
 - [ ] The dataset does not contain TritonBench or other protected evaluation material.

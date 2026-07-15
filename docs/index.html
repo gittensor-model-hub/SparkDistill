@@ -253,8 +253,8 @@
       <li><strong>Build diverse training tasks.</strong> Seeded, stratified sampling draws from official Triton API documentation, semantics and tutorials, deterministic kernel mutations, PyTorch-to-Triton translation tasks, self-evolution, and failure mining. TritonBench remains evaluation-only.</li>
       <li><strong>Call only pinned frontier teachers.</strong> Requests go through an approved gateway—OpenRouter or yunwu—to <code>claude-fable-5</code> and <code>gpt-5.6-sol</code> with <code>reasoning.effort=xhigh</code>. The exact request body is fingerprinted.</li>
       <li><strong>Validate outside the model.</strong> The compiler, PyTorch oracle, anti-cheating checks, numerical tests, and the attested GPU—not the teacher—decide whether a kernel is correct. Bad candidates may be repaired; failures are preserved separately.</li>
-      <li><strong>Prove on confidential hardware.</strong> Production runs execute on a Blackwell RTX PRO 6000 or Hopper H100/H200 CC node. NVIDIA attestation evidence is nonce-bound to the raw trajectory archive so it cannot be reused for a different dataset.</li>
-      <li><strong>Seal the verified subset.</strong> SparkProof writes a <code>sparkproof-2</code> manifest, Merkle root, validation report, raw and verified trajectories, release-gate report, dataset hash, and <code>gpu_attestation.json</code>.</li>
+      <li><strong>Prove on confidential hardware.</strong> Production runs execute on a Blackwell RTX PRO 6000 or Hopper H100/H200 CC node inside an Intel TDX guest. NVIDIA GPU attestation is nonce-bound to the raw trajectory archive; an Intel TDX quote binds the measured VM to the same nonce.</li>
+      <li><strong>Seal the verified subset.</strong> SparkProof writes a <code>sparkproof-2</code> manifest, Merkle root, validation report, raw and verified trajectories, release-gate report, dataset hash, and <code>gpu_attestation.json</code> (including <code>tdx</code> on production bundles).</li>
       <li><strong>Publish data and proof together.</strong> Hugging Face receives the SFT-ready rows plus the complete <code>proof/</code> directory, allowing validators to replay the checks without access to the miner's machine.</li>
     </ol>
     <div class="callout">
@@ -275,7 +275,8 @@
           <tr><td>Raw → verified consistency</td><td>The miner cannot replace accepted rows after validation or hide where the verified subset came from.</td></tr>
           <tr><td>Merkle root + dataset SHA-256</td><td>Any post-proof edit changes the committed bundle root or the registry-pinned trajectory hash.</td></tr>
           <tr><td>GPU CC nonce binding</td><td>The NVIDIA attestation evidence is tied to the raw trajectory archive used in that proof.</td></tr>
-          <tr><td>Online NVIDIA verification</td><td><code>sparkproof-verify --online</code> additionally verifies the NRAS JWT signature against NVIDIA JWKS.</td></tr>
+          <tr><td>Intel TDX binding</td><td><code>gpu_attestation.tdx</code> REPORTDATA commits the measured guest VM to the same dataset nonce (production required on new bundles).</td></tr>
+          <tr><td>Online NVIDIA + Intel verification</td><td><code>sparkproof-verify --online</code> verifies the NRAS JWT against NVIDIA JWKS and the TDX quote via Intel DCAP.</td></tr>
         </tbody>
       </table>
     </div>

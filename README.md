@@ -13,7 +13,7 @@ verification** — not maintainer opinion or third-party trust.
 
 | Track | What you submit | What the validator re-checks |
 |---|---|---|
-| **Dataset** (`dataset:xs`–`xl`) | Hugging Face `proof/` + registry line | [SparkProof](https://github.com/gittensor-model-hub/SparkProof) bundle: pinned teachers, GPU CC attestation, release gate, merkle + raw→verified consistency — **no hand-waved CSV** |
+| **Dataset** (`dataset:xs`–`xl`) | Hugging Face `proof/` + registry line | [SparkProof](https://github.com/gittensor-model-hub/SparkProof) bundle: pinned teachers, GPU CC + Intel TDX attestation, release gate, merkle + raw→verified consistency — **no hand-waved CSV** |
 | **Training** (`eval:XS`–`XL`) | Public recipe + dataset + eval claim | Retrain-from-source or attested cheap re-score on held-out benchmarks — **not your checkpoint alone** |
 
 Miners compete; the harness and registry gate decide. Third parties do not get veto power
@@ -232,6 +232,7 @@ hardware or live teacher API calls:
 | `metadata.gateway_response_model` (yunwu) | Response model slug is also pinned |
 | raw → verified consistency | Miner cannot swap `trajectories.jsonl` after GPU attestation / release gate |
 | `gpu_attestation` nonce | Attestation is bound to `trajectories_raw.jsonl`, not a different dataset |
+| `gpu_attestation.tdx` | Intel TDX quote `report_data` bound to the same dataset nonce (required on new bundles) |
 | release gate + PR hash | `trajectories_sha256` in the PR still matches the gated HF artifact |
 
 **Offline verify means:** the miner recorded the exact pinned teacher slugs
@@ -243,8 +244,8 @@ OpenAI/Anthropic actually served those models on every call.
 
 | Mode | Teacher model guarantee | GPU guarantee |
 |---|---|---|
-| **Offline** (registry CI today) | Bundle claims + `request_sha256` + gateway slug metadata + tamper checks | Stored `gpu_attestation.json` fields + nonce binding |
-| **Online (`--online`)** | Same as offline | Above **plus** NVIDIA NRAS JWT signature verified against NVIDIA JWKS |
+| **Offline** (registry CI today) | Bundle claims + `request_sha256` + gateway slug metadata + tamper checks | Stored `gpu_attestation.json` fields + nonce binding + TDX `report_data` binding |
+| **Online (`--online`)** | Same as offline | Above **plus** NVIDIA NRAS JWT signature and Intel DCAP TDX quote verification |
 | **Online + OpenRouter ledger** | Can re-query OpenRouter generation IDs — only for `gateway=openrouter` and only with the creating API key | Same as online |
 
 For **yunwu** bundles there is currently no external teacher ledger re-check. Swapping rows
