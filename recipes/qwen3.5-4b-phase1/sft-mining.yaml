@@ -49,6 +49,10 @@ learning_rate: 1.0e-4
 warmup_ratio: 0.05
 weight_decay: 0.0
 
+# NEFTune (ICLR 2024): embedding noise during training only — improves
+# instruction-following generalization on small mining mixes without affecting inference.
+neftune_noise_alpha: 5
+
 bf16: true
 tf32: true
 gradient_checkpointing: true
