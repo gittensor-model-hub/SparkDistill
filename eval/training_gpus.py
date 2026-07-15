@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import json
-
 # Substrings matched case-insensitively against manifest train_gpu claims.
 ACCEPTED_TRAINING_GPU_SUBSTRINGS = (
   # Blackwell workstation (RTX PRO 6000, etc.)
@@ -32,26 +30,54 @@ def accepted_training_gpu_label() -> str:
     return "Blackwell (RTX PRO 6000 / B200 / B300) or Hopper (H100 / H200) CC node"
 
 
+def claimed_hwmodels(claims: dict) -> list[str]:
+    """Lowercased `hwmodel` values carried by an attestation's claims.
+
+    Hardware identity lives on the per-device submodule claims that
+    `eval.attestation._decode_overall_claims` collects under `devices` — the
+    overall EAT has no hardware fields. A top-level `hwmodel` is read too, so
+    flattened or hand-rolled claim shapes still corroborate.
+    """
+    models: list[str] = []
+    for source in (claims, *(claims.get("devices") or {}).values()):
+        if not isinstance(source, dict):
+            continue
+        hwmodel = source.get("hwmodel")
+        if hwmodel:
+            models.append(str(hwmodel).lower())
+    return models
+
+
 def attestation_corroborates_training_gpu(train_gpu: str, attestation: dict | None) -> bool:
-    """When attestation is present, hwmodel claims must match the declared train_gpu family."""
+    """When attestation is present, hwmodel claims must match the declared train_gpu family.
+
+    Only `hwmodel` claims are considered. Matching against the whole claims blob
+    would let unrelated hex fields stand in for hardware evidence: `b200` and
+    `b300` are themselves valid hex, so a `claim_sha256` nonce or a measurement
+    digest can contain them by chance, and the nonce is miner-controlled.
+    """
     if not attestation:
         return True
-    claims_blob = json.dumps(attestation.get("claims") or {}).lower()
-    if claims_blob == "{}":
+    claims = attestation.get("claims")
+    if not claims:
         return True
+    models = claimed_hwmodels(claims) if isinstance(claims, dict) else []
+
+    def attests(*tokens: str) -> bool:
+        return any(token in model for model in models for token in tokens)
 
     gpu = str(train_gpu).lower()
     if any(token in gpu for token in ("h100", "gh100")):
-        return "h100" in claims_blob or "gh100" in claims_blob
+        return attests("h100", "gh100")
     if any(token in gpu for token in ("h200", "gh200")):
         # H200 is the same GH100 die as H100 (upgraded HBM3e only) — NVIDIA's
         # hwmodel attestation claim reports the die, not the memory SKU, so a
         # genuine H200 node attests as "GH100" too. Confirmed live: a real H200
         # training submission's attestation reported hwmodel="GH100" and was
         # wrongly rejected here before this fix (gittensor-model-hub/SparkDistill#120).
-        return any(token in claims_blob for token in ("h200", "gh200", "gh100"))
+        return attests("h200", "gh200", "gh100")
     if any(token in gpu for token in ("b200", "b300", "gb200")):
-        return any(token in claims_blob for token in ("b200", "b300", "gb200", "gb102"))
+        return attests("b200", "b300", "gb200", "gb102")
     if "pro 6000" in gpu or "gb20" in gpu:
-        return "pro 6000" in claims_blob or "gb20" in claims_blob
+        return attests("pro 6000", "gb20")
     return is_accepted_training_gpu(train_gpu)
