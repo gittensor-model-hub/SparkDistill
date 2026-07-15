@@ -180,6 +180,7 @@ rows, run SparkProof and open a dataset-track registry PR first.
 - Calls teachers via **OpenRouter** (Fable 5 + GPT 5.6)
 - **Compiles and executes** Triton 3.7.1 kernels on Blackwell; publishes verified-only trajectories
 - Seals manifest + Merkle root + **GPU CC attestation** (`gpu_attestation.json`)
+  + **Intel TDX measured-VM quote** (`gpu_attestation.tdx`, production required)
 
 Run SparkProof **on the Blackwell CC VM** (SSH) — no Polaris. Teacher calls use OpenRouter
 with **`reasoning.effort: xhigh`** on `anthropic/claude-fable-5` and `openai/gpt-5.6-sol`.
