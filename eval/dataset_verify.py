@@ -8,13 +8,15 @@ artifacts), and opens a text-only PR here linking that HF repo plus the bundle's
 1. The `proof/` artifacts exist in the HF repo (dataset_manifest.json from SparkProof's
    release gate, manifest.json, gpu_attestation.json, trajectories.jsonl, ...).
 2. The GPU CC attestation passed — the data really came from an attested Blackwell node.
-3. The release gate passed (decontamination + provenance) and `trajectories.jsonl`
+3. **Intel TDX** (production): `gpu_attestation.tdx` binds the measured VM to the same
+   dataset nonce as NRAS — closes the userland-trust gap GPU attestation alone leaves.
+4. The release gate passed (decontamination + provenance) and `trajectories.jsonl`
    matches the sha256 the release gate recorded, so the rows can't be swapped after
    gating.
-4. Re-runs full production `sparkproof-verify` (pinned generator, pinned teachers,
+5. Re-runs full production `sparkproof-verify` (pinned generator, pinned teachers,
    raw/verified consistency, merkle, attestation nonce) when a SparkProof checkout is
    available — required for merge.
-5. Sizes the dataset into a reward label from verified row count (bundle sizing).
+6. Sizes the dataset into a reward label from verified row count (bundle sizing).
    SparkDistill's registry gate then **downgrades to a fair label** from
    ``mix_manifest.components[].rows_selected`` after cross-registry dedupe — see
    ``eval.fair_dataset_label``.
@@ -78,6 +80,31 @@ def _sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _check_dataset_tdx_attestation(attestation: dict) -> list[str]:
+    """Production dataset bundles must include TDX bound to the dataset nonce."""
+    if "tdx" not in attestation:
+        return []  # legacy bundle predating TDX requirement
+    tdx = attestation.get("tdx")
+    if not tdx:
+        return [
+            "gpu_attestation.tdx required for production dataset bundles — "
+            "regenerate on an Intel TDX guest with configfs-tsm provisioned"
+        ]
+    nonce = attestation.get("nonce") or ""
+    if not nonce:
+        return ["gpu_attestation.tdx present but dataset nonce missing"]
+    from eval.attestation import tdx_report_data
+
+    expected = tdx_report_data(nonce).hex()
+    if str(tdx.get("report_data") or "").lower() != expected:
+        return [
+            "gpu_attestation.tdx report_data does not match dataset attestation nonce"
+        ]
+    if not tdx.get("quote_b64"):
+        return ["gpu_attestation.tdx missing quote_b64"]
+    return []
+
+
 def check_proof_dir(proof_dir: Path, claimed_sha256: str | None = None) -> tuple[list[str], int, str | None]:
     """Return (issues, verified_row_count, gpu_architecture) for a bundle's proof directory."""
     issues: list[str] = []
@@ -92,6 +119,7 @@ def check_proof_dir(proof_dir: Path, claimed_sha256: str | None = None) -> tuple
         issues.append("gpu_attestation.passed is false")
     if not attestation.get("nonce"):
         issues.append("gpu_attestation.nonce missing — bundle predates content-bound attestation")
+    issues.extend(_check_dataset_tdx_attestation(attestation))
 
     dataset_manifest = json.loads((proof_dir / "dataset_manifest.json").read_text())
     if not dataset_manifest.get("passed"):

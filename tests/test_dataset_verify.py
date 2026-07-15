@@ -20,7 +20,7 @@ def _write_proof_dir(
     (proof / "validation_report.jsonl").write_text(
         "\n".join(json.dumps({"index": i, "validation": {"passed": True}}) for i in range(rows)) + "\n"
     )
-    (proof / "gpu_attestation.json").write_text(json.dumps({"passed": attested, "nonce": "n" * 64}))
+    (proof / "gpu_attestation.json").write_text(json.dumps({"passed": attested, "nonce": "a" * 64}))
     (proof / "novelty_report.json").write_text(json.dumps({"verified_rows": rows, "novel_verified_rows": rows}))
     (proof / "dataset_manifest.json").write_text(
         json.dumps(
@@ -146,6 +146,34 @@ def test_missing_artifact_rejects(tmp_path):
     report = verify_dataset_submission(proof, sparkproof_root=None)
     assert report["label"] == "dataset:REJECT"
     assert any("missing proof artifact" in issue for issue in report["issues"])
+
+
+def test_missing_tdx_on_new_bundle_rejects(tmp_path):
+    proof, sha = _write_proof_dir(tmp_path)
+    (proof / "gpu_attestation.json").write_text(
+        json.dumps({"passed": True, "nonce": "a" * 64, "tdx": None})
+    )
+    issues, _rows, _arch = check_proof_dir(proof, claimed_sha256=sha)
+    assert any("tdx required" in issue for issue in issues)
+
+
+def test_bound_tdx_passes(tmp_path):
+    from eval.attestation import tdx_report_data
+
+    nonce = "ab" * 32
+    proof, sha = _write_proof_dir(tmp_path)
+    (proof / "gpu_attestation.json").write_text(
+        json.dumps(
+            {
+                "passed": True,
+                "nonce": nonce,
+                "tdx": {"quote_b64": "AAAA", "report_data": tdx_report_data(nonce).hex()},
+            }
+        )
+    )
+    issues, rows, gpu_architecture = check_proof_dir(proof, claimed_sha256=sha)
+    assert issues == []
+    assert rows == 3
 
 
 def test_sparkproof_verify_runs_online_trust_anchors(monkeypatch, tmp_path):
