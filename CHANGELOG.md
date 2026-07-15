@@ -5,11 +5,25 @@ All notable changes to SparkDistill are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.3] — 2026-07-15
+
+Architecture-scoped exact dedupe for the canonical mining mix, `sparkproof-mining`
+republished with four recovered cross-arch rows, and miner docs for SparkProof registry
+snapshot dedupe prevention.
+
 ### Fixed
-- **Architecture-scoped dataset dedupe:** exact dedupe (mining mix + registry snapshot +
-  SparkProof novelty gate) now keys prompt matches by `gpu_architecture`. The same prompt
-  on Blackwell vs Hopper is a fresh row, not a duplicate — pairs with SparkProof arch-aware
-  `NoveltyRegistry` exact fingerprints.
+
+- **Architecture-scoped dataset dedupe** ([#133], SparkProof [#26]): exact dedupe (mining mix,
+  registry snapshot, SparkProof novelty gate) keys prompt matches by `gpu_architecture`.
+  The same prompt on Blackwell vs Hopper is a fresh row, not a duplicate.
+- **Canonical mining pin refresh** ([#134]): republished `gittensor-model-hub/sparkproof-mining`
+  with arch-aware dedupe — **174 → 178 rows** (+4 cross-arch prompts that were wrongly dropped).
+
+### Changed
+
+- **Miner docs: registry snapshot workflow** ([#132]): `sparkproof-publish-dataset
+  --mining-repo` and `accepted_registry_snapshot.jsonl` pins documented in
+  `docs/miner-guide.md` and `datasets/README.md`.
 
 ## [0.1.2] — 2026-07-15
 
@@ -236,7 +250,12 @@ and verify it from public artifacts alone.
 [#126]: https://github.com/gittensor-model-hub/SparkDistill/pull/126
 [#127]: https://github.com/gittensor-model-hub/SparkDistill/pull/127
 
-[Unreleased]: https://github.com/gittensor-model-hub/SparkDistill/compare/v0.1.2...HEAD
+[#132]: https://github.com/gittensor-model-hub/SparkDistill/pull/132
+[#133]: https://github.com/gittensor-model-hub/SparkDistill/pull/133
+[#134]: https://github.com/gittensor-model-hub/SparkDistill/pull/134
+
+[Unreleased]: https://github.com/gittensor-model-hub/SparkDistill/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/gittensor-model-hub/SparkDistill/releases/tag/v0.1.3
 [0.1.2]: https://github.com/gittensor-model-hub/SparkDistill/releases/tag/v0.1.2
 [0.1.1]: https://github.com/gittensor-model-hub/SparkDistill/releases/tag/v0.1.1
 [0.1.0]: https://github.com/gittensor-model-hub/SparkDistill/releases/tag/v0.1.0
