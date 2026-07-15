@@ -4,7 +4,8 @@ Miners export benchmark artifacts on a GPU CC + Intel TDX guest, bind them into 
 proof bundle (`claim_sha256`), and attach GPU + TDX attestation. Validators re-check
 scores from the bundled artifacts on CPU — no checkpoint reproduction or harness re-run.
 
-GSM8K uses a frozen 50-problem set with response re-grading (strongest). Other lm-eval
+GSM8K uses a frozen 50-problem set with lm-eval-aligned 5-shot prompts and
+`exact_match,strict-match` grading. Other lm-eval
 benchmarks bundle the harness results JSON; Triton bundles the TritonBench report so
 composites can be recomputed from per-problem details.
 """
@@ -16,6 +17,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from eval.benchmarks import BENCHMARKS, _extract_metric, _locate_results_file
+from eval.frontier import is_regression, regression_floor_pct, triton_pct_delta
 from eval.regression_sample import (
     REGRESSION_BENCHMARK_KEY,
     REGRESSION_SAMPLE_FILENAME,
@@ -80,20 +82,20 @@ def check_benchmark_no_regression(
     benchmark_key: str,
     sample_score: float,
     frontier: dict[str, float] | None,
+    *,
+    claimed: dict[str, float] | None = None,
 ) -> list[str]:
     if frontier is None or benchmark_key not in frontier:
         return []
-    benchmark = BENCHMARKS.get(benchmark_key)
-    if benchmark is None:
+    if benchmark_key not in BENCHMARKS:
         return []
     frontier_score = float(frontier[benchmark_key])
-    if frontier_score == 0:
-        return []
-    floor_pct = benchmark.regression_floor_pct
-    pct_delta = (sample_score - frontier_score) / frontier_score * 100.0
-    if pct_delta < 0 and abs(pct_delta) > floor_pct:
+    triton_pct = triton_pct_delta(claimed or {}, frontier) if claimed is not None else None
+    if is_regression(benchmark_key, sample_score, frontier_score, triton_pct=triton_pct):
+        floor = regression_floor_pct(benchmark_key, triton_pct=triton_pct)
+        pct_delta = (sample_score - frontier_score) / frontier_score * 100.0 if frontier_score else 0.0
         return [
-            f"{benchmark_key} regression: {pct_delta:.2f}% vs frontier exceeds -{floor_pct}% floor"
+            f"{benchmark_key} regression: {pct_delta:.2f}% vs frontier exceeds -{floor}% floor"
         ]
     return []
 
@@ -129,7 +131,7 @@ def verify_regression_responses(
     )
     recomputed = float(sample.get("exact_match", 0.0))
     if not issues:
-        issues.extend(check_benchmark_no_regression(benchmark_key, recomputed, frontier))
+        issues.extend(check_benchmark_no_regression(benchmark_key, recomputed, frontier, claimed=claimed))
     return recomputed if not issues else None, issues
 
 
@@ -171,7 +173,7 @@ def verify_lm_eval_results(
             )
 
     if not issues:
-        issues.extend(check_benchmark_no_regression(benchmark_key, recomputed, frontier))
+        issues.extend(check_benchmark_no_regression(benchmark_key, recomputed, frontier, claimed=claimed))
     return recomputed if not issues else None, issues
 
 

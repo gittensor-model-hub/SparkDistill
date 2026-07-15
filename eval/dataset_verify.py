@@ -40,6 +40,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from eval.gpu_architecture import dataset_architecture_allowed, normalize_gpu_architecture
+
 # (min_rows, label) — first match wins, checked largest-to-smallest.
 _SIZE_BANDS = [
     (150, "dataset:xl"),
@@ -73,14 +75,14 @@ def _sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def check_proof_dir(proof_dir: Path, claimed_sha256: str | None = None) -> tuple[list[str], int]:
-    """Return (issues, verified_row_count) for a bundle's proof directory."""
+def check_proof_dir(proof_dir: Path, claimed_sha256: str | None = None) -> tuple[list[str], int, str | None]:
+    """Return (issues, verified_row_count, gpu_architecture) for a bundle's proof directory."""
     issues: list[str] = []
     for name in REQUIRED_PROOF_FILES:
         if not (proof_dir / name).exists():
             issues.append(f"missing proof artifact: {name}")
     if issues:
-        return issues, 0
+        return issues, 0, None
 
     attestation = json.loads((proof_dir / "gpu_attestation.json").read_text())
     if not attestation.get("passed"):
@@ -110,7 +112,13 @@ def check_proof_dir(proof_dir: Path, claimed_sha256: str | None = None) -> tuple
     if not novelty_path.exists():
         issues.append("missing novelty_report.json from release gate")
 
-    return issues, rows
+    gpu_architecture = normalize_gpu_architecture(dataset_manifest.get("gpu_architecture"))
+    if gpu_architecture is None:
+        issues.append("dataset_manifest.gpu_architecture missing or unrecognized")
+    elif not dataset_architecture_allowed(gpu_architecture):
+        issues.append(f"gpu_architecture {gpu_architecture!r} is not an accepted dataset-generation architecture")
+
+    return issues, rows, gpu_architecture
 
 
 def run_sparkproof_verify(proof_dir: Path, sparkproof_root: Path, *, production: bool = True) -> list[str]:
@@ -153,7 +161,7 @@ def verify_dataset_submission(
 ) -> dict:
     if proof_dir is None:
         proof_dir = _resolve_proof_dir(hf_repo, None)
-    issues, rows = check_proof_dir(proof_dir, claimed_sha256)
+    issues, rows, gpu_architecture = check_proof_dir(proof_dir, claimed_sha256)
     if sparkproof_root is None:
         issues.append("sparkproof-root is required for production dataset verification")
     elif not issues:
@@ -164,6 +172,7 @@ def verify_dataset_submission(
         "verified": not issues,
         "label": label,
         "rows_total": rows,
+        "gpu_architecture": gpu_architecture,
         "issues": issues,
     }
 

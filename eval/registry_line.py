@@ -8,6 +8,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from eval.gpu_architecture import dataset_architecture_allowed, normalize_gpu_architecture
+
 
 def normalize_hf_url(hf_url_or_repo: str) -> str:
     value = hf_url_or_repo.strip().rstrip("/")
@@ -39,12 +41,19 @@ def build_registry_entry(*, miner: str, hf_url: str, manifest: dict[str, Any]) -
     if not isinstance(dataset_version, str) or not dataset_version.strip():
         raise ValueError("dataset_manifest.json missing dataset_version")
 
+    gpu_architecture = normalize_gpu_architecture(manifest.get("gpu_architecture"))
+    if gpu_architecture is None:
+        raise ValueError("dataset_manifest.json missing or unrecognized gpu_architecture")
+    if not dataset_architecture_allowed(gpu_architecture):
+        raise ValueError(f"gpu_architecture {gpu_architecture!r} is not an accepted dataset-generation architecture")
+
     return {
         "miner": miner.strip(),
         "hf_url": normalize_hf_url(hf_url),
         "trajectories_sha256": sha,
         "rows_total": rows_total,
         "dataset_version": dataset_version,
+        "gpu_architecture": gpu_architecture,
     }
 
 

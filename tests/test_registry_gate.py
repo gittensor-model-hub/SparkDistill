@@ -7,6 +7,7 @@ from eval.registry_gate import (
     check_registry_duplicates,
     close_dataset_pr,
     gate_registry_pr,
+    gate_registry_submission,
     is_dataset_track_pr,
     merge_eligible,
     parse_added_registry_lines,
@@ -25,6 +26,7 @@ def _entry(**overrides):
         "trajectories_sha256": "a" * 64,
         "rows_total": 128,
         "dataset_version": "triton-distill-v0.2",
+        "gpu_architecture": "blackwell",
     }
     base.update(overrides)
     return base
@@ -84,6 +86,49 @@ def test_reward_and_merge_eligibility_require_dataset_xs_or_above():
 def test_validate_registry_entry_requires_fields():
     issues = validate_registry_entry({"miner": "alice"})
     assert any("hf_url" in issue for issue in issues)
+    assert any("gpu_architecture" in issue for issue in issues)
+
+
+def test_validate_registry_entry_accepts_hopper():
+    assert validate_registry_entry(_entry(gpu_architecture="hopper-h100")) == []
+
+
+def test_validate_registry_entry_rejects_unsupported_architecture():
+    issues = validate_registry_entry(_entry(gpu_architecture="ampere-a100"))
+    assert any("gpu_architecture" in issue for issue in issues)
+
+
+def test_gate_registry_submission_rejects_gpu_architecture_mismatch(monkeypatch):
+    monkeypatch.setattr(
+        "eval.registry_gate.verify_dataset_submission",
+        lambda **kwargs: {
+            "verified": True,
+            "label": "dataset:xl",
+            "rows_total": 128,
+            "gpu_architecture": "hopper",
+            "issues": [],
+        },
+    )
+    report = gate_registry_submission(_entry(gpu_architecture="blackwell"), sparkproof_root=Path("."))
+    assert report["verified"] is False
+    assert report["label"] == "dataset:REJECT"
+    assert any("gpu_architecture mismatch" in issue for issue in report["issues"])
+
+
+def test_gate_registry_submission_accepts_matching_gpu_architecture(monkeypatch):
+    monkeypatch.setattr(
+        "eval.registry_gate.verify_dataset_submission",
+        lambda **kwargs: {
+            "verified": True,
+            "label": "dataset:xl",
+            "rows_total": 128,
+            "gpu_architecture": "hopper",
+            "issues": [],
+        },
+    )
+    report = gate_registry_submission(_entry(gpu_architecture="hopper-h100"), sparkproof_root=Path("."))
+    assert report["verified"] is True
+    assert report["label"] == "dataset:xl"
 
 
 def test_check_registry_duplicates_rejects_repeat_sha():

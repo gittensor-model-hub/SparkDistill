@@ -8,7 +8,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from eval.mining_dataset import DEFAULT_MINING_DATASET_REPO, mining_dataset_repo
 from eval.canonical_dataset import (
     CANONICAL_TRAINING_DATASET_PATH,
     canonical_hf_url,
@@ -17,6 +16,7 @@ from eval.canonical_dataset import (
     sha256_matches_canonical_export,
     verify_manifest_matches_pin,
 )
+from eval.mining_dataset import DEFAULT_MINING_DATASET_REPO, mining_dataset_repo
 
 
 def export_mining_sft(

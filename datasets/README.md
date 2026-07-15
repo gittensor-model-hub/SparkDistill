@@ -5,8 +5,11 @@ dataset-track counterpart of `runs/` (which records proof-of-training runs).
 
 ## How a dataset gets in here (miner flow)
 
-1. Run SparkProof on a Blackwell CC VM and pass the release gate
-   (`sparkproof-publish-dataset` refuses to publish otherwise).
+1. Run SparkProof on a Blackwell or Hopper H100/H200 CC VM and pass the release gate
+   (`sparkproof-publish-dataset` refuses to publish otherwise). SparkProof detects the
+   GPU automatically and stamps prompts, mutation/failure-mining templates, and the
+   dataset manifest with the matching architecture — an unsupported GPU (Ampere, Ada,
+   ...) fails fast before any generation starts.
 2. Publish to Hugging Face. The publisher uploads the dataset rows **and** the proof
    artifacts under `proof/` in the same HF repo (`manifest.json`,
    `dataset_manifest.json`, `gpu_attestation.json`, `trajectories.jsonl`, ...).
@@ -22,8 +25,13 @@ scripts/registry_line.sh --bundle <sparkproof-bundle-dir> --miner <github-handle
    other file:
 
 ```json
-{"miner": "<github-handle>", "hf_url": "https://huggingface.co/datasets/<user>/<repo>", "trajectories_sha256": "<from dataset_manifest.json>", "rows_total": 128, "dataset_version": "triton-distill-v0.2"}
+{"miner": "<github-handle>", "hf_url": "https://huggingface.co/datasets/<user>/<repo>", "trajectories_sha256": "<from dataset_manifest.json>", "rows_total": 128, "dataset_version": "triton-distill-v0.2", "gpu_architecture": "blackwell"}
 ```
+
+`gpu_architecture` is `"blackwell"` or `"hopper"` (`scripts/registry_line.sh` reads it
+straight from the bundle's `dataset_manifest.json` — no need to set it by hand). The
+gate cross-checks the claimed value against what the re-verified bundle actually
+attested; a mismatch is `dataset:REJECT`.
 
 No dataset files are committed here — the PR is the link plus the hash that pins the
 exact gated rows.
@@ -49,9 +57,12 @@ The gate runs `eval.registry_gate`, which for each appended registry line:
 `dataset_verify` checks, in order: required proof artifacts (including
 `trajectories_raw.jsonl`, `validation_report.jsonl`, `novelty_report.json`);
 GPU CC attestation passed with a content-bound nonce; release gate passed and rows
-still match the gated sha256; and full production `sparkproof-verify` (pinned
-generator, Fable 5 / GPT 5.6 Sol at `xhigh`, raw→verified consistency, merkle,
-attestation nonce). Any failure is `dataset:REJECT` and the PR is not merged.
+still match the gated sha256; `dataset_manifest.gpu_architecture` is `blackwell` or
+`hopper` (anything else is `dataset:REJECT`); and full production `sparkproof-verify`
+(pinned generator, Fable 5 / GPT 5.6 Sol at `xhigh`, raw→verified consistency, merkle,
+attestation nonce). The registry gate then cross-checks the PR's claimed
+`gpu_architecture` against this re-verified value — a mismatch rejects the same way a
+`rows_total` mismatch does. Any failure is `dataset:REJECT` and the PR is not merged.
 
 Manual re-check:
 

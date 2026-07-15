@@ -22,17 +22,17 @@ import sys
 from contextlib import contextmanager
 from pathlib import Path
 
-from eval.benchmarks import BENCHMARKS, assert_fraction_scores
-from eval.canonical_dataset import canonical_hf_url, canonical_sft_sha256
-from eval.dataset_verify import _sha256_file
-from eval.harness import run_harness
 from eval.attested_samples import (
     ATTESTED_VERIFY_LIMIT,
     has_attested_samples,
     verify_attested_eval_samples,
 )
-from eval.regression_sample import REGRESSION_BENCHMARK_KEY
+from eval.benchmarks import BENCHMARKS, assert_fraction_scores
+from eval.canonical_dataset import canonical_hf_url, canonical_sft_sha256
+from eval.dataset_verify import _sha256_file
+from eval.harness import run_harness
 from eval.mix_registry import REGISTRY_PATH, verify_mix_manifest
+from eval.regression_sample import REGRESSION_BENCHMARK_KEY
 from eval.score import score
 from eval.training_gpus import (
     accepted_training_gpu_label,

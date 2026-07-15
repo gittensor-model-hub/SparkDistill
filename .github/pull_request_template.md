@@ -20,11 +20,12 @@ Complete this section only when **Dataset track submission** is checked.
 - Verified row count:
 - `trajectories_sha256`:
 - SparkProof dataset version:
+- GPU architecture used to generate/validate the dataset (`blackwell` or `hopper`):
 
 Registry line:
 
 ```json
-{"miner": "<github-handle>", "hf_url": "https://huggingface.co/datasets/<org>/<repo>", "trajectories_sha256": "<64-character hash from dataset_manifest.json>", "rows_total": 25, "dataset_version": "triton-distill-v0.2"}
+{"miner": "<github-handle>", "hf_url": "https://huggingface.co/datasets/<org>/<repo>", "trajectories_sha256": "<64-character hash from dataset_manifest.json>", "rows_total": 25, "dataset_version": "triton-distill-v0.2", "gpu_architecture": "blackwell"}
 ```
 
 ### Dataset checklist

@@ -36,27 +36,53 @@ def test_score_emits_documented_slug_for_underscored_keys():
     assert set(report["regressions"]) <= DOCUMENTED_REGRESSION_LABELS
 
 
-def test_score_improvement_gets_expected_tier():
-    # Scores are fractions in [0, 1] (issue #72), matching runs/frontier.json.
-    candidate = {"gsm8k": 0.90, "humaneval": 0.80}
-    frontier = {"gsm8k": 0.80, "humaneval": 0.80}
+def test_score_improvement_gets_expected_tier_from_triton():
+    candidate = {"triton": 0.71, "gsm8k": 0.80}
+    frontier = {"triton": 0.60, "gsm8k": 0.80}
     report = score(candidate, frontier)
-    assert report["label"] == "eval:L"  # (0.90-0.80)/0.80 = 12.5% -> L band
-    assert report["best_benchmark"] == "gsm8k"
+    assert report["label"] == "eval:XL"  # (0.71-0.60)/0.60 = 18.3% -> XL band
+    assert report["best_benchmark"] == "triton"
     assert report["regressions"] == []
 
 
+def test_score_gsm8k_improvement_alone_does_not_tier():
+    candidate = {"gsm8k": 0.90, "triton": 0.60}
+    frontier = {"gsm8k": 0.80, "triton": 0.60}
+    report = score(candidate, frontier)
+    assert report["label"] == "eval:none"
+    assert report["best_benchmark"] == "triton"
+    assert report["best_pct_delta"] == 0.0
+
+
+def test_score_rejects_on_gsm8k_regression_even_when_triton_improves():
+    candidate = {"triton": 0.71, "gsm8k": 0.50}
+    frontier = {"triton": 0.60, "gsm8k": 0.60}
+    report = score(candidate, frontier)
+    assert report["label"] == "eval:REJECT"
+    assert "regression-gsm8k" in report["regressions"]
+
+
+def test_score_triton_tiers_at_l_and_m():
+    frontier = {"triton": 0.428, "gsm8k": 0.6}
+    # L band: >= 10% relative improvement on triton
+    l_report = score({"triton": 0.471, "gsm8k": 0.6}, frontier)
+    assert l_report["label"] == "eval:L"
+    # M band: >= 6%
+    m_report = score({"triton": 0.454, "gsm8k": 0.6}, frontier)
+    assert m_report["label"] == "eval:M"
+
+
 def test_score_rejects_on_regression_beyond_floor():
-    candidate = {"gsm8k": 0.88, "humaneval": 0.70}
-    frontier = {"gsm8k": 0.80, "humaneval": 0.80}
+    candidate = {"gsm8k": 0.88, "humaneval": 0.70, "triton": 0.60}
+    frontier = {"gsm8k": 0.80, "humaneval": 0.80, "triton": 0.60}
     report = score(candidate, frontier)
     assert report["label"] == "eval:REJECT"
     assert "regression-humaneval" in report["regressions"]
 
 
 def test_score_none_below_minimum_tier():
-    candidate = {"gsm8k": 0.805}
-    frontier = {"gsm8k": 0.80}
+    candidate = {"triton": 0.61, "gsm8k": 0.80}
+    frontier = {"triton": 0.60, "gsm8k": 0.80}
     report = score(candidate, frontier)
     assert report["label"] == "eval:none"
 

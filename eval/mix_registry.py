@@ -79,6 +79,7 @@ class MixResult:
                     "rows_selected": component.rows_selected,
                     "rows_skipped_dedupe": component.rows_skipped_dedupe,
                     "dataset_version": component.registry_entry.get("dataset_version"),
+                    "gpu_architecture": component.registry_entry.get("gpu_architecture"),
                 }
                 for component in self.components
             ],
@@ -254,7 +255,7 @@ def resolve_proof_dir(
             )
         )
         proof_dir = snapshot / "proof"
-    issues, _rows = check_proof_dir(proof_dir, claimed_sha256=entry["trajectories_sha256"])
+    issues, _rows, _gpu_architecture = check_proof_dir(proof_dir, claimed_sha256=entry["trajectories_sha256"])
     if issues:
         raise ValueError(f"{repo}: proof check failed: {'; '.join(issues)}")
     return proof_dir

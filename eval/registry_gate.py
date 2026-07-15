@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -17,9 +18,10 @@ from pathlib import Path
 from typing import Any, Callable
 
 from eval.dataset_verify import MERGE_THRESHOLD_ROWS, REWARDED_DATASET_LABELS, verify_dataset_submission
+from eval.gpu_architecture import dataset_architecture_allowed, normalize_gpu_architecture
 
 REGISTRY_PATH = Path("datasets/registry.jsonl")
-REQUIRED_FIELDS = ("miner", "hf_url", "trajectories_sha256", "rows_total", "dataset_version")
+REQUIRED_FIELDS = ("miner", "hf_url", "trajectories_sha256", "rows_total", "dataset_version", "gpu_architecture")
 _HF_REPO_RE = re.compile(r"^https://huggingface\.co/datasets/([^/]+/[^/#?]+)")
 _DATASET_TRACK_CHECKBOX_RE = re.compile(
     r"^\s*-\s*\[[xX]\]\s+\*{0,2}Dataset track submission\*{0,2}\s*$",
@@ -237,6 +239,12 @@ def validate_registry_entry(entry: dict[str, Any]) -> list[str]:
         hf_repo_from_url(str(entry.get("hf_url", "")))
     except ValueError as exc:
         issues.append(str(exc))
+    if entry.get("gpu_architecture"):
+        gpu_architecture = normalize_gpu_architecture(str(entry["gpu_architecture"]))
+        if gpu_architecture is None:
+            issues.append(f"gpu_architecture {entry['gpu_architecture']!r} is not recognized")
+        elif not dataset_architecture_allowed(gpu_architecture):
+            issues.append(f"gpu_architecture {gpu_architecture!r} is not an accepted dataset-generation architecture")
     return issues
 
 
@@ -293,6 +301,14 @@ def gate_registry_submission(
     if int(entry.get("rows_total", 0)) != verification.get("rows_total", -1):
         report["issues"] = list(report.get("issues") or []) + [
             f"rows_total mismatch: PR claims {entry['rows_total']} but verified bundle has {verification.get('rows_total')}"
+        ]
+        report["verified"] = False
+        report["label"] = "dataset:REJECT"
+    claimed_arch = normalize_gpu_architecture(str(entry.get("gpu_architecture") or ""))
+    if claimed_arch != verification.get("gpu_architecture"):
+        report["issues"] = list(report.get("issues") or []) + [
+            f"gpu_architecture mismatch: PR claims {entry.get('gpu_architecture')!r} "
+            f"but verified bundle has {verification.get('gpu_architecture')!r}"
         ]
         report["verified"] = False
         report["label"] = "dataset:REJECT"

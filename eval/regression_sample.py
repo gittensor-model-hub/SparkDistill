@@ -9,14 +9,14 @@ re-running the model when attestation + binding pass.
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 from typing import Any
 
-from eval.benchmarks import BENCHMARKS
 from eval.dataset_verify import _sha256_file
+from eval.frontier import is_regression, regression_floor_pct
+from eval.gsm8k_eval import gold_answer, grade_gsm8k_response
 
-REGRESSION_VERSION = "sparkdistill-gsm8k-regression-v2"
+REGRESSION_VERSION = "sparkdistill-gsm8k-regression-v3"
 REGRESSION_PROBLEM_COUNT = 50
 REGRESSION_PROBLEMS_PATH = (
     Path(__file__).resolve().parent / "data" / f"gsm8k_regression_{REGRESSION_PROBLEM_COUNT}.jsonl"
@@ -45,18 +45,8 @@ def regression_problem_set_sha256(path: Path = REGRESSION_PROBLEMS_PATH) -> str:
     return _sha256_file(path)
 
 
-def normalize_gsm8k_answer(text: str) -> str:
-    """Normalize a GSM8K final answer for exact-match grading."""
-    value = str(text).strip()
-    if "####" in value:
-        value = value.split("####")[-1]
-    value = value.replace("$", "").replace(",", "").strip()
-    value = re.sub(r"\s+", " ", value)
-    return value
-
-
 def grade_response(gold: str, model_response: str) -> bool:
-    return normalize_gsm8k_answer(gold) == normalize_gsm8k_answer(model_response)
+    return grade_gsm8k_response(gold, model_response)
 
 
 def compute_exact_match(responses: list[dict[str, Any]], problems: list[dict[str, Any]]) -> float:
@@ -66,7 +56,7 @@ def compute_exact_match(responses: list[dict[str, Any]], problems: list[dict[str
         problem_id = int(item["problem_id"])
         if problem_id not in by_id:
             raise ValueError(f"unknown problem_id {problem_id}")
-        if grade_response(by_id[problem_id]["answer"], str(item["model_response"])):
+        if grade_response(gold_answer(by_id[problem_id]), str(item["model_response"])):
             correct += 1
     return correct / len(problems)
 
@@ -142,14 +132,13 @@ def check_gsm8k_no_regression(
     sample_score: float,
     frontier_gsm8k: float,
     *,
+    triton_pct: float | None = None,
     floor_pct: float | None = None,
 ) -> list[str]:
     if floor_pct is None:
-        floor_pct = BENCHMARKS[REGRESSION_BENCHMARK_KEY].regression_floor_pct
-    if frontier_gsm8k == 0:
-        return []
-    pct_delta = (sample_score - frontier_gsm8k) / frontier_gsm8k * 100.0
-    if pct_delta < 0 and abs(pct_delta) > floor_pct:
+        floor_pct = regression_floor_pct(REGRESSION_BENCHMARK_KEY, triton_pct=triton_pct)
+    if is_regression(REGRESSION_BENCHMARK_KEY, sample_score, frontier_gsm8k, triton_pct=triton_pct):
+        pct_delta = (sample_score - frontier_gsm8k) / frontier_gsm8k * 100.0 if frontier_gsm8k else 0.0
         return [f"gsm8k regression: {pct_delta:.2f}% vs frontier exceeds -{floor_pct}% floor"]
     return []
 

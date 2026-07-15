@@ -169,7 +169,7 @@ def test_build_bundle_records_gsm8k_regression_sample(tmp_path):
     from eval.regression_sample import build_regression_sample, load_regression_problems
 
     responses = [
-        {"problem_id": int(row["problem_id"]), "model_response": f"#### {row['answer']}"}
+        {"problem_id": int(row["problem_id"]), "model_response": f"#### {row['answer'].split('####')[-1].strip()}"}
         for row in load_regression_problems()
     ]
     sample_path = tmp_path / "gsm8k_regression_sample.json"

@@ -45,6 +45,7 @@ def test_aggregate_and_publish_mining_dataset(tmp_path: Path):
                 "rows_total": 1,
                 "trajectories_sha256": sha_a,
                 "dataset_version": "triton-distill-v0.2",
+                "gpu_architecture": "blackwell",
             }
         ),
         encoding="utf-8",

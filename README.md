@@ -115,8 +115,8 @@ improvement is what gets rewarded, so "copy the leader and add one optimization"
 completely valid — and expected — way to compete.
 
 **Sharing training data:** `data/processed/` stays git-ignored (too large for git). For Triton
-datasets, use the **dataset track** — SparkProof on a Blackwell CC VM, then
-`sparkproof-publish-dataset`, then a text-only registry PR against
+datasets, use the **dataset track** — SparkProof on a Blackwell or Hopper H100/H200 CC VM,
+then `sparkproof-publish-dataset`, then a text-only registry PR against
 [`datasets/registry.jsonl`](datasets/registry.jsonl). GitHub Actions verifies the Hugging
 Face `proof/` bundle, **aggregates all merged datasets into the canonical mining dataset**
 ([`gittensor-model-hub/sparkproof-mining`](https://huggingface.co/datasets/gittensor-model-hub/sparkproof-mining)),
@@ -197,9 +197,9 @@ verification, same as before this feature existed. See
 
 The **dataset track** rewards verified SparkProof training data merged via
 [`datasets/registry.jsonl`](datasets/registry.jsonl). Miners **prove** datasets on a
-Blackwell CC VM with [SparkProof](https://github.com/gittensor-model-hub/SparkProof);
-validators **verify** from the Hugging Face `proof/` directory on any CPU host — GitHub
-Actions, a laptop, no NVIDIA GPU.
+Blackwell or Hopper H100/H200 CC VM with [SparkProof](https://github.com/gittensor-model-hub/SparkProof)
+(the manifest records which); validators **verify** from the Hugging Face `proof/`
+directory on any CPU host — GitHub Actions, a laptop, no NVIDIA GPU.
 
 ```bash
 # Validator / local re-check (downloads proof/ from HF)

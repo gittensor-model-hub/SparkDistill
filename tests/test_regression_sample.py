@@ -1,26 +1,29 @@
 import pytest
 
+from eval.gsm8k_eval import normalize_gsm8k_answer
 from eval.regression_sample import (
     REGRESSION_BENCHMARK_KEY,
     REGRESSION_PROBLEM_COUNT,
     build_regression_sample,
     check_gsm8k_no_regression,
     load_regression_problems,
-    normalize_gsm8k_answer,
     verify_regression_sample,
 )
 
 
 def _all_correct_responses():
     return [
-        {"problem_id": int(row["problem_id"]), "model_response": f"work\n#### {row['answer']}"}
+        {
+            "problem_id": int(row["problem_id"]),
+            "model_response": f"work\n#### {row['answer'].split('####')[-1].strip()}",
+        }
         for row in load_regression_problems()
     ]
 
 
 def test_normalize_gsm8k_answer_strips_markers_and_currency():
-    assert normalize_gsm8k_answer("foo #### 18") == "18"
-    assert normalize_gsm8k_answer("$70,000") == "70000"
+    assert normalize_gsm8k_answer("reasoning\n#### 18") == "18"
+    assert normalize_gsm8k_answer("$70,000.") == "70000"
 
 
 def test_build_regression_sample_exact_match():
@@ -50,6 +53,8 @@ def test_verify_regression_sample_catches_claim_divergence():
 
 def test_check_gsm8k_no_regression_within_floor():
     assert check_gsm8k_no_regression(0.595, 0.60) == []
+    # 2% relaxed floor when triton up >= 2%
+    assert check_gsm8k_no_regression(0.591, 0.60, triton_pct=12.0) == []
 
 
 def test_check_gsm8k_no_regression_flags_large_drop():

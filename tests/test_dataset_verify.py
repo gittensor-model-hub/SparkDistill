@@ -4,7 +4,9 @@ import json
 from eval.dataset_verify import check_proof_dir, size_label, verify_dataset_submission
 
 
-def _write_proof_dir(tmp_path, *, rows=3, attested=True, gate_passed=True, tamper_rows=False):
+def _write_proof_dir(
+    tmp_path, *, rows=3, attested=True, gate_passed=True, tamper_rows=False, gpu_architecture="blackwell"
+):
     proof = tmp_path / "proof"
     proof.mkdir()
 
@@ -27,6 +29,7 @@ def _write_proof_dir(tmp_path, *, rows=3, attested=True, gate_passed=True, tampe
                 "blocked_rows": 0 if gate_passed else 2,
                 "rows_total": rows,
                 "trajectories_sha256": sha,
+                "gpu_architecture": gpu_architecture,
             }
         )
     )
@@ -48,9 +51,43 @@ def test_size_label_bands():
 
 def test_valid_proof_dir_passes(tmp_path):
     proof, sha = _write_proof_dir(tmp_path)
-    issues, rows = check_proof_dir(proof, claimed_sha256=sha)
+    issues, rows, gpu_architecture = check_proof_dir(proof, claimed_sha256=sha)
     assert issues == []
     assert rows == 3
+    assert gpu_architecture == "blackwell"
+
+
+def test_hopper_gpu_architecture_is_accepted(tmp_path):
+    proof, sha = _write_proof_dir(tmp_path, gpu_architecture="hopper-h100")
+    issues, rows, gpu_architecture = check_proof_dir(proof, claimed_sha256=sha)
+    assert issues == []
+    assert gpu_architecture == "hopper"
+
+
+def test_unsupported_gpu_architecture_rejects(tmp_path):
+    proof, sha = _write_proof_dir(tmp_path, gpu_architecture="ampere-a100")
+    issues, rows, gpu_architecture = check_proof_dir(proof, claimed_sha256=sha)
+    assert any("gpu_architecture" in issue for issue in issues)
+
+
+def test_missing_gpu_architecture_rejects(tmp_path):
+    proof = tmp_path / "proof"
+    proof.mkdir()
+    traj_lines = json.dumps({"prompt": "p0", "response": "r0"}) + "\n"
+    (proof / "trajectories.jsonl").write_text(traj_lines)
+    sha = hashlib.sha256(traj_lines.encode()).hexdigest()
+    (proof / "manifest.json").write_text(json.dumps({"version": "sparkproof-2"}))
+    (proof / "prompts.jsonl").write_text(json.dumps({"prompt": "p0"}) + "\n")
+    (proof / "trajectories_raw.jsonl").write_text(traj_lines)
+    (proof / "validation_report.jsonl").write_text(json.dumps({"index": 0, "validation": {"passed": True}}) + "\n")
+    (proof / "gpu_attestation.json").write_text(json.dumps({"passed": True, "nonce": "n" * 64}))
+    (proof / "novelty_report.json").write_text(json.dumps({"verified_rows": 1, "novel_verified_rows": 1}))
+    (proof / "dataset_manifest.json").write_text(
+        json.dumps({"passed": True, "blocked_rows": 0, "rows_total": 1, "trajectories_sha256": sha})
+    )
+    issues, _rows, gpu_architecture = check_proof_dir(proof, claimed_sha256=sha)
+    assert gpu_architecture is None
+    assert any("gpu_architecture" in issue for issue in issues)
 
 
 def test_failed_attestation_rejects(tmp_path):

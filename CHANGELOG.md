@@ -5,6 +5,20 @@ All notable changes to SparkDistill are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- **Hopper H100/H200 dataset generation** (SparkProof): dataset-track proof-of-work
+  no longer requires Blackwell hardware — SparkProof detects Blackwell or Hopper
+  H100/H200 automatically (rejecting Ampere/Ada/etc.) and stamps prompts, mutation
+  and failure-mining templates, self-evolution, and decontamination fingerprints
+  with the matching architecture so training-data text always matches the GPU that
+  validated it. `datasets/registry.jsonl` entries gain a required `gpu_architecture`
+  field (`blackwell` or `hopper`), read straight from the bundle's
+  `dataset_manifest.json`; the registry gate cross-checks the miner's claim against
+  the re-verified bundle the same way it already does for `rows_total`.
+- Fixed a pre-existing `NameError` in `eval.score` (undefined `TIER_BENCHMARK`) and
+  a missing `import os` in `eval.registry_gate` (`commit_canonical_pin_to_main`),
+  both surfaced while wiring up the Hopper registry field.
+
 ## [0.1.1] — 2026-07-12
 
 Hardens the proof of training into dual-vendor authenticated, measured-VM

@@ -1,10 +1,7 @@
 import json
 
-import pytest
-
 from eval.attested_samples import (
     ATTESTED_SAMPLES_FILENAME,
-    ATTESTED_SAMPLES_VERSION,
     build_attested_samples_document,
     build_gsm8k_regression_entry,
     build_lm_eval_entry,
@@ -39,7 +36,7 @@ def _tdx_binding(bundle_dir, attestation):
 
 def test_verify_attested_samples_requires_gpu_and_tdx_bindings(tmp_path):
     responses = [
-        {"problem_id": int(row["problem_id"]), "model_response": f"#### {row['answer']}"}
+        {"problem_id": int(row["problem_id"]), "model_response": f"#### {row['answer'].split('####')[-1].strip()}"}
         for row in load_regression_problems()
     ]
     document = build_attested_samples_document(
@@ -127,7 +124,7 @@ def test_verify_attested_lm_eval_and_triton_entries(tmp_path):
 def test_read_attested_samples_wraps_legacy_gsm8k_file(tmp_path):
     sample = build_regression_sample(
         [
-            {"problem_id": int(row["problem_id"]), "model_response": f"#### {row['answer']}"}
+            {"problem_id": int(row["problem_id"]), "model_response": f"#### {row['answer'].split('####')[-1].strip()}"}
             for row in load_regression_problems()
         ]
     )

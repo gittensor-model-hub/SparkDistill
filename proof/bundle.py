@@ -27,8 +27,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from eval.dataset_verify import _sha256_file
 from eval.attested_samples import ATTESTED_SAMPLES_FILENAME
+from eval.dataset_verify import _sha256_file
 from eval.regression_sample import REGRESSION_SAMPLE_FILENAME
 
 

@@ -25,6 +25,7 @@ def _registry_entry(miner: str, sha: str, *, rows: int = 2) -> dict:
         "trajectories_sha256": sha,
         "rows_total": rows,
         "dataset_version": "triton-distill-v0.2",
+        "gpu_architecture": "blackwell",
     }
 
 
@@ -80,6 +81,7 @@ def test_mix_registry_deduplicates_and_writes_manifest(tmp_path: Path):
                 "rows_total": 2,
                 "trajectories_sha256": sha_a,
                 "dataset_version": "triton-distill-v0.2",
+                "gpu_architecture": "blackwell",
             }
         ),
         encoding="utf-8",
@@ -97,6 +99,7 @@ def test_mix_registry_deduplicates_and_writes_manifest(tmp_path: Path):
                 "rows_total": 1,
                 "trajectories_sha256": sha_b,
                 "dataset_version": "triton-distill-v0.2",
+                "gpu_architecture": "blackwell",
             }
         ),
         encoding="utf-8",

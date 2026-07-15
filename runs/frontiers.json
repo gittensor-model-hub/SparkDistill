@@ -1,0 +1,21 @@
+{
+  "blackwell": {
+    "gpu_architecture": "blackwell",
+    "run_id": "2026-07-11-qwen3.5-4b-mining-001",
+    "proof_bundle": "https://huggingface.co/gittensor-model-hub/sparkdistill-2026-07-11-qwen3.5-4b-mining-001",
+    "scores": {
+      "gsm8k": 0.6,
+      "triton": 0.42777777777777776,
+      "triton_quick": 0.42777777777777776,
+      "triton_exec_pass_rate": 0.0,
+      "triton_correctness": 0.0,
+      "triton_syntax_pass_rate": 1.0
+    }
+  },
+  "hopper": {
+    "gpu_architecture": "hopper",
+    "run_id": null,
+    "proof_bundle": null,
+    "scores": {}
+  }
+}

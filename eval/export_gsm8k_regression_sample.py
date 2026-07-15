@@ -12,15 +12,8 @@ import json
 import sys
 from pathlib import Path
 
+from eval.gsm8k_eval import format_gsm8k_prompt
 from eval.regression_sample import REGRESSION_PROBLEMS_PATH, build_regression_sample, load_regression_problems
-
-
-def _format_prompt(question: str) -> str:
-    return (
-        "Solve the following grade-school math word problem. "
-        "Show your work, then give the final numeric answer after #### on its own line.\n\n"
-        f"Question: {question}\n\nAnswer:"
-    )
 
 
 def export_gsm8k_regression_sample(
@@ -45,7 +38,7 @@ def export_gsm8k_regression_sample(
 
     responses: list[dict] = []
     for row in problems:
-        prompt = _format_prompt(str(row["question"]))
+        prompt = format_gsm8k_prompt(str(row["question"]))
         inputs = tokenizer(prompt, return_tensors="pt")
         if torch.cuda.is_available():
             inputs = {key: value.to(model.device) for key, value in inputs.items()}

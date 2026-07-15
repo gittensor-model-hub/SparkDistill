@@ -175,16 +175,16 @@ def test_no_frontier_yields_baseline_label(tmp_path, monkeypatch):
     (bundle / "manifest.json").write_text(
         json.dumps({"run_id": "r1", "dataset_url": canonical_hf_url()})
     )
-    (bundle / "eval_scores.json").write_text(json.dumps({"scores": {"gsm8k": 0.6}}))
-    monkeypatch.setattr(v, "run_harness", lambda *a, **k: {"gsm8k": 0.6})
+    (bundle / "eval_scores.json").write_text(json.dumps({"scores": {"gsm8k": 0.6, "triton": 0.5}}))
+    monkeypatch.setattr(v, "run_harness", lambda *a, **k: {"gsm8k": 0.6, "triton": 0.5})
 
     report = v.verify_submission(bundle, frontier=None)
     assert report["verified"] is True
     assert report["label"] == "eval:BASELINE"
     assert report["per_benchmark"]["gsm8k"] == {"candidate": 0.6, "frontier": None}
 
-    # With a frontier, normal tier scoring applies unchanged.
-    scored = v.verify_submission(bundle, frontier={"gsm8k": 0.5})
+    # With a frontier, tier scoring uses triton only.
+    scored = v.verify_submission(bundle, frontier={"gsm8k": 0.5, "triton": 0.4})
     assert scored["label"] == "eval:XL"
 
 
@@ -228,13 +228,13 @@ def test_attested_gsm8k_skips_harness_without_checkpoint(tmp_path, monkeypatch):
     import json
 
     import eval.verify as v
+    from eval.attestation import tdx_report_data
     from eval.canonical_dataset import canonical_hf_url
     from eval.regression_sample import REGRESSION_SAMPLE_FILENAME, build_regression_sample, load_regression_problems
-    from eval.attestation import tdx_report_data
     from proof.bundle import claim_sha256
 
     responses = [
-        {"problem_id": int(row["problem_id"]), "model_response": f"#### {row['answer']}"}
+        {"problem_id": int(row["problem_id"]), "model_response": f"#### {row['answer'].split('####')[-1].strip()}"}
         for row in load_regression_problems()
     ]
     sample = build_regression_sample(responses)
@@ -273,7 +273,7 @@ def test_attested_gsm8k_sample_without_attestation_fails(tmp_path):
     from eval.verify import verify_submission
 
     responses = [
-        {"problem_id": int(row["problem_id"]), "model_response": f"#### {row['answer']}"}
+        {"problem_id": int(row["problem_id"]), "model_response": f"#### {row['answer'].split('####')[-1].strip()}"}
         for row in load_regression_problems()
     ]
     sample = build_regression_sample(responses)
