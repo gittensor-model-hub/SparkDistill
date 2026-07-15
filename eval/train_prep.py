@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
 from typing import Any
@@ -15,7 +16,19 @@ from eval.canonical_dataset import assert_recipe_uses_canonical_dataset
 # Axolotl multipack sampler fails on very small mixes (observed at 17 rows).
 MIN_SAMPLE_PACKING_ROWS = 32
 
+# Rough chars→tokens for chat JSON without loading a tokenizer (~code/English mix).
+_CHARS_PER_TOKEN = 4.0
+# Chat-template / special-token overhead per message (conservative).
+_TOKENS_PER_MESSAGE_OVERHEAD = 8
+# Candidate sequence lengths (Axolotl-friendly). Pack-budget only snaps downward.
+_SEQUENCE_LEN_CANDIDATES = (1024, 1536, 2048, 2560, 3072, 3584, 4096, 5120, 6144, 8192)
+# Only retune when current pad fraction is at least this high.
+_MIN_PAD_RATIO_TO_TUNE = 0.15
+# When estimated steps/epoch fall at or below this, clamp mid-epoch eval/save I/O.
+_IO_THROTTLE_MAX_STEPS = 64
+
 _PATH_KEYS = ("path", "dataset_prepared_path", "output_dir")
+_SPARKDISTILL_KEYS = ("sparkdistill_pack_budget", "sparkdistill_io_throttle")
 
 
 def count_jsonl_rows(path: Path) -> int:
@@ -25,6 +38,184 @@ def count_jsonl_rows(path: Path) -> int:
             if line.strip():
                 count += 1
     return count
+
+
+def estimate_row_tokens(row: dict[str, Any]) -> int:
+    """Estimate tokens for one SFT chat row without loading a tokenizer."""
+    messages = row.get("messages")
+    if not isinstance(messages, list):
+        # Fall back to raw payload size for non-chat rows.
+        return max(1, math.ceil(len(json.dumps(row, ensure_ascii=False)) / _CHARS_PER_TOKEN))
+
+    total = 0
+    for message in messages:
+        if not isinstance(message, dict):
+            continue
+        content = message.get("content", "")
+        if not isinstance(content, str):
+            content = json.dumps(content, ensure_ascii=False)
+        total += math.ceil(len(content) / _CHARS_PER_TOKEN) + _TOKENS_PER_MESSAGE_OVERHEAD
+    return max(1, total)
+
+
+def profile_jsonl_token_lengths(path: Path) -> tuple[int, list[int]]:
+    """Return (row_count, per-row token estimates) for a chat jsonl file."""
+    lengths: list[int] = []
+    with path.open(encoding="utf-8") as handle:
+        for line in handle:
+            text = line.strip()
+            if not text:
+                continue
+            try:
+                row = json.loads(text)
+            except json.JSONDecodeError:
+                lengths.append(1)
+                continue
+            if isinstance(row, dict):
+                lengths.append(estimate_row_tokens(row))
+            else:
+                lengths.append(1)
+    return len(lengths), lengths
+
+
+def greedy_pack_pad_ratio(lengths: list[int], sequence_len: int) -> float:
+    """Next-fit pad ratio for lengths packed into fixed sequence_len bins."""
+    if not lengths or sequence_len <= 0:
+        return 0.0
+
+    bins = 0
+    used = 0
+    waste = 0
+    for raw in lengths:
+        length = min(max(1, raw), sequence_len)
+        if used and used + length > sequence_len:
+            waste += sequence_len - used
+            bins += 1
+            used = 0
+        used += length
+    if used:
+        waste += sequence_len - used
+        bins += 1
+    capacity = bins * sequence_len
+    if capacity <= 0:
+        return 0.0
+    return waste / capacity
+
+
+def choose_pack_budget_sequence_len(lengths: list[int], current: int) -> int:
+    """Snap sequence_len downward when pad_to_sequence_len would waste FLOPs.
+
+    Prefer the candidate with the lowest next-fit pad ratio. Near-ties keep the
+    shorter context so attention work shrinks without giving pad back.
+    """
+    if not lengths or current <= 0:
+        return current
+    max_len = max(lengths)
+    if max_len > current:
+        return current
+
+    current_pad = greedy_pack_pad_ratio(lengths, current)
+    if current_pad < _MIN_PAD_RATIO_TO_TUNE:
+        return current
+
+    best = current
+    best_pad = current_pad
+    for candidate in _SEQUENCE_LEN_CANDIDATES:
+        if candidate < max_len or candidate >= current:
+            continue
+        pad = greedy_pack_pad_ratio(lengths, candidate)
+        # Require a real pad win; on a near-tie prefer the shorter budget.
+        if pad + 1e-9 < best_pad - 0.02 or (
+            abs(pad - best_pad) <= 0.02 and candidate < best and pad <= current_pad
+        ):
+            best = candidate
+            best_pad = pad
+    return best
+
+
+def _flag_enabled(cfg: dict[str, Any], key: str, *, default: bool) -> bool:
+    value = cfg.get(key, default)
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() not in {"0", "false", "no", "off"}
+    return bool(value) if value is not None else default
+
+
+def apply_pack_budget(
+    cfg: dict[str, Any],
+    lengths: list[int],
+    notes: list[str],
+) -> None:
+    """Lower sequence_len when packing + pad_to_sequence_len is pad-heavy."""
+    if not _flag_enabled(cfg, "sparkdistill_pack_budget", default=True):
+        notes.append("pack-budget skipped (sparkdistill_pack_budget=false)")
+        return
+    if not cfg.get("sample_packing") or not cfg.get("pad_to_sequence_len"):
+        return
+
+    current = cfg.get("sequence_len")
+    if not isinstance(current, int) or current <= 0:
+        return
+
+    chosen = choose_pack_budget_sequence_len(lengths, current)
+    if chosen >= current:
+        notes.append(
+            "pack-budget: keep sequence_len="
+            f"{current} (pad_ratio={greedy_pack_pad_ratio(lengths, current):.2f})"
+        )
+        return
+
+    before_pad = greedy_pack_pad_ratio(lengths, current)
+    after_pad = greedy_pack_pad_ratio(lengths, chosen)
+    cfg["sequence_len"] = chosen
+    notes.append(
+        f"pack-budget: sequence_len {current}→{chosen} "
+        f"(est. pad_ratio {before_pad:.2f}→{after_pad:.2f}, max_row≈{max(lengths)})"
+    )
+
+
+def estimated_steps_per_epoch(cfg: dict[str, Any], row_count: int) -> int:
+    micro = cfg.get("micro_batch_size") or 1
+    try:
+        micro_i = max(1, int(micro))
+    except (TypeError, ValueError):
+        micro_i = 1
+    # Unpacked upper bound; packing coalesces rows so real steps are lower.
+    steps = max(1, math.ceil(row_count / micro_i))
+    if cfg.get("sample_packing"):
+        steps = max(1, math.ceil(steps / 2))
+    return steps
+
+
+def apply_io_throttle(
+    cfg: dict[str, Any],
+    row_count: int | None,
+    notes: list[str],
+) -> None:
+    """Clamp mid-epoch eval/save when the pack is too small to justify the I/O tax."""
+    if not _flag_enabled(cfg, "sparkdistill_io_throttle", default=True):
+        notes.append("I/O throttle skipped (sparkdistill_io_throttle=false)")
+        return
+    if row_count is None:
+        return
+
+    steps = estimated_steps_per_epoch(cfg, row_count)
+    if steps > _IO_THROTTLE_MAX_STEPS:
+        return
+
+    for key in ("evals_per_epoch", "saves_per_epoch"):
+        value = cfg.get(key)
+        if isinstance(value, (int, float)) and value > 1:
+            cfg[key] = 1
+            notes.append(
+                f"{key} clamped to 1 (small-pack I/O throttle, ~{steps} steps/epoch)"
+            )
+
+
+def _strip_sparkdistill_keys(cfg: dict[str, Any]) -> None:
+    for key in _SPARKDISTILL_KEYS:
+        cfg.pop(key, None)
 
 
 def _has_flash_attn() -> bool:
@@ -89,6 +280,7 @@ def prepare_train_recipe(
 
     notes: list[str] = []
     row_count: int | None = None
+    token_lengths: list[int] = []
 
     for key in _PATH_KEYS:
         value = cfg.get(key)
@@ -107,8 +299,9 @@ def prepare_train_recipe(
                 entry["path"] = _resolve_path(data_path, root)
             data_path = entry.get("path")
             if isinstance(data_path, str) and data_path.endswith(".jsonl"):
-                rows = count_jsonl_rows(Path(data_path))
+                rows, lengths = profile_jsonl_token_lengths(Path(data_path))
                 total_rows += rows
+                token_lengths.extend(lengths)
                 counted_sources += 1
                 notes.append(f"dataset rows: {rows}")
         if counted_sources:
@@ -125,6 +318,11 @@ def prepare_train_recipe(
         if cfg.get("pad_to_sequence_len"):
             cfg["pad_to_sequence_len"] = False
             notes.append("pad_to_sequence_len disabled for small dataset")
+
+    if token_lengths:
+        apply_pack_budget(cfg, token_lengths, notes)
+
+    apply_io_throttle(cfg, row_count, notes)
 
     attn = cfg.get("attn_implementation")
     if attn == "flash_attention_2" and _has_flash_attn_3():
@@ -146,6 +344,8 @@ def prepare_train_recipe(
         if cce_reason:
             cfg.pop("plugins", None)
             notes.append(f"removed CutCrossEntropyPlugin ({cce_reason})")
+
+    _strip_sparkdistill_keys(cfg)
 
     destination = out_path or (root / "data" / "prepared" / f"{recipe_path.stem}.prepared.yaml")
     destination.parent.mkdir(parents=True, exist_ok=True)
