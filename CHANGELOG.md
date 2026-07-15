@@ -5,18 +5,12 @@ All notable changes to SparkDistill are documented here. The format follows
 
 ## [Unreleased]
 
-### Fixed
-- **Architecture-scoped dataset dedupe:** exact dedupe (mining mix + registry snapshot +
-  SparkProof novelty gate) now keys prompt matches by `gpu_architecture`. The same prompt
-  on Blackwell vs Hopper is a fresh row, not a duplicate — pairs with SparkProof arch-aware
-  `NoveltyRegistry` exact fingerprints.
-
 ## [0.1.2] — 2026-07-15
 
 Hopper joins Blackwell on both mining tracks, per-architecture frontiers replace the
 shared Triton scoreboard, and dataset verification closes the last userland trust gaps
-(NRAS JWKS + Intel TDX). Training-track CI now re-runs every attested check that does
-not need a GPU, and the ledger finally writes itself at merge time.
+(NRAS JWKS + Intel TDX). Architecture-scoped exact dedupe and a refreshed canonical mining
+mix (174→178 rows) land in the same release window.
 
 ### Added
 - **Canonical mining dataset for every training PR** ([#89], [#97]): `datasets/canonical.json`
@@ -69,9 +63,14 @@ not need a GPU, and the ledger finally writes itself at merge time.
   live config via [gittensor #1635](https://github.com/entrius/gittensor/pull/1635).
 - **Mining mix dedupe defaults to `exact`** ([#98]): only identical prompts drop at mix
   time; quality still enforced by SparkProof pre-merge. `dedupe_mode` recorded in
-  `mix_manifest.json` ([#98] policy docs).
-- **Canonical pin grows 94 → 133 → 174 rows** as registry merges land ([#99], [#115],
-  [#107]); `prepare_mining_sft` export format now matches registry publish ([#100]).
+  `mix_manifest.json` ([#98] policy docs). Exact dedupe is **architecture-scoped**
+  ([#133], SparkProof [#26]): same prompt on Blackwell vs Hopper is a fresh row.
+- **Miner docs: registry snapshot workflow** ([#132]): `sparkproof-publish-dataset
+  --mining-repo` and `accepted_registry_snapshot.jsonl` pins in `docs/miner-guide.md`
+  and `datasets/README.md`.
+- **Canonical pin grows 94 → 133 → 174 → 178 rows** as registry merges land ([#99],
+  [#115], [#107], [#134]); `prepare_mining_sft` export format now matches registry
+  publish ([#100]).
 - **Training GPU claims** accept H100/H200 and B200/B300 in proof bundles ([#98]).
 - **Blackwell training defaults to SDPA** with hardened Qwen3.5 train prep ([#84]).
 - **Auto-close `dataset:none` PRs** ([#91]); PR template checkboxes accept bold or plain
@@ -90,6 +89,11 @@ not need a GPU, and the ledger finally writes itself at merge time.
 - **H200 attestation corroboration** ([#126]): genuine H200 nodes report `hwmodel=GH100`
   (same die as H100); old check wrongly required `gh200` tokens.
 - **Invalid YAML in `update_canonical_pin.yml`** blocked the workflow entirely ([#98]).
+- **Architecture-scoped dataset dedupe** ([#133], SparkProof [#26]): exact dedupe keys
+  prompt matches by `gpu_architecture` in mining mix, registry snapshot, and SparkProof
+  novelty gate.
+- **Canonical mining pin refresh** ([#134]): republished `gittensor-model-hub/sparkproof-mining`
+  with arch-aware dedupe — **174 → 178 rows** (+4 cross-arch prompts wrongly dropped).
 
 ## [0.1.1] — 2026-07-12
 
@@ -235,6 +239,9 @@ and verify it from public artifacts alone.
 [#125]: https://github.com/gittensor-model-hub/SparkDistill/pull/125
 [#126]: https://github.com/gittensor-model-hub/SparkDistill/pull/126
 [#127]: https://github.com/gittensor-model-hub/SparkDistill/pull/127
+[#132]: https://github.com/gittensor-model-hub/SparkDistill/pull/132
+[#133]: https://github.com/gittensor-model-hub/SparkDistill/pull/133
+[#134]: https://github.com/gittensor-model-hub/SparkDistill/pull/134
 
 [Unreleased]: https://github.com/gittensor-model-hub/SparkDistill/compare/v0.1.2...HEAD
 [0.1.2]: https://github.com/gittensor-model-hub/SparkDistill/releases/tag/v0.1.2
