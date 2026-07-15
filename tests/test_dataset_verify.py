@@ -70,7 +70,14 @@ def test_unsupported_gpu_architecture_rejects(tmp_path):
     assert any("gpu_architecture" in issue for issue in issues)
 
 
-def test_missing_gpu_architecture_rejects(tmp_path):
+def test_missing_gpu_architecture_defaults_to_blackwell(tmp_path):
+    # Regression test: bundles published before the gpu_architecture field existed
+    # (e.g. speedy00/sparkproof-miner-25-v1's live HF dataset_manifest.json) must
+    # keep verifying — this field is re-checked on EVERY registry entry whenever
+    # the canonical mining dataset re-aggregates, not just on new submissions, so
+    # treating a missing key as a hard failure breaks every prior merge and blocks
+    # the mining-dataset publish step for brand-new PRs too. Confirmed live: this
+    # broke PR #105's auto-merge on 2026-07-15 before this fix.
     proof = tmp_path / "proof"
     proof.mkdir()
     traj_lines = json.dumps({"prompt": "p0", "response": "r0"}) + "\n"
@@ -86,8 +93,17 @@ def test_missing_gpu_architecture_rejects(tmp_path):
         json.dumps({"passed": True, "blocked_rows": 0, "rows_total": 1, "trajectories_sha256": sha})
     )
     issues, _rows, gpu_architecture = check_proof_dir(proof, claimed_sha256=sha)
+    assert issues == []
+    assert gpu_architecture == "blackwell"
+
+
+def test_garbage_gpu_architecture_value_still_rejects(tmp_path):
+    # Unlike a missing key, an explicitly-present-but-unrecognized value is a
+    # real anomaly (corrupted or hand-edited manifest) and must still fail.
+    proof, sha = _write_proof_dir(tmp_path, gpu_architecture="not-a-real-gpu")
+    issues, _rows, gpu_architecture = check_proof_dir(proof, claimed_sha256=sha)
     assert gpu_architecture is None
-    assert any("gpu_architecture" in issue for issue in issues)
+    assert any("not recognized" in issue for issue in issues)
 
 
 def test_failed_attestation_rejects(tmp_path):

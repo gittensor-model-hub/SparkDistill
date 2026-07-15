@@ -40,7 +40,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from eval.gpu_architecture import dataset_architecture_allowed, normalize_gpu_architecture
+from eval.gpu_architecture import DEFAULT_GPU_ARCHITECTURE, dataset_architecture_allowed, normalize_gpu_architecture
 
 # (min_rows, label) — first match wins, checked largest-to-smallest.
 _SIZE_BANDS = [
@@ -112,10 +112,17 @@ def check_proof_dir(proof_dir: Path, claimed_sha256: str | None = None) -> tuple
     if not novelty_path.exists():
         issues.append("missing novelty_report.json from release gate")
 
-    gpu_architecture = normalize_gpu_architecture(dataset_manifest.get("gpu_architecture"))
-    if gpu_architecture is None:
-        issues.append("dataset_manifest.gpu_architecture missing or unrecognized")
-    elif not dataset_architecture_allowed(gpu_architecture):
+    raw_gpu_architecture = dataset_manifest.get("gpu_architecture")
+    if raw_gpu_architecture is None:
+        # Legacy bundle predating Hopper support (field didn't exist yet) —
+        # every dataset accepted before this field existed was Blackwell-only,
+        # so defaulting here doesn't let anything actually unsupported through.
+        gpu_architecture = DEFAULT_GPU_ARCHITECTURE
+    else:
+        gpu_architecture = normalize_gpu_architecture(raw_gpu_architecture)
+        if gpu_architecture is None:
+            issues.append(f"dataset_manifest.gpu_architecture {raw_gpu_architecture!r} is not recognized")
+    if gpu_architecture is not None and not dataset_architecture_allowed(gpu_architecture):
         issues.append(f"gpu_architecture {gpu_architecture!r} is not an accepted dataset-generation architecture")
 
     return issues, rows, gpu_architecture
