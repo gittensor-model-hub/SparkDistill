@@ -142,9 +142,16 @@ with speedy00. Set `SPARKDISTILL_MINING_DEDUPE=none` only for local debugging.
 
 **Miner-side dedupe prevention:** after each registry merge, CI publishes
 `accepted_registry_snapshot.jsonl` on the canonical mining HF repo and pins
-`accepted_registry_snapshot_sha256` in `mix_manifest.json`. Miners pass the
-snapshot to SparkProof as `--registry-snapshot` and verify the sha256 pin before
-publish. The registry gate recomputes and checks the pin after every merge.
+`accepted_registry_snapshot_sha256` in `mix_manifest.json`. SparkProof **v0.1.2+**
+downloads and verifies that snapshot automatically:
+
+```bash
+sparkproof-publish-dataset --bundle <dir> --repo-id <you>/<repo> --release-gate --mining-repo
+```
+
+Or download first via `scripts/download_registry_snapshot.sh` (SparkProof repo) and pass
+`--registry-snapshot`. See [SparkProof `docs/MINER_GUIDE.md`](https://github.com/gittensor-model-hub/SparkProof/blob/main/docs/MINER_GUIDE.md).
+The registry gate recomputes and checks the pin after every merge.
 
 After each eligible registry merge, CI refreshes [`canonical.json`](canonical.json) from
 the live HF `mix_manifest.json` (also triggered by `.github/workflows/update_canonical_pin.yml`).

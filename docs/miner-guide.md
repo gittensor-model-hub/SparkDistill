@@ -85,18 +85,26 @@ the pinned `trajectories_sha256` are in [`datasets/README.md`](../datasets/READM
 
 ### Avoid registry dedupe before you publish
 
-SparkProof already supports cross-registry novelty when you pass the pinned
-accepted snapshot:
+SparkProof downloads and verifies the pinned snapshot for you (SparkProof v0.1.2+):
 
 ```bash
-# download the current accepted registry snapshot (updated after every merge)
-huggingface-cli download gittensor-model-hub/sparkproof-mining accepted_registry_snapshot.jsonl
-
+# Recommended: download + verify + publish in one step
+uv sync --extra publish --frozen
 sparkproof-publish-dataset \
   --bundle <dir> \
   --repo-id <you>/<repo> \
-  --registry-snapshot ./accepted_registry_snapshot.jsonl
+  --release-gate --mining-repo
+
+# Or download first, then publish with an explicit path
+scripts/download_registry_snapshot.sh --out-dir ./snapshots   # from SparkProof repo
+sparkproof-publish-dataset \
+  --bundle <dir> \
+  --repo-id <you>/<repo> \
+  --release-gate \
+  --registry-snapshot ./snapshots/accepted_registry_snapshot.jsonl
 ```
+
+See [SparkProof `docs/MINER_GUIDE.md`](https://github.com/gittensor-model-hub/SparkProof/blob/main/docs/MINER_GUIDE.md#avoid-registry-dedupe-surprises).
 
 `novelty_report.json` will then include registry duplicates, not just
 intra-bundle duplicates. Target `novel_verified_rows` ≥ 25 before publishing.
