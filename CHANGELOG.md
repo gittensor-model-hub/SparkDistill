@@ -5,52 +5,85 @@ All notable changes to SparkDistill are documented here. The format follows
 
 ## [Unreleased]
 
-### Changed
-- **SN74 eval tier multipliers (2× dataset at same letter):** live Gittensor payout for
-  training-track `eval:XL/L/M/S/XS` is now **2×** the `dataset:xl/l/m/s/xs` multiplier at
-  the same tier (e.g. `eval:L` = 5.0 vs `dataset:l` = 2.5); `eval:BASELINE` = **2.0**.
-  Documented in `.gittensor/weights.json`, `docs/miner-guide.md`, and
-  `datasets/README.md`. Config lands via
-  [gittensor PR #1635](https://github.com/entrius/gittensor/pull/1635).
+## [0.1.2] — 2026-07-15
+
+Hopper joins Blackwell on both mining tracks, per-architecture frontiers replace the
+shared Triton scoreboard, and dataset verification closes the last userland trust gaps
+(NRAS JWKS + Intel TDX). Training-track CI now re-runs every attested check that does
+not need a GPU, and the ledger finally writes itself at merge time.
 
 ### Added
-- **Training-track canonical pin grace window** ([#121], fixes [#118]): training PRs
-  no longer fail when dataset-track merges advance `datasets/canonical.json` while a
-  miner is still training (~60 min cycles). The gate accepts any `sft_sha256` from the
-  PR merge-base through `main` HEAD (merge-base pin, each intermediate pin commit, and
-  current HEAD). Cite the pin you actually trained on in the PR body; the proof bundle
-  `mix_manifest.sft_sha256` must match one of those accepted pins. Live HF pin vs HEAD
-  check is unchanged.
+- **Canonical mining dataset for every training PR** ([#89], [#97]): `datasets/canonical.json`
+  pins `gittensor-model-hub/sparkproof-mining`; recipes must cite the canonical path,
+  HF URL, and `sft_sha256`. Training gate rejects local generators, private blends, and
+  registry edits; published HF proof bundles are mandatory ([#97]).
+- **Training-track canonical pin grace window** ([#121], fixes [#118]): when dataset
+  merges advance the pin mid-train (~60 min cycles), the gate accepts any `sft_sha256`
+  from the PR merge-base through `main` HEAD. Cite the pin you trained on in the PR body.
+- **Hopper H100/H200 dataset generation** ([#104], SparkProof [#20]): registry entries
+  carry required `gpu_architecture` (`blackwell` / `hopper`), cross-checked against the
+  re-verified bundle. SparkProof stamps architecture-specific prompts and validation.
+- **Per-architecture TritonBench frontiers** ([#104], [#109]): `runs/frontiers.json`
+  holds separate Blackwell and Hopper buckets; `eval.verify` tiers each bundle against
+  its own architecture's frontier instead of comparing hardware-sensitive speed numbers
+  across GPUs. `eval.triton_bench` records the architecture a run executed on.
+- **Attested no-GPU validator path** ([#101], [#104]): miners export
+  `attested_eval_samples.json` on a GPU CC + Intel TDX guest once; validators
+  re-check claimed scores from bundled artifacts on CPU alone — no checkpoint
+  reproduction, no harness re-run. GSM8K uses a frozen 50-problem set with CPU
+  re-grading.
 - **Intel TDX for dataset-track bundles** ([#122], SparkProof [#22]): production
-  dataset verification now requires `gpu_attestation.tdx` with `report_data` bound
-  to the same dataset nonce as NRAS GPU CC attestation — closing the userland trust
-  gap where GPU attestation alone could not prove the measured VM ran real SparkProof
-  validation. `sparkproof-verify --online` additionally DCAP-verifies the Intel quote.
-  Legacy registry bundles without a `tdx` key are grandfathered until republished.
-- **TritonBench is GPU-architecture aware for scoring, not just dataset generation.**
-  `eval.triton_bench` now detects (via `nvidia-smi`, overridable with
-  `SPARKDISTILL_GPU_ARCHITECTURE`) and records which architecture a run executed
-  on. `eval.gpu_architecture.tier_benchmark_for_arch` now tiers **both** Blackwell
-  and Hopper submissions on the Triton composite (previously Hopper silently fell
-  back to GSM8K, since a shared frontier would have compared hardware-sensitive
-  speed numbers across architectures). This is safe because `eval.verify` now
-  resolves each bundle's architecture from its manifest (`gpu_architecture` or
-  `train_gpu` claim) and scores it against that architecture's own frontier
-  bucket in `runs/frontiers.json` (`eval.frontiers`, previously wired up but never
-  actually called from the verification path) instead of a single shared
-  `runs/frontier.json`. Legacy bundles with neither field default to Blackwell.
-- **Hopper H100/H200 dataset generation** (SparkProof): dataset-track proof-of-work
-  no longer requires Blackwell hardware — SparkProof detects Blackwell or Hopper
-  H100/H200 automatically (rejecting Ampere/Ada/etc.) and stamps prompts, mutation
-  and failure-mining templates, self-evolution, and decontamination fingerprints
-  with the matching architecture so training-data text always matches the GPU that
-  validated it. `datasets/registry.jsonl` entries gain a required `gpu_architecture`
-  field (`blackwell` or `hopper`), read straight from the bundle's
-  `dataset_manifest.json`; the registry gate cross-checks the miner's claim against
-  the re-verified bundle the same way it already does for `rows_total`.
-- Fixed a pre-existing `NameError` in `eval.score` (undefined `TIER_BENCHMARK`) and
-  a missing `import os` in `eval.registry_gate` (`commit_canonical_pin_to_main`),
-  both surfaced while wiring up the Hopper registry field.
+  dataset verification requires `gpu_attestation.tdx` with `report_data` bound to the
+  dataset nonce. Legacy bundles without a `tdx` key are grandfathered; `"tdx": null`
+  rejects on new bundles.
+- **NRAS JWKS verification in the dataset gate** ([#53]): `sparkproof-verify --online`
+  is now always passed — hand-crafted attestations fail NVIDIA signature verification.
+- **Fair dataset reward labels** ([#116]): labels come from canonical-mix
+  `rows_selected` after cross-registry dedupe, not raw bundle `verified_rows`.
+- **Accepted-registry snapshot for miner-side novelty** ([#119]): CI publishes
+  `accepted_registry_snapshot.jsonl` + `accepted_task_ids.json` on the canonical mining
+  HF repo so miners can run SparkProof `--registry-snapshot` before spending GPU time.
+- **Training-track ledger automation** ([#127]): `training_track_ledger.yml` appends
+  `runs/ledger.jsonl` and `runs/<run-id>/result.json` on every merged training PR;
+  backfilled [#120].
+- **Training-track attested verification in CI** ([#126]): gate runs `eval.verify`'s
+  CPU-only checks (claim binding, JWKS, TDX DCAP, attested samples) against the PR's
+  committed `attestation.json` and per-arch frontier.
+- **6-hour cron safety net** for canonical pin refresh when registry merges skip the
+  in-job commit path.
+- **Registry merges:** nghetienhiep sparkproof-triton-xl-001 ([#96], 161 rows),
+  magicrails-xs-v1 ([#105], 25 rows), sparkproof-triton-xl-002 ([#112], 159 rows).
+- **First Hopper training BASELINE** ([#120]): magicrails-hopper-v2 on H200 —
+  `eval:BASELINE`, first verified run in the Hopper frontier bucket.
+
+### Changed
+- **SN74 eval tier multipliers (2× dataset at same letter)** ([#125]): training-track
+  `eval:XL/L/M/S/XS` pay **2×** `dataset:xl/l/m/s/xs` at the same tier;
+  `eval:BASELINE` = **2.0**. Documented in `.gittensor/weights.json` and miner guide;
+  live config via [gittensor #1635](https://github.com/entrius/gittensor/pull/1635).
+- **Mining mix dedupe defaults to `exact`** ([#98]): only identical prompts drop at mix
+  time; quality still enforced by SparkProof pre-merge. `dedupe_mode` recorded in
+  `mix_manifest.json` ([#98] policy docs).
+- **Canonical pin grows 94 → 133 → 174 rows** as registry merges land ([#99], [#115],
+  [#107]); `prepare_mining_sft` export format now matches registry publish ([#100]).
+- **Training GPU claims** accept H100/H200 and B200/B300 in proof bundles ([#98]).
+- **Blackwell training defaults to SDPA** with hardened Qwen3.5 train prep ([#84]).
+- **Auto-close `dataset:none` PRs** ([#91]); PR template checkboxes accept bold or plain
+  ([#82]).
+- **GitHub Pages** updated for Hopper support and per-architecture frontiers ([#113]).
+
+### Fixed
+- **Stale `datasets/canonical.json` after registry auto-merges** ([#107]): missing git
+  identity in `dataset_registry.yml` caused silent pin drift; sibling
+  `update_canonical_pin.yml` never fired on token merges.
+- **`prepare_mining_sft` hash mismatch** ([#100]): export now uses the same compact JSON
+  format as registry publish.
+- **`eval.score` NameError** (`TIER_BENCHMARK`) and missing `import os` in
+  `registry_gate` pin path — surfaced while wiring Hopper ([#104]).
+- **Default missing `gpu_architecture` to Blackwell** for legacy bundles ([#106]).
+- **H200 attestation corroboration** ([#126]): genuine H200 nodes report `hwmodel=GH100`
+  (same die as H100); old check wrongly required `gh200` tokens.
+- **Invalid YAML in `update_canonical_pin.yml`** blocked the workflow entirely ([#98]).
 
 ## [0.1.1] — 2026-07-12
 
@@ -169,7 +202,35 @@ and verify it from public artifacts alone.
 [#49]: https://github.com/gittensor-model-hub/SparkDistill/pull/49
 
 [#51]: https://github.com/gittensor-model-hub/SparkDistill/pull/51
+[#53]: https://github.com/gittensor-model-hub/SparkDistill/pull/53
+[#84]: https://github.com/gittensor-model-hub/SparkDistill/pull/84
+[#89]: https://github.com/gittensor-model-hub/SparkDistill/pull/89
+[#91]: https://github.com/gittensor-model-hub/SparkDistill/pull/91
+[#96]: https://github.com/gittensor-model-hub/SparkDistill/pull/96
+[#97]: https://github.com/gittensor-model-hub/SparkDistill/pull/97
+[#98]: https://github.com/gittensor-model-hub/SparkDistill/pull/98
+[#99]: https://github.com/gittensor-model-hub/SparkDistill/pull/99
+[#100]: https://github.com/gittensor-model-hub/SparkDistill/pull/100
+[#101]: https://github.com/gittensor-model-hub/SparkDistill/pull/101
+[#104]: https://github.com/gittensor-model-hub/SparkDistill/pull/104
+[#105]: https://github.com/gittensor-model-hub/SparkDistill/pull/105
+[#106]: https://github.com/gittensor-model-hub/SparkDistill/pull/106
+[#107]: https://github.com/gittensor-model-hub/SparkDistill/pull/107
+[#109]: https://github.com/gittensor-model-hub/SparkDistill/pull/109
+[#112]: https://github.com/gittensor-model-hub/SparkDistill/pull/112
+[#113]: https://github.com/gittensor-model-hub/SparkDistill/pull/113
+[#115]: https://github.com/gittensor-model-hub/SparkDistill/pull/115
+[#116]: https://github.com/gittensor-model-hub/SparkDistill/pull/116
+[#118]: https://github.com/gittensor-model-hub/SparkDistill/issues/118
+[#119]: https://github.com/gittensor-model-hub/SparkDistill/pull/119
+[#120]: https://github.com/gittensor-model-hub/SparkDistill/pull/120
+[#121]: https://github.com/gittensor-model-hub/SparkDistill/pull/121
+[#122]: https://github.com/gittensor-model-hub/SparkDistill/pull/122
+[#125]: https://github.com/gittensor-model-hub/SparkDistill/pull/125
+[#126]: https://github.com/gittensor-model-hub/SparkDistill/pull/126
+[#127]: https://github.com/gittensor-model-hub/SparkDistill/pull/127
 
-[Unreleased]: https://github.com/gittensor-model-hub/SparkDistill/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/gittensor-model-hub/SparkDistill/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/gittensor-model-hub/SparkDistill/releases/tag/v0.1.2
 [0.1.1]: https://github.com/gittensor-model-hub/SparkDistill/releases/tag/v0.1.1
 [0.1.0]: https://github.com/gittensor-model-hub/SparkDistill/releases/tag/v0.1.0
