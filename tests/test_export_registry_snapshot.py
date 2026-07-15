@@ -10,11 +10,19 @@ from eval.export_registry_snapshot import (
 from eval.mix_registry import load_trajectories_jsonl
 
 
-def _traj(task_id: str, prompt: str) -> dict:
+def _traj(task_id: str, prompt: str, *, gpu_architecture: str = "blackwell") -> dict:
     return {
         "prompt": prompt,
         "response": f"```python\n# {task_id}\n```",
-        "metadata": {"prompt_meta": {"task_id": task_id, "origin": "torch_op", "split": "train"}},
+        "metadata": {
+            "prompt_meta": {
+                "task_id": task_id,
+                "origin": "torch_op",
+                "split": "train",
+                "gpu_architecture": gpu_architecture,
+            }
+        },
+        "gpu_architecture": gpu_architecture,
         "sparkproof_validation": {"passed": True},
     }
 
@@ -59,6 +67,45 @@ def test_collect_accepted_trajectories_respects_registry_order(tmp_path, monkeyp
     accepted = collect_accepted_trajectories(entries, dedupe="exact", sparkproof_root=None)
     task_ids = [((row.get("metadata") or {}).get("prompt_meta") or {}).get("task_id") for row in accepted]
     assert task_ids == ["task_a", "task_shared", "task_b"]
+
+
+def test_collect_accepted_trajectories_keeps_same_prompt_across_architectures(tmp_path, monkeypatch):
+    bundle_a = tmp_path / "a" / "proof"
+    bundle_b = tmp_path / "b" / "proof"
+    bundle_a.mkdir(parents=True)
+    bundle_b.mkdir(parents=True)
+    shared = "shared prompt"
+    (bundle_a / "trajectories.jsonl").write_text(json.dumps(_traj("task_bw", shared, gpu_architecture="blackwell")) + "\n")
+    (bundle_b / "trajectories.jsonl").write_text(json.dumps(_traj("task_hp", shared, gpu_architecture="hopper-h100")) + "\n")
+
+    entries = [
+        {
+            "miner": "alice",
+            "hf_url": "https://huggingface.co/datasets/org/a",
+            "trajectories_sha256": "a" * 64,
+            "rows_total": 1,
+            "dataset_version": "triton-distill-v0.2",
+            "gpu_architecture": "blackwell",
+        },
+        {
+            "miner": "bob",
+            "hf_url": "https://huggingface.co/datasets/org/b",
+            "trajectories_sha256": "b" * 64,
+            "rows_total": 1,
+            "dataset_version": "triton-distill-v0.2",
+            "gpu_architecture": "hopper",
+        },
+    ]
+
+    def fake_resolve(entry, proof_cache=None, download_proof=None):
+        repo = entry["hf_url"].rsplit("/", 1)[-1]
+        return tmp_path / repo / "proof"
+
+    monkeypatch.setattr("eval.export_registry_snapshot.resolve_proof_dir", fake_resolve)
+
+    accepted = collect_accepted_trajectories(entries, dedupe="exact", sparkproof_root=None)
+    task_ids = [((row.get("metadata") or {}).get("prompt_meta") or {}).get("task_id") for row in accepted]
+    assert task_ids == ["task_bw", "task_hp"]
 
 
 def test_write_registry_snapshot_writes_task_id_index(tmp_path, monkeypatch):

@@ -29,11 +29,19 @@ def _registry_entry(miner: str, sha: str, *, rows: int = 2) -> dict:
     }
 
 
-def _trajectory(prompt: str, response: str) -> dict:
+def _trajectory(prompt: str, response: str, *, gpu_architecture: str = "blackwell") -> dict:
     return {
         "prompt": prompt,
         "response": response,
-        "metadata": {"prompt_meta": {"task_id": prompt, "origin": "torch_op", "split": "train"}},
+        "metadata": {
+            "prompt_meta": {
+                "task_id": prompt,
+                "origin": "torch_op",
+                "split": "train",
+                "gpu_architecture": gpu_architecture,
+            }
+        },
+        "gpu_architecture": gpu_architecture,
     }
 
 
@@ -139,6 +147,81 @@ def test_mix_registry_deduplicates_and_writes_manifest(tmp_path: Path):
 
     report = verify_mix_manifest(manifest_path, sft_path=out_path, registry_path=registry_path)
     assert report["verified"] is True
+
+
+def test_mix_registry_keeps_same_prompt_across_gpu_architectures(tmp_path: Path):
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    proof_a, _sha_a = _write_proof_dir(tmp_path / "a", rows=1)
+    proof_b, _sha_b = _write_proof_dir(tmp_path / "b", rows=1)
+    shared = "shared prompt across architectures"
+    (proof_a / "trajectories.jsonl").write_text(
+        json.dumps(_trajectory(shared, "resp-a", gpu_architecture="blackwell")) + "\n",
+        encoding="utf-8",
+    )
+    sha_a = hashlib.sha256((proof_a / "trajectories.jsonl").read_bytes()).hexdigest()
+    (proof_a / "dataset_manifest.json").write_text(
+        json.dumps(
+            {
+                "passed": True,
+                "blocked_rows": 0,
+                "rows_total": 1,
+                "trajectories_sha256": sha_a,
+                "dataset_version": "triton-distill-v0.2",
+                "gpu_architecture": "blackwell",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (proof_b / "trajectories.jsonl").write_text(
+        json.dumps(_trajectory(shared, "resp-b", gpu_architecture="hopper-h100")) + "\n",
+        encoding="utf-8",
+    )
+    sha_b = hashlib.sha256((proof_b / "trajectories.jsonl").read_bytes()).hexdigest()
+    (proof_b / "dataset_manifest.json").write_text(
+        json.dumps(
+            {
+                "passed": True,
+                "blocked_rows": 0,
+                "rows_total": 1,
+                "trajectories_sha256": sha_b,
+                "dataset_version": "triton-distill-v0.2",
+                "gpu_architecture": "hopper-h100",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    registry_path = tmp_path / "registry.jsonl"
+    entries = [
+        _registry_entry("alice", sha_a, rows=1),
+        {**_registry_entry("bob", sha_b, rows=1), "gpu_architecture": "hopper"},
+    ]
+    _write_registry(registry_path, entries)
+
+    out_path = tmp_path / "mix_sft.jsonl"
+    manifest_path = tmp_path / "mix_manifest.json"
+    download = _fake_download(
+        {
+            "alice/sparkproof-" + sha_a[:8]: proof_a,
+            "bob/sparkproof-" + sha_b[:8]: proof_b,
+        }
+    )
+
+    result = mix_registry_datasets(
+        entries,
+        out_path=out_path,
+        manifest_path=manifest_path,
+        mix_id="mix-arch-test",
+        dedupe="exact",
+        download_proof=download,
+    )
+
+    assert result.rows_total == 2
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["components"][0]["rows_selected"] == 1
+    assert manifest["components"][1]["rows_selected"] == 1
+    assert manifest["dedupe"]["exact_skipped"] == 0
 
 
 def test_verify_mix_manifest_rejects_unknown_component(tmp_path: Path):

@@ -5,6 +5,12 @@ All notable changes to SparkDistill are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- **Architecture-scoped dataset dedupe:** exact dedupe (mining mix + registry snapshot +
+  SparkProof novelty gate) now keys prompt matches by `gpu_architecture`. The same prompt
+  on Blackwell vs Hopper is a fresh row, not a duplicate — pairs with SparkProof arch-aware
+  `NoveltyRegistry` exact fingerprints.
+
 ## [0.1.2] — 2026-07-15
 
 Hopper joins Blackwell on both mining tracks, per-architecture frontiers replace the

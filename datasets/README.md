@@ -138,7 +138,8 @@ with speedy00. Set `SPARKDISTILL_MINING_DEDUPE=none` only for local debugging.
 **Fair reward labels:** after mixing, the gate labels each submission from
 `mix_manifest.components[].rows_selected` (canonical contribution), not raw bundle
 `rows_total`. A 159-row bundle that only adds 25 novel mix rows earns `dataset:xs`, not
-`dataset:xl`.
+`dataset:xl`. **Exact dedupe is architecture-scoped:** the same prompt on Blackwell vs
+Hopper counts as a fresh row (not a duplicate).
 
 **Miner-side dedupe prevention:** after each registry merge, CI publishes
 `accepted_registry_snapshot.jsonl` on the canonical mining HF repo and pins

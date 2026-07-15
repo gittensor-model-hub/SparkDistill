@@ -169,22 +169,32 @@ class _PromptDedupeRegistry:
     """Fallback exact dedupe when SparkProof is not on the path."""
 
     def __init__(self) -> None:
-        self._prompt_hashes: set[str] = set()
+        self._prompt_keys: set[str] = set()
+
+    @staticmethod
+    def _row_gpu_architecture(row: dict[str, Any]) -> str:
+        meta = (row.get("metadata") or {}).get("prompt_meta") or {}
+        return str(row.get("gpu_architecture") or meta.get("gpu_architecture") or "blackwell")
 
     def classify(self, row: dict[str, Any]) -> Literal["exact", "near", "novel"]:
         prompt = (row.get("prompt") or "").strip().lower()
-        if prompt and prompt in self._prompt_hashes:
+        if not prompt:
+            return "novel"
+        arch = self._row_gpu_architecture(row)
+        key = f"{arch}:{prompt}"
+        if key in self._prompt_keys:
             return "exact"
         return "novel"
 
     def add(self, row: dict[str, Any]) -> None:
         prompt = (row.get("prompt") or "").strip().lower()
         if prompt:
-            self._prompt_hashes.add(prompt)
+            arch = self._row_gpu_architecture(row)
+            self._prompt_keys.add(f"{arch}:{prompt}")
 
     def copy(self) -> "_PromptDedupeRegistry":
         clone = _PromptDedupeRegistry()
-        clone._prompt_hashes = set(self._prompt_hashes)
+        clone._prompt_keys = set(self._prompt_keys)
         return clone
 
 
