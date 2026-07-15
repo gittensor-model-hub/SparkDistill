@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import json
+from typing import Any
 
 # Substrings matched case-insensitively against manifest train_gpu claims.
 ACCEPTED_TRAINING_GPU_SUBSTRINGS = (
-  # Blackwell workstation (RTX PRO 6000, etc.)
+    # Blackwell workstation (RTX PRO 6000, etc.)
     "rtx pro 6000",
     "gb20",
     # Datacenter Blackwell
@@ -32,14 +32,53 @@ def accepted_training_gpu_label() -> str:
     return "Blackwell (RTX PRO 6000 / B200 / B300) or Hopper (H100 / H200) CC node"
 
 
+def _hwmodel_claim_values(claims: dict[str, Any] | None) -> list[str]:
+    """Return only hardware-model claim strings (never the whole claims blob).
+
+    NRAS per-device submodule tokens carry `hwmodel` under `claims.devices`
+    (see `eval.attestation._decode_overall_claims`). A top-level `hwmodel` is
+    also accepted for tests / simplified fixtures.
+    """
+    if not isinstance(claims, dict) or not claims:
+        return []
+
+    values: list[str] = []
+    top = claims.get("hwmodel")
+    if isinstance(top, str) and top.strip():
+        values.append(top)
+
+    devices = claims.get("devices")
+    if isinstance(devices, dict):
+        for device_claims in devices.values():
+            if not isinstance(device_claims, dict):
+                continue
+            hwmodel = device_claims.get("hwmodel")
+            if isinstance(hwmodel, str) and hwmodel.strip():
+                values.append(hwmodel)
+    return values
+
+
 def attestation_corroborates_training_gpu(train_gpu: str, attestation: dict | None) -> bool:
-    """When attestation is present, hwmodel claims must match the declared train_gpu family."""
+    """When attestation is present, hwmodel claims must match the declared train_gpu family.
+
+    Matches **only** `hwmodel` fields — never the flattened claims JSON blob.
+    A grindable `eat_nonce` / `claim_sha256` that happens to contain `b200` etc.
+    must not corroborate a Blackwell declaration against Hopper hardware (#148).
+    """
     if not attestation:
         return True
-    claims_blob = json.dumps(attestation.get("claims") or {}).lower()
-    if claims_blob == "{}":
+    claims = attestation.get("claims") or {}
+    if not isinstance(claims, dict) or claims == {}:
         return True
 
+    hwmodels = _hwmodel_claim_values(claims)
+    if not hwmodels:
+        # No hardware identity to check — fail closed so a nonce/claims grind
+        # cannot stand in for hwmodel (unlike an empty claims dict above, which
+        # preserves the legacy "no claims decoded" pass-through).
+        return False
+
+    claims_blob = " ".join(hwmodels).lower()
     gpu = str(train_gpu).lower()
     if any(token in gpu for token in ("h100", "gh100")):
         return "h100" in claims_blob or "gh100" in claims_blob
