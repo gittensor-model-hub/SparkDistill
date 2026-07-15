@@ -6,6 +6,12 @@ All notable changes to SparkDistill are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- **Intel TDX for dataset-track bundles** ([#122], SparkProof [#22]): production
+  dataset verification now requires `gpu_attestation.tdx` with `report_data` bound
+  to the same dataset nonce as NRAS GPU CC attestation — closing the userland trust
+  gap where GPU attestation alone could not prove the measured VM ran real SparkProof
+  validation. `sparkproof-verify --online` additionally DCAP-verifies the Intel quote.
+  Legacy registry bundles without a `tdx` key are grandfathered until republished.
 - **TritonBench is GPU-architecture aware for scoring, not just dataset generation.**
   `eval.triton_bench` now detects (via `nvidia-smi`, overridable with
   `SPARKDISTILL_GPU_ARCHITECTURE`) and records which architecture a run executed

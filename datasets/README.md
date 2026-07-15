@@ -12,7 +12,8 @@ dataset-track counterpart of `runs/` (which records proof-of-training runs).
    ...) fails fast before any generation starts.
 2. Publish to Hugging Face. The publisher uploads the dataset rows **and** the proof
    artifacts under `proof/` in the same HF repo (`manifest.json`,
-   `dataset_manifest.json`, `gpu_attestation.json`, `trajectories.jsonl`, ...).
+   `dataset_manifest.json`, `gpu_attestation.json` with optional `tdx` Intel quote,
+   `trajectories.jsonl`, ...).
 3. Build the registry line and open a **text-only PR** that appends it to
    `datasets/registry.jsonl`:
 
@@ -36,6 +37,22 @@ attested; a mismatch is `dataset:REJECT`.
 No dataset files are committed here — the PR is the link plus the hash that pins the
 exact gated rows.
 
+### Intel TDX (production required on new bundles)
+
+GPU CC attestation proves the GPU; **Intel TDX** proves the measured VM that ran
+SparkProof. Provision configfs-tsm once per boot on TDX guests before `sparkproof-prove`:
+
+```bash
+sudo chmod 0777 /sys/kernel/config/tsm/report
+mkdir /sys/kernel/config/tsm/report/sparkproof
+sudo chmod 0666 /sys/kernel/config/tsm/report/sparkproof/inblob
+export SPARKPROOF_TSM_REPORT_PATH=/sys/kernel/config/tsm/report/sparkproof
+```
+
+`gpu_attestation.json` then includes `tdx` with `quote_b64` and `report_data` bound to
+the dataset nonce. Bundles merged **before** [#122](https://github.com/gittensor-model-hub/SparkDistill/pull/122)
+lack a `tdx` key and remain grandfathered; republish with TDX for strongest trust.
+
 ## What the validator does
 
 Registry PRs are gated automatically by `.github/workflows/dataset_registry.yml`.
@@ -56,7 +73,9 @@ The gate runs `eval.registry_gate`, which for each appended registry line:
 
 `dataset_verify` checks, in order: required proof artifacts (including
 `trajectories_raw.jsonl`, `validation_report.jsonl`, `novelty_report.json`);
-GPU CC attestation passed with a content-bound nonce; release gate passed and rows
+GPU CC attestation passed with a content-bound nonce; **Intel TDX** (`gpu_attestation.tdx`
+`report_data` bound to that nonce — required on new bundles; legacy entries without a
+`tdx` key are grandfathered); release gate passed and rows
 still match the gated sha256; `dataset_manifest.gpu_architecture` is `blackwell` or
 `hopper` (anything else is `dataset:REJECT`); and full production `sparkproof-verify`
 (pinned generator, Fable 5 / GPT 5.6 Sol at `xhigh`, raw→verified consistency, merkle,

@@ -25,8 +25,8 @@ data.
 
 The full flow, end to end:
 
-1. **Generate** on a Blackwell RTX PRO 6000 or Hopper H100/H200 CC VM with an unmodified
-   SparkProof checkout: `scripts/run_triton_pipeline.sh` (teacher calls go through an
+1. **Generate** on a Blackwell RTX PRO 6000 or Hopper H100/H200 **Intel TDX** CC VM
+   with an unmodified SparkProof checkout: `scripts/run_triton_pipeline.sh` (teacher calls go through an
    approved gateway to the pinned teachers — GPT 5.6 Sol / Fable 5 at `xhigh` — and every
    kernel is compiled and executed on the GPU that's actually present; SparkProof detects
    Blackwell vs. Hopper automatically and rejects anything else before generation starts).
@@ -90,6 +90,11 @@ miners should treat the snapshot as the source of truth for expected credit.
 **Before you generate on a CC VM:** sibling `SparkDistill/tritonbench/` must be present
 (gitignored — sync it beside SparkProof or set `SPARKPROOF_TRITONBENCH_PROBLEMS`). Without
 it, decontamination aborts. Set `HF_TOKEN` in `.env` before `--publish`.
+
+**Intel TDX (required on new dataset bundles):** provision configfs-tsm once per boot so
+`sparkproof-prove` captures `gpu_attestation.tdx` bound to the dataset nonce — see
+[`datasets/README.md`](../datasets/README.md#intel-tdx-production-required-on-new-bundles).
+Without TDX, production verification records `"tdx": null` and rejects the bundle.
 
 ### Can miners submit an evaluation dataset?
 
