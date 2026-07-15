@@ -172,12 +172,17 @@ class _PromptDedupeRegistry:
         self._prompt_keys: set[str] = set()
 
     @staticmethod
+    def _task_prompt(row: dict[str, Any]) -> str:
+        meta = (row.get("metadata") or {}).get("prompt_meta") or {}
+        return str(meta.get("prompt") or row.get("prompt") or "").strip().lower()
+
+    @staticmethod
     def _row_gpu_architecture(row: dict[str, Any]) -> str:
         meta = (row.get("metadata") or {}).get("prompt_meta") or {}
         return str(row.get("gpu_architecture") or meta.get("gpu_architecture") or "blackwell")
 
     def classify(self, row: dict[str, Any]) -> Literal["exact", "near", "novel"]:
-        prompt = (row.get("prompt") or "").strip().lower()
+        prompt = self._task_prompt(row)
         if not prompt:
             return "novel"
         arch = self._row_gpu_architecture(row)
@@ -187,7 +192,7 @@ class _PromptDedupeRegistry:
         return "novel"
 
     def add(self, row: dict[str, Any]) -> None:
-        prompt = (row.get("prompt") or "").strip().lower()
+        prompt = self._task_prompt(row)
         if prompt:
             arch = self._row_gpu_architecture(row)
             self._prompt_keys.add(f"{arch}:{prompt}")

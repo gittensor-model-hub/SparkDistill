@@ -5,6 +5,11 @@ All notable changes to SparkDistill are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- **Repair-tier mix dedupe fallback** (SparkProof [#29]): `_PromptDedupeRegistry` now
+  fingerprints `metadata.prompt_meta.prompt` before top-level `prompt`, matching SparkProof
+  `NoveltyRegistry` for repair-heavy bundles.
+
 ## [0.1.2] — 2026-07-15
 
 Hopper joins Blackwell on both mining tracks, per-architecture frontiers replace the

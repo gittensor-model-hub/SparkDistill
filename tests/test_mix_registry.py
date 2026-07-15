@@ -29,6 +29,27 @@ def _registry_entry(miner: str, sha: str, *, rows: int = 2) -> dict:
     }
 
 
+def _repair_trajectory(task_prompt: str, response: str, *, gpu_architecture: str = "hopper-h100") -> dict:
+    return {
+        "prompt": (
+            "Your prior Triton 3.7.1 answer failed hardware validation.\n"
+            "Failure: triton_api\nTrace tail:\n"
+        ),
+        "response": response,
+        "metadata": {
+            "tier": "repair",
+            "prompt_meta": {
+                "task_id": task_prompt,
+                "prompt": task_prompt,
+                "origin": "torch_op",
+                "split": "train",
+                "gpu_architecture": gpu_architecture,
+            },
+        },
+        "gpu_architecture": gpu_architecture,
+    }
+
+
 def _trajectory(prompt: str, response: str, *, gpu_architecture: str = "blackwell") -> dict:
     return {
         "prompt": prompt,
@@ -36,6 +57,7 @@ def _trajectory(prompt: str, response: str, *, gpu_architecture: str = "blackwel
         "metadata": {
             "prompt_meta": {
                 "task_id": prompt,
+                "prompt": prompt,
                 "origin": "torch_op",
                 "split": "train",
                 "gpu_architecture": gpu_architecture,
@@ -213,6 +235,80 @@ def test_mix_registry_keeps_same_prompt_across_gpu_architectures(tmp_path: Path)
         out_path=out_path,
         manifest_path=manifest_path,
         mix_id="mix-arch-test",
+        dedupe="exact",
+        download_proof=download,
+    )
+
+    assert result.rows_total == 2
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["components"][0]["rows_selected"] == 1
+    assert manifest["components"][1]["rows_selected"] == 1
+    assert manifest["dedupe"]["exact_skipped"] == 0
+
+
+def test_mix_registry_keeps_repair_rows_with_shared_wrapper_but_distinct_tasks(tmp_path: Path):
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    proof_a, _sha_a = _write_proof_dir(tmp_path / "a", rows=1)
+    proof_b, _sha_b = _write_proof_dir(tmp_path / "b", rows=1)
+    (proof_a / "trajectories.jsonl").write_text(
+        json.dumps(_repair_trajectory("translate matmul kernel task A", "resp-a")) + "\n",
+        encoding="utf-8",
+    )
+    sha_a = hashlib.sha256((proof_a / "trajectories.jsonl").read_bytes()).hexdigest()
+    (proof_a / "dataset_manifest.json").write_text(
+        json.dumps(
+            {
+                "passed": True,
+                "blocked_rows": 0,
+                "rows_total": 1,
+                "trajectories_sha256": sha_a,
+                "dataset_version": "triton-distill-v0.2",
+                "gpu_architecture": "hopper-h100",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (proof_b / "trajectories.jsonl").write_text(
+        json.dumps(_repair_trajectory("translate relu kernel task B", "resp-b")) + "\n",
+        encoding="utf-8",
+    )
+    sha_b = hashlib.sha256((proof_b / "trajectories.jsonl").read_bytes()).hexdigest()
+    (proof_b / "dataset_manifest.json").write_text(
+        json.dumps(
+            {
+                "passed": True,
+                "blocked_rows": 0,
+                "rows_total": 1,
+                "trajectories_sha256": sha_b,
+                "dataset_version": "triton-distill-v0.2",
+                "gpu_architecture": "hopper-h100",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    registry_path = tmp_path / "registry.jsonl"
+    entries = [
+        {**_registry_entry("alice", sha_a, rows=1), "gpu_architecture": "hopper"},
+        {**_registry_entry("bob", sha_b, rows=1), "gpu_architecture": "hopper"},
+    ]
+    _write_registry(registry_path, entries)
+
+    out_path = tmp_path / "mix_sft.jsonl"
+    manifest_path = tmp_path / "mix_manifest.json"
+    download = _fake_download(
+        {
+            "alice/sparkproof-" + sha_a[:8]: proof_a,
+            "bob/sparkproof-" + sha_b[:8]: proof_b,
+        }
+    )
+
+    result = mix_registry_datasets(
+        entries,
+        out_path=out_path,
+        manifest_path=manifest_path,
+        mix_id="mix-repair-test",
         dedupe="exact",
         download_proof=download,
     )
