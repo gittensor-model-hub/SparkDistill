@@ -202,8 +202,10 @@ least one benchmark without dropping others below their floor.
 dataset-track data) — the general basket cannot measure kernel skill and only guards
 against catastrophic forgetting there. It runs through the vendored TritonBench harness
 instead of lm-eval: the student is served behind an OpenAI-compatible endpoint, each
-generated kernel is compiled and executed on the Blackwell GPU, and the headline score
-is the average composite (correctness + execution + API modernity). TritonBench problems
+generated kernel is compiled and executed on the GPU (Blackwell or Hopper H100/H200 —
+`eval.triton_bench` records which one it ran on, since the composite is speed-derived
+and hardware-sensitive), and the headline score is the average composite (correctness +
+execution + API modernity). TritonBench problems
 are quarantined from training data by SparkProof's release-gate decontamination, which
 is what keeps this a legitimate held-out eval — a dataset row that structurally matches
 a TritonBench problem is blocked before it can ever be trained on.
@@ -265,10 +267,19 @@ benchmark-specific labels:
 relative to frontier (enough to earn at least `eval:XS`), GSM8K may regress up to **2%**
 instead — a deliberate trade for Triton-focused recipes.
 
-**Frontier updates:** on any verified non-`eval:REJECT` run, `runs/frontier.json` is
-merged per benchmark: any score that beats the current frontier high is updated — including
-GSM8K when a miner improves math reasoning even if Triton is flat. Triton tiers still
-come only from the Triton composite.
+**Frontier updates:** on any verified non-`eval:REJECT` run, the frontier is merged per
+benchmark: any score that beats the current frontier high is updated — including GSM8K
+when a miner improves math reasoning even if Triton is flat. Triton tiers still come only
+from the Triton composite.
+
+**Per-architecture frontiers:** Blackwell and Hopper each keep their own frontier bucket
+in `runs/frontiers.json` (`eval.frontiers`) — TritonBench composites are hardware-sensitive,
+so a Hopper run is only ever tiered against other Hopper runs, never against Blackwell's.
+`eval.verify` resolves which bucket applies to a bundle from its manifest's
+`gpu_architecture` (dataset track) or `train_gpu` (training track) claim; legacy bundles
+with neither field default to Blackwell. Both architectures tier on Triton the same way —
+`--frontier` still accepts an explicit flat scores file when you want to override the
+resolved bucket.
 
 If no benchmark improves by at least the eval threshold and any guarded benchmark
 regresses, the PR is rejected and may be auto-closed.

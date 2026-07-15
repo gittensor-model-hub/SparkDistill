@@ -30,6 +30,8 @@ from eval.attested_samples import (
 from eval.benchmarks import BENCHMARKS, assert_fraction_scores
 from eval.canonical_dataset import canonical_hf_url, canonical_sft_sha256
 from eval.dataset_verify import _sha256_file
+from eval.frontiers import load_frontier_scores
+from eval.gpu_architecture import DEFAULT_GPU_ARCHITECTURE, GpuArchitecture, normalize_gpu_architecture
 from eval.harness import run_harness
 from eval.mix_registry import REGISTRY_PATH, verify_mix_manifest
 from eval.regression_sample import REGRESSION_BENCHMARK_KEY
@@ -43,6 +45,22 @@ from eval.training_gpus import (
 # Training-track budget (see docs/miner-guide.md): a proof-of-training claim must have
 # been produced within this wall-clock budget on an accepted CC GPU.
 MAX_TRAIN_HOURS = 5.0
+
+
+def resolve_bundle_gpu_architecture(manifest: dict) -> GpuArchitecture:
+    """Best-effort GPU architecture for this bundle, used to pick its frontier
+    bucket (`eval.frontiers`) and pass to `eval.score` for tiering.
+
+    Prefers an explicit `gpu_architecture` field, then the training-track
+    `train_gpu` claim, else Blackwell — every bundle predating both fields was
+    generated before Hopper support existed, so the legacy default is safe.
+    """
+    for value in (manifest.get("gpu_architecture"), manifest.get("train_gpu")):
+        if value:
+            arch = normalize_gpu_architecture(str(value))
+            if arch is not None:
+                return arch
+    return DEFAULT_GPU_ARCHITECTURE
 
 
 def check_training_claims(
@@ -281,6 +299,7 @@ def verify_submission(
     """
     manifest = json.loads((bundle_dir / "manifest.json").read_text())
     claimed = json.loads((bundle_dir / "eval_scores.json").read_text())["scores"]
+    gpu_architecture = resolve_bundle_gpu_architecture(manifest)
 
     if attestation is not None and not attestation.get("passed"):
         return {"verified": False, "reason": "attestation_failed", "label": "eval:REJECT", "run_id": manifest.get("run_id")}
@@ -373,7 +392,7 @@ def verify_submission(
             }
 
     if frontier:
-        report = score(claimed, frontier)
+        report = score(claimed, frontier, gpu_architecture=gpu_architecture)
     else:
         report = {
             "label": "eval:BASELINE",
@@ -385,6 +404,7 @@ def verify_submission(
     report["verified"] = True
     report["reason"] = None
     report["run_id"] = manifest.get("run_id")
+    report["gpu_architecture"] = gpu_architecture
     report["attested_eval_benchmarks"] = sorted(attested_keys)
     report["attested_gsm8k_regression"] = REGRESSION_BENCHMARK_KEY in attested_keys
     # Informational trust signals: claim_bound distinguishes an attestation that
@@ -415,9 +435,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--frontier",
         type=Path,
-        default=Path("runs/frontier.json"),
-        help="frontier scores json (default: the canonical runs/frontier.json; "
-        "a missing file means no frontier exists yet -> eval:BASELINE)",
+        default=None,
+        help="frontier scores json, as a flat {benchmark: score} dict. Default: resolve "
+        "the bundle's GPU architecture from its manifest and load that architecture's "
+        "bucket from runs/frontiers.json (falling back to the legacy runs/frontier.json "
+        "for Blackwell); an unset bucket means no frontier exists yet -> eval:BASELINE",
     )
     parser.add_argument("--attestation", type=Path, default=None, help="attestation json from eval.attestation")
     parser.add_argument(
@@ -437,7 +459,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     bundle_dir = _resolve_bundle_dir(args.bundle_repo, args.bundle_path)
-    frontier = json.loads(args.frontier.read_text())["scores"] if args.frontier.exists() else None
+    if args.frontier is not None:
+        frontier = json.loads(args.frontier.read_text())["scores"] if args.frontier.exists() else None
+    else:
+        manifest = json.loads((bundle_dir / "manifest.json").read_text())
+        frontier = load_frontier_scores(resolve_bundle_gpu_architecture(manifest))
     attestation = json.loads(args.attestation.read_text()) if args.attestation else None
 
     report = verify_submission(

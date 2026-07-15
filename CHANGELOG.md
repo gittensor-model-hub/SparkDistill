@@ -6,6 +6,18 @@ All notable changes to SparkDistill are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- **TritonBench is GPU-architecture aware for scoring, not just dataset generation.**
+  `eval.triton_bench` now detects (via `nvidia-smi`, overridable with
+  `SPARKDISTILL_GPU_ARCHITECTURE`) and records which architecture a run executed
+  on. `eval.gpu_architecture.tier_benchmark_for_arch` now tiers **both** Blackwell
+  and Hopper submissions on the Triton composite (previously Hopper silently fell
+  back to GSM8K, since a shared frontier would have compared hardware-sensitive
+  speed numbers across architectures). This is safe because `eval.verify` now
+  resolves each bundle's architecture from its manifest (`gpu_architecture` or
+  `train_gpu` claim) and scores it against that architecture's own frontier
+  bucket in `runs/frontiers.json` (`eval.frontiers`, previously wired up but never
+  actually called from the verification path) instead of a single shared
+  `runs/frontier.json`. Legacy bundles with neither field default to Blackwell.
 - **Hopper H100/H200 dataset generation** (SparkProof): dataset-track proof-of-work
   no longer requires Blackwell hardware — SparkProof detects Blackwell or Hopper
   H100/H200 automatically (rejecting Ampere/Ada/etc.) and stamps prompts, mutation

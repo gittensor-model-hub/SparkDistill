@@ -3,9 +3,9 @@ import json
 import eval.harness as harness
 
 
-def _write_triton_sidecar(work_dir, scores):
+def _write_triton_sidecar(work_dir, scores, gpu_architecture=None):
     work_dir.mkdir(parents=True, exist_ok=True)
-    (work_dir / "triton.json").write_text(json.dumps({"scores": scores}))
+    (work_dir / "triton.json").write_text(json.dumps({"scores": scores, "gpu_architecture": gpu_architecture}))
 
 
 def test_main_preserves_triton_quick_in_claim(tmp_path, monkeypatch):
@@ -19,6 +19,7 @@ def test_main_preserves_triton_quick_in_claim(tmp_path, monkeypatch):
             "triton_correctness": 0.50,
             "triton_syntax_pass_rate": 0.90,
         },
+        gpu_architecture="hopper",
     )
     monkeypatch.setattr(harness, "run_harness", lambda *a, **k: {"triton": 0.55})
 
@@ -28,9 +29,11 @@ def test_main_preserves_triton_quick_in_claim(tmp_path, monkeypatch):
     )
     assert rc == 0
 
-    scores = json.loads(out.read_text())["scores"]
+    payload = json.loads(out.read_text())
+    scores = payload["scores"]
     assert scores["triton"] == 0.55
     assert scores["triton_quick"] == 0.82
+    assert payload["gpu_architecture"] == "hopper"
 
 
 def test_main_does_not_read_sidecar_when_triton_absent(tmp_path, monkeypatch):

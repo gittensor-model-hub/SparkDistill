@@ -36,8 +36,14 @@ def infer_gpu_architecture_from_attestation(attestation: dict | None) -> GpuArch
 
 
 def tier_benchmark_for_arch(arch: GpuArchitecture) -> str:
-    """Blackwell tiers on Triton; Hopper uses GSM8K until TritonBench supports Hopper."""
-    return "triton" if arch == "blackwell" else "gsm8k"
+    """Both Blackwell and Hopper tier the reward label on TritonBench.
+
+    Kept as a per-arch function (rather than a bare constant) because each
+    architecture keeps its own frontier bucket (see `eval.frontiers`) — absolute
+    TritonBench composites are hardware-sensitive and are never compared across
+    architectures, only within one.
+    """
+    return "triton"
 
 
 def dataset_architecture_allowed(arch: GpuArchitecture) -> bool:

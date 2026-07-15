@@ -48,12 +48,19 @@ def main(argv: list[str] | None = None) -> int:
     # triton claims. Merge the sidecar sub-metrics back in so the claim is verifiable
     # like-for-like; these extra keys are ignored by eval.score/eval.verify, which
     # only iterate registered BENCHMARKS.
+    gpu_architecture = None
     if "triton" in benchmarks:
         triton_detail = json.loads((args.work_dir / "triton.json").read_text())
         scores = {**triton_detail.get("scores", {}), **scores}
+        gpu_architecture = triton_detail.get("gpu_architecture")
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps({"checkpoint": args.checkpoint, "scores": scores}, indent=2))
+    args.out.write_text(
+        json.dumps(
+            {"checkpoint": args.checkpoint, "scores": scores, "gpu_architecture": gpu_architecture},
+            indent=2,
+        )
+    )
     print(f"wrote scores for {args.checkpoint} to {args.out}", file=sys.stderr)
     return 0
 

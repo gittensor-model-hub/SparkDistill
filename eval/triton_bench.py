@@ -38,6 +38,8 @@ import urllib.request
 from contextlib import contextmanager
 from pathlib import Path
 
+from eval.gpu_architecture import GpuArchitecture, normalize_gpu_architecture
+
 HEADLINE_METRIC = "avg_composite"
 _QUICK_LEVELS = [1]  # cheap re-verification, mirrors configs/eval_quick.yaml
 _FULL_LEVELS = [1, 2, 3, 4]
@@ -57,6 +59,34 @@ def tritonbench_root() -> Path:
     if configured:
         return Path(configured).expanduser()
     return Path(__file__).resolve().parents[1] / "tritonbench"
+
+
+def detect_gpu_architecture() -> GpuArchitecture | None:
+    """Best-effort architecture of the GPU TritonBench is about to run on.
+
+    Recorded alongside the composite score so a claim/re-run comparison never
+    silently mixes Blackwell and Hopper numbers — TritonBench's composite is
+    speed-derived and hardware-sensitive, so `eval.score`/`eval.verify` must
+    tier a run against the frontier bucket for the hardware it actually ran on.
+    An explicit `SPARKDISTILL_GPU_ARCHITECTURE` override wins over detection
+    (e.g. CI runners without nvidia-smi, or exercising the other bucket).
+    """
+    override = os.environ.get("SPARKDISTILL_GPU_ARCHITECTURE")
+    if override:
+        return normalize_gpu_architecture(override)
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode != 0:
+        return None
+    name = result.stdout.strip().splitlines()[0] if result.stdout.strip() else ""
+    return normalize_gpu_architecture(name)
 
 
 def _quick_subset_composite(report: dict) -> float | None:
@@ -219,8 +249,12 @@ def run_triton_benchmark(
             report = run_tritonbench(served, model_name, results_dir, levels)
 
     scores = summary_scores(report)
+    gpu_architecture = detect_gpu_architecture()
     (output_dir / "triton.json").write_text(
-        json.dumps({"scores": scores, "levels": levels, "report": report}, indent=2)
+        json.dumps(
+            {"scores": scores, "levels": levels, "gpu_architecture": gpu_architecture, "report": report},
+            indent=2,
+        )
     )
     return scores["triton"]
 
@@ -247,7 +281,16 @@ def main(argv: list[str] | None = None) -> int:
     detail = json.loads((args.work_dir / "triton.json").read_text())
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps({"checkpoint": args.checkpoint, "scores": detail["scores"]}, indent=2))
+    args.out.write_text(
+        json.dumps(
+            {
+                "checkpoint": args.checkpoint,
+                "scores": detail["scores"],
+                "gpu_architecture": detail.get("gpu_architecture"),
+            },
+            indent=2,
+        )
+    )
     print(f"triton={headline:.3f} — wrote {args.out}", file=sys.stderr)
     return 0
 

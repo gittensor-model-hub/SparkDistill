@@ -6,7 +6,7 @@ import pytest
 
 from eval.benchmarks import BENCHMARKS, run_benchmark
 from eval.score import score
-from eval.triton_bench import latest_report, run_tritonbench, serve_checkpoint, summary_scores
+from eval.triton_bench import detect_gpu_architecture, latest_report, run_tritonbench, serve_checkpoint, summary_scores
 
 
 def _report(composite=0.71, exec_pass=0.65, correctness=0.7, syntax=0.9, details=None):
@@ -184,6 +184,55 @@ def test_locate_results_file_prefers_exact_then_date_suffixed(tmp_path):
     assert _locate_results_file(exact) == dated_new
     exact.write_text("{}")
     assert _locate_results_file(exact) == exact
+
+
+def test_detect_gpu_architecture_env_override_wins(monkeypatch):
+    import eval.triton_bench as tb
+
+    monkeypatch.setenv("SPARKDISTILL_GPU_ARCHITECTURE", "hopper-h200")
+
+    def fail_run(*a, **k):
+        raise AssertionError("nvidia-smi should not run when the env override is set")
+
+    monkeypatch.setattr(tb.subprocess, "run", fail_run)
+    assert detect_gpu_architecture() == "hopper"
+
+
+def test_detect_gpu_architecture_parses_nvidia_smi_name(monkeypatch):
+    import eval.triton_bench as tb
+
+    monkeypatch.delenv("SPARKDISTILL_GPU_ARCHITECTURE", raising=False)
+
+    class Result:
+        returncode = 0
+        stdout = "NVIDIA H100 80GB HBM3\n"
+
+    monkeypatch.setattr(tb.subprocess, "run", lambda *a, **k: Result())
+    assert detect_gpu_architecture() == "hopper"
+
+
+def test_detect_gpu_architecture_returns_none_without_nvidia_smi(monkeypatch):
+    import eval.triton_bench as tb
+
+    monkeypatch.delenv("SPARKDISTILL_GPU_ARCHITECTURE", raising=False)
+
+    def fake_run(*a, **k):
+        raise FileNotFoundError("nvidia-smi not found")
+
+    monkeypatch.setattr(tb.subprocess, "run", fake_run)
+    assert detect_gpu_architecture() is None
+
+
+def test_run_triton_benchmark_records_gpu_architecture(tmp_path, monkeypatch):
+    import eval.triton_bench as tb
+
+    monkeypatch.setenv("SPARKDISTILL_GPU_ARCHITECTURE", "blackwell")
+    monkeypatch.setattr(tb, "run_tritonbench", lambda *a, **k: _report())
+
+    headline = tb.run_triton_benchmark("outputs/student", tmp_path, endpoint="http://x/v1")
+    assert headline == 0.71
+    detail = json.loads((tmp_path / "triton.json").read_text())
+    assert detail["gpu_architecture"] == "blackwell"
 
 
 def test_extract_metric_handles_lm_eval_filter_suffixes():

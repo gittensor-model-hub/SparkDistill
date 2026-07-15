@@ -1,4 +1,4 @@
-from eval.verify import _no_student_endpoint_env, check_claim, check_training_claims
+from eval.verify import _no_student_endpoint_env, check_claim, check_training_claims, resolve_bundle_gpu_architecture
 
 
 def test_check_claim_within_tolerance_has_no_mismatch():
@@ -289,3 +289,37 @@ def test_attested_gsm8k_sample_without_attestation_fails(tmp_path):
     report = verify_submission(bundle, frontier={"gsm8k": 0.5})
     assert report["verified"] is False
     assert report["reason"] == "attested_eval_samples_failed"
+
+
+def test_resolve_bundle_gpu_architecture_prefers_explicit_field():
+    assert resolve_bundle_gpu_architecture({"gpu_architecture": "hopper-h100", "train_gpu": "NVIDIA B200"}) == "hopper"
+
+
+def test_resolve_bundle_gpu_architecture_falls_back_to_train_gpu():
+    assert resolve_bundle_gpu_architecture({"train_gpu": "NVIDIA H200"}) == "hopper"
+
+
+def test_resolve_bundle_gpu_architecture_defaults_to_blackwell():
+    assert resolve_bundle_gpu_architecture({}) == "blackwell"
+    assert resolve_bundle_gpu_architecture({"train_gpu": "NVIDIA A100"}) == "blackwell"
+
+
+def test_verify_submission_hopper_tiers_on_triton(tmp_path, monkeypatch):
+    import json
+
+    import eval.verify as v
+    from eval.canonical_dataset import canonical_hf_url
+
+    bundle = tmp_path / "bundle"
+    (bundle / "checkpoint").mkdir(parents=True)
+    (bundle / "checkpoint" / "w.bin").write_text("w")
+    (bundle / "manifest.json").write_text(
+        json.dumps({"run_id": "r-hopper", "dataset_url": canonical_hf_url(), "train_gpu": "NVIDIA H100"})
+    )
+    (bundle / "eval_scores.json").write_text(json.dumps({"scores": {"gsm8k": 0.6, "triton": 0.5}}))
+    monkeypatch.setattr(v, "run_harness", lambda *a, **k: {"gsm8k": 0.6, "triton": 0.5})
+
+    report = v.verify_submission(bundle, frontier={"gsm8k": 0.5, "triton": 0.4})
+    assert report["gpu_architecture"] == "hopper"
+    assert report["best_benchmark"] == "triton"
+    assert report["label"] == "eval:XL"
