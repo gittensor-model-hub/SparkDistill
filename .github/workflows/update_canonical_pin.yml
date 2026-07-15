@@ -5,16 +5,24 @@ on:
     branches: [main]
     paths:
       - datasets/registry.jsonl
+  # Bot merges from the dataset gate do not re-fire push workflows (GITHUB_TOKEN).
+  workflow_run:
+    workflows: ["Dataset registry gate"]
+    types: [completed]
   # Safety net when registry merges bypass the dataset gate auto-pin step.
   schedule:
-    - cron: "0 */6 * * *"
+    - cron: "*/15 * * * *"
   workflow_dispatch:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   refresh-pin:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion != 'cancelled'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -24,6 +32,11 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Configure git identity for automated commits
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
       - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
@@ -31,21 +44,8 @@ jobs:
       - name: Install SparkDistill
         run: uv sync --extra dev --frozen
 
-      - name: Refresh datasets/canonical.json from HF
+      - name: Refresh and publish datasets/canonical.json from HF
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: scripts/update_canonical_pin.sh
-
-      - name: Commit pin update
-        env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if git diff --quiet datasets/canonical.json; then
-            echo "canonical pin already up to date"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add datasets/canonical.json
-          git commit -m "Refresh canonical mining dataset pin after registry update."
-          git push origin HEAD:main
+        run: uv run python -m eval.update_canonical_pin --publish
