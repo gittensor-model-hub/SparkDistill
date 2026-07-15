@@ -71,6 +71,23 @@ _LABEL_COLORS = {
     "training:REJECT": "b60205",
 }
 
+# eval:* is the reward-tier label eval.verify computes (separate from training:* above,
+# which only gates format/provenance) — applied only when verify_remote_proof_bundle_scores
+# could actually compute one (i.e. the bundle's claims were CPU-verifiable; see its docstring).
+EVAL_LABELS = frozenset(
+    {"eval:XL", "eval:L", "eval:M", "eval:S", "eval:XS", "eval:none", "eval:BASELINE", "eval:REJECT"}
+)
+_EVAL_LABEL_COLORS = {
+    "eval:XL": "1d76db",
+    "eval:L": "0e8a16",
+    "eval:M": "2cbe4e",
+    "eval:S": "7bd88f",
+    "eval:XS": "c5def5",
+    "eval:none": "d4c5f9",
+    "eval:BASELINE": "fbca04",
+    "eval:REJECT": "b60205",
+}
+
 
 def is_training_track_pr(pr_body: str | None) -> bool:
     body = pr_body or ""
@@ -339,7 +356,7 @@ def verify_remote_proof_bundle_scores(
     head_ref: str,
     changed_paths: list[str] | None,
     hf_token: str | None = None,
-) -> list[str]:
+) -> tuple[list[str], str | None]:
     """Re-run eval.verify's no-GPU attested checks against the cited proof bundle.
 
     This is the exact CPU-only check a validator otherwise has to run by hand:
@@ -348,7 +365,8 @@ def verify_remote_proof_bundle_scores(
     claim/attested-sample mismatches and GPU-corroboration issues (e.g. an H200
     run whose attestation reports hwmodel=GH100, the same die as H100) at PR time
     instead of only when a human happens to check manually — that gap is what let
-    gittensor-model-hub/SparkDistill#120 sit with a stale gsm8k claim until review.
+    gittensor-model-hub/SparkDistill#120 sit with a stale gsm8k claim (and no
+    eval:* label at all) until review.
 
     Never needs a GPU: proof bundles are weights-free (no checkpoint on HF), so
     any claimed benchmark that isn't covered by an attested sample always ends in
@@ -356,6 +374,11 @@ def verify_remote_proof_bundle_scores(
     re-run — that reason is intentionally not gated here, since it just means part
     of the claim is deferred to off-CI validator verification, not that anything
     checkable here failed.
+
+    Returns `(issues, eval_label)` — `eval_label` is the reward-tier label
+    eval.verify computed (e.g. "eval:BASELINE", "eval:XL", "eval:REJECT"), or
+    None when nothing could be computed (download failure, or the deferred
+    "checkpoint_required" case above).
     """
     from huggingface_hub import snapshot_download
 
@@ -370,27 +393,28 @@ def verify_remote_proof_bundle_scores(
             try:
                 attestation = json.loads(text)
             except json.JSONDecodeError:
-                return [f"{attestation_path}: invalid JSON"]
+                return [f"{attestation_path}: invalid JSON"], None
 
     try:
         bundle_dir = Path(snapshot_download(repo_id=repo_id, repo_type="model", token=hf_token))
     except Exception as exc:
-        return [f"failed to download proof bundle from {repo_id} for score verification: {exc}"]
+        return [f"failed to download proof bundle from {repo_id} for score verification: {exc}"], None
 
     if not (bundle_dir / "manifest.json").exists() or not (bundle_dir / "eval_scores.json").exists():
-        return []  # already flagged by verify_remote_proof_bundle
+        return [], None  # already flagged by verify_remote_proof_bundle
 
     manifest = json.loads((bundle_dir / "manifest.json").read_text(encoding="utf-8"))
     frontier = load_frontier_scores(resolve_bundle_gpu_architecture(manifest))
 
     report = verify_submission(bundle_dir, frontier, attestation=attestation)
-    if report.get("verified") or report.get("reason") == "checkpoint_required":
-        return []
+    if report.get("reason") == "checkpoint_required":
+        return [], None
+    if report.get("verified"):
+        return [], report.get("label")
     detail = report.get("issues") or report.get("mismatches") or []
     reason = report.get("reason") or "verification failed"
-    if detail:
-        return [f"eval.verify {reason}: {issue}" for issue in detail]
-    return [f"eval.verify: {reason}"]
+    issues = [f"eval.verify {reason}: {issue}" for issue in detail] if detail else [f"eval.verify: {reason}"]
+    return issues, report.get("label")
 
 
 def should_enforce_training_gate(
@@ -445,6 +469,7 @@ def gate_training_pr(
     if verify_hf_pin:
         issues.extend(verify_remote_matches_pin(hf_token=hf_token))
 
+    eval_label: str | None = None
     if verify_proof_bundle:
         repo_id = parse_proof_bundle_hf_repo(pr_body)
         if repo_id is not None:
@@ -455,19 +480,19 @@ def gate_training_pr(
             )
             issues.extend(bundle_issues)
             if not bundle_issues:
-                issues.extend(
-                    verify_remote_proof_bundle_scores(
-                        repo_id,
-                        head_ref=head_ref,
-                        changed_paths=changed_paths,
-                        hf_token=hf_token,
-                    )
+                score_issues, eval_label = verify_remote_proof_bundle_scores(
+                    repo_id,
+                    head_ref=head_ref,
+                    changed_paths=changed_paths,
+                    hf_token=hf_token,
                 )
+                issues.extend(score_issues)
 
     label = "training:valid" if not issues else "training:REJECT"
     return {
         "verified": not issues,
         "label": label,
+        "eval_label": eval_label,
         "issues": issues,
         "canonical": load_canonical(),
         "acceptable_sft_shas": sorted(acceptable_sft_shas),
@@ -486,6 +511,36 @@ def update_pr_training_label(pr_number: int, label: str) -> list[str]:
         check=False,
     )
     for existing in TRAINING_LABELS:
+        if existing != label:
+            subprocess.run(
+                ["gh", "pr", "edit", str(pr_number), "--remove-label", existing],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+    result = subprocess.run(
+        ["gh", "pr", "edit", str(pr_number), "--add-label", label],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return [result.stderr.strip() or result.stdout.strip() or "failed to apply label"]
+    return []
+
+
+def update_pr_eval_label(pr_number: int, label: str) -> list[str]:
+    """Apply the eval.verify reward-tier label, replacing any prior eval:* label."""
+    if label not in EVAL_LABELS:
+        return [f"refusing to apply unknown eval label {label!r}"]
+
+    subprocess.run(
+        ["gh", "label", "create", label, "--color", _EVAL_LABEL_COLORS[label], "--force"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    for existing in EVAL_LABELS:
         if existing != label:
             subprocess.run(
                 ["gh", "pr", "edit", str(pr_number), "--remove-label", existing],
@@ -581,6 +636,13 @@ def main(argv: list[str] | None = None) -> int:
             label_issues = update_pr_training_label(args.pr_number, report["label"])
             if label_issues:
                 for issue in label_issues:
+                    print(f"  - {issue}", file=sys.stderr)
+                return 1
+        eval_label = report.get("eval_label")
+        if eval_label is not None:
+            eval_label_issues = update_pr_eval_label(args.pr_number, eval_label)
+            if eval_label_issues:
+                for issue in eval_label_issues:
                     print(f"  - {issue}", file=sys.stderr)
                 return 1
 
