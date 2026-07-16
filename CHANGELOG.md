@@ -16,6 +16,11 @@ All notable changes to SparkDistill are documented here. The format follows
   instead of a `dataset:REJECT` label and a helpful close comment. The duplicate check and
   the report's `hf_repo` lookup now tolerate fields that `validate_registry_entry` already
   flags.
+- **Teacher generation no longer aborts on a single flaky call**: `generate_trajectories`
+  now skips (and warns about) an individual teacher API failure instead of letting it
+  propagate and discard every other completed trajectory from an expensive generation
+  pass. A run where *every* call fails still errors loudly so a bad API key / no
+  connectivity isn't mistaken for an empty dataset.
 
 ## [0.1.2] — 2026-07-15
 
