@@ -24,11 +24,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+from threading import Lock
 from typing import Any, Callable, Literal
 
 from eval.dataset_verify import _sha256_file, check_proof_dir
@@ -251,6 +254,61 @@ def load_trajectories_jsonl(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
+def _snapshot_download_proof(repo: str, proof_cache: Path | None) -> Path:
+    from huggingface_hub import snapshot_download
+
+    cache_dir = str(proof_cache) if proof_cache else None
+    snapshot = Path(
+        snapshot_download(
+            repo_id=repo,
+            repo_type="dataset",
+            allow_patterns=["proof/*"],
+            cache_dir=cache_dir,
+        )
+    )
+    return snapshot / "proof"
+
+
+def _proof_download_workers(count: int) -> int:
+    raw = os.environ.get("SPARKDISTILL_PROOF_DOWNLOAD_WORKERS", "").strip()
+    if raw:
+        try:
+            return max(1, min(int(raw), count))
+        except ValueError:
+            pass
+    return max(1, min(8, count))
+
+
+class ProofDownloadCache:
+    """Memoize HF proof downloads and prefetch them in parallel across registry entries."""
+
+    def __init__(self, underlying: Callable[[str, Path | None], Path] | None = None):
+        self._underlying = underlying or _snapshot_download_proof
+        self._cache: dict[str, Path] = {}
+        self._lock = Lock()
+
+    def __call__(self, repo: str, proof_cache: Path | None) -> Path:
+        with self._lock:
+            if repo in self._cache:
+                return self._cache[repo]
+        proof_dir = self._underlying(repo, proof_cache)
+        with self._lock:
+            self._cache[repo] = proof_dir
+            return proof_dir
+
+    def prefetch(self, repos: set[str] | list[str], *, proof_cache: Path | None = None) -> None:
+        unique = sorted(set(repos))
+        workers = _proof_download_workers(len(unique))
+        if workers <= 1:
+            for repo in unique:
+                self(repo, proof_cache)
+            return
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = [pool.submit(self, repo, proof_cache) for repo in unique]
+            for future in as_completed(futures):
+                future.result()
+
+
 def resolve_proof_dir(
     entry: dict[str, Any],
     *,
@@ -261,18 +319,7 @@ def resolve_proof_dir(
     if download_proof is not None:
         proof_dir = download_proof(repo, proof_cache)
     else:
-        from huggingface_hub import snapshot_download
-
-        cache_dir = str(proof_cache) if proof_cache else None
-        snapshot = Path(
-            snapshot_download(
-                repo_id=repo,
-                repo_type="dataset",
-                allow_patterns=["proof/*"],
-                cache_dir=cache_dir,
-            )
-        )
-        proof_dir = snapshot / "proof"
+        proof_dir = _snapshot_download_proof(repo, proof_cache)
     issues, _rows, _gpu_architecture = check_proof_dir(proof_dir, claimed_sha256=entry["trajectories_sha256"])
     if issues:
         raise ValueError(f"{repo}: proof check failed: {'; '.join(issues)}")
@@ -318,9 +365,15 @@ def mix_registry_datasets(
     dedupe_counts = {"exact_skipped": 0, "near_skipped": 0, "intra_mix_skipped": 0}
     rows_written = 0
 
+    cached_download = ProofDownloadCache(download_proof)
+    cached_download.prefetch(
+        {hf_repo_from_url(entry["hf_url"]) for entry in entries},
+        proof_cache=proof_cache,
+    )
+
     with out_path.open("w", encoding="utf-8") as out_f:
         for entry in entries:
-            proof_dir = resolve_proof_dir(entry, proof_cache=proof_cache, download_proof=download_proof)
+            proof_dir = resolve_proof_dir(entry, proof_cache=proof_cache, download_proof=cached_download)
             trajectories = load_trajectories_jsonl(proof_dir / "trajectories.jsonl")
             component = MixComponent(registry_entry=entry, rows_in_source=len(trajectories))
 

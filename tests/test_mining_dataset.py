@@ -83,6 +83,54 @@ def test_aggregate_and_publish_mining_dataset(tmp_path: Path, monkeypatch):
     assert (tmp_path / "work" / "mix_manifest.json").exists()
 
 
+def test_aggregate_and_publish_reuses_proof_download_cache(tmp_path: Path, monkeypatch):
+    (tmp_path / "a").mkdir()
+    proof_a, _ = _write_proof_dir(tmp_path / "a", rows=1)
+    (proof_a / "trajectories.jsonl").write_text(json.dumps(_trajectory("prompt-a", "resp-a")) + "\n", encoding="utf-8")
+    sha_a = __import__("hashlib").sha256((proof_a / "trajectories.jsonl").read_bytes()).hexdigest()
+    (proof_a / "dataset_manifest.json").write_text(
+        json.dumps(
+            {
+                "passed": True,
+                "blocked_rows": 0,
+                "rows_total": 1,
+                "trajectories_sha256": sha_a,
+                "dataset_version": "triton-distill-v0.2",
+                "gpu_architecture": "blackwell",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    entries = [_registry_entry("alice", sha_a, rows=1)]
+    repo = "alice/sparkproof-" + sha_a[:8]
+    counts: dict[str, int] = {}
+
+    def counting_download(target_repo: str, _cache: Path | None) -> Path:
+        counts[target_repo] = counts.get(target_repo, 0) + 1
+        return proof_a
+
+    monkeypatch.setattr(
+        "eval.export_registry_snapshot.publish_registry_snapshot",
+        lambda *args, **kwargs: {
+            "published": True,
+            "hf_url": "https://huggingface.co/datasets/org/mining",
+            "rows_total": 1,
+        },
+    )
+
+    report = aggregate_and_publish_mining_dataset(
+        entries,
+        repo_id="org/mining",
+        work_dir=tmp_path / "work",
+        download_proof=counting_download,
+        publish_fn=lambda **kwargs: {"published": True, "hf_url": "https://huggingface.co/datasets/org/mining", "rows_total": 1, "issues": []},
+    )
+    assert report["published"] is True
+    # Mix + snapshot export + snapshot verify should hit the cache, not re-download.
+    assert counts.get(repo, 0) == 1
+
+
 def test_gate_blocks_merge_when_mining_publish_fails(monkeypatch):
     import eval.registry_gate as registry_gate
 

@@ -380,3 +380,44 @@ def test_load_registry_validates_entries(tmp_path: Path):
     registry_path.write_text(json.dumps({"miner": "alice"}) + "\n", encoding="utf-8")
     with pytest.raises(ValueError, match="invalid registry entry"):
         load_registry(registry_path)
+
+
+def test_proof_download_cache_memoizes_downloads():
+    from eval.mix_registry import ProofDownloadCache
+
+    calls: list[str] = []
+
+    def download(repo: str, _cache: Path | None) -> Path:
+        calls.append(repo)
+        return Path(f"/proof/{repo}")
+
+    cache = ProofDownloadCache(download)
+    assert cache("alice/pkg", None) == Path("/proof/alice/pkg")
+    assert cache("alice/pkg", None) == Path("/proof/alice/pkg")
+    assert calls == ["alice/pkg"]
+
+
+def test_proof_download_cache_prefetches_in_parallel(monkeypatch):
+    import threading
+    import time
+
+    from eval.mix_registry import ProofDownloadCache
+
+    active: list[str] = []
+    max_active = 0
+    lock = threading.Lock()
+
+    def slow_download(repo: str, _cache: Path | None) -> Path:
+        nonlocal max_active
+        with lock:
+            active.append(repo)
+            max_active = max(max_active, len(active))
+        time.sleep(0.05)
+        with lock:
+            active.remove(repo)
+        return Path(f"/{repo}")
+
+    cache = ProofDownloadCache(slow_download)
+    monkeypatch.setenv("SPARKDISTILL_PROOF_DOWNLOAD_WORKERS", "4")
+    cache.prefetch({"a/r", "b/r", "c/r", "d/r"})
+    assert max_active > 1

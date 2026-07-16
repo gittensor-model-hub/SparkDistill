@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from eval.dataset_verify import _sha256_file
-from eval.mix_registry import mix_registry_datasets, verify_mix_manifest
+from eval.mix_registry import ProofDownloadCache, mix_registry_datasets, verify_mix_manifest
 
 DEFAULT_MINING_DATASET_REPO = "gittensor-model-hub/sparkproof-mining"
 MINING_MANIFEST_PATH = "mix_manifest.json"
@@ -110,6 +110,10 @@ def aggregate_mining_mix(
     sft_path = work_dir / "mining_sft.jsonl"
     manifest_path = work_dir / "mix_manifest.json"
 
+    cached_download = (
+        download_proof if isinstance(download_proof, ProofDownloadCache) else ProofDownloadCache(download_proof)
+    )
+
     try:
         registry_path = work_dir / "registry.jsonl"
         registry_path.write_text("".join(json.dumps(row) + "\n" for row in registry_entries), encoding="utf-8")
@@ -121,7 +125,7 @@ def aggregate_mining_mix(
             mix_id=f"mining-{repo_id.replace('/', '-')}",
             sparkproof_root=sparkproof_root,
             dedupe=(dedupe or mining_dedupe_mode()),  # type: ignore[arg-type]
-            download_proof=download_proof,
+            download_proof=cached_download,
         )
         verify_report = verify_mix_manifest(manifest_path, sft_path=sft_path, registry_path=registry_path)
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -172,6 +176,8 @@ def aggregate_and_publish_mining_dataset(
         work_dir = Path(tempfile.mkdtemp(prefix="sparkdistill-mining-"))
     work_dir.mkdir(parents=True, exist_ok=True)
 
+    cached_download = ProofDownloadCache(download_proof)
+
     try:
         mix_report = aggregate_mining_mix(
             registry_entries,
@@ -179,7 +185,7 @@ def aggregate_and_publish_mining_dataset(
             sparkproof_root=sparkproof_root,
             work_dir=work_dir,
             dedupe=dedupe,
-            download_proof=download_proof,
+            download_proof=cached_download,
         )
         if not mix_report.get("verified"):
             return {
@@ -205,7 +211,7 @@ def aggregate_and_publish_mining_dataset(
             task_ids_path=task_ids_path,
             sparkproof_root=sparkproof_root,
             dedupe=dedupe,
-            download_proof=download_proof,
+            download_proof=cached_download,
         )
         manifest = attach_snapshot_pins_to_manifest(mix_report["manifest_path"], snapshot_report)
         pin_issues = verify_registry_snapshot_pins(
@@ -215,7 +221,7 @@ def aggregate_and_publish_mining_dataset(
             task_ids_path=task_ids_path,
             sparkproof_root=sparkproof_root,
             dedupe=dedupe,
-            download_proof=download_proof,
+            download_proof=cached_download,
         )
         if pin_issues:
             return {
