@@ -4,10 +4,10 @@
   "training_dataset_path": "data/processed/sparkproof-mining_sft.jsonl",
   "mix_manifest": {
     "mix_id": "mining-gittensor-model-hub-sparkproof-mining",
-    "rows_total": 213,
-    "sft_sha256": "215eef3e578be6070242e89fe949a656d57d7a04943c22ba21269ef093ce9db8",
-    "accepted_registry_snapshot_sha256": "936c483d5a88e2d98a9f793d264182d53deace7e85f22771ddbfa990b1c18e63",
-    "accepted_registry_snapshot_rows_total": 213,
-    "accepted_task_ids_sha256": "aa4e41a5470c912e1ca710c4b8fbab7dba0a0242fb73257cddc62b4f1526c2dc"
+    "rows_total": 303,
+    "sft_sha256": "f16982b352f69b310d382afdfcff7b0ab145f5d5de9d3f6dc6e071ad36f3022b",
+    "accepted_registry_snapshot_sha256": "40d966ae7322735cae720dabdfe9ed01b2b44c5b64d56dee16ac3f864054c3ff",
+    "accepted_registry_snapshot_rows_total": 303,
+    "accepted_task_ids_sha256": "568e3506b31ed5addf52c2abc15a07727a0ce95ea2a2fab6e3f7b50607b33ac6"
   }
 }
