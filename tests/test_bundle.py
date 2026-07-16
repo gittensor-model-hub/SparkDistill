@@ -111,14 +111,20 @@ def test_build_bundle_rejects_empty_checkpoint_dir(tmp_path):
     scores_path = tmp_path / "candidate.json"
     scores_path.write_text(json.dumps({"scores": {"gsm8k": 0.88}}))
 
+    out_dir = tmp_path / "bundle"
     with pytest.raises(ValueError):
         build_bundle(
             checkpoint_dir,
             scores_path,
-            tmp_path / "bundle",
+            out_dir,
             run_id="run-x",
             base_model="Qwen/Qwen3.5-4B",
         )
+    # A rejected build must leave no partial bundle behind: the empty-checkpoint path used to
+    # write eval_scores.json before validating the checkpoint, leaking a manifest-less bundle.
+    # Matches test_build_bundle_rejects_missing_checkpoint's no-artifacts invariant.
+    assert not (out_dir / "eval_scores.json").exists()
+    assert not (out_dir / "manifest.json").exists()
 
 
 def test_build_bundle_records_mix_manifest(tmp_path):

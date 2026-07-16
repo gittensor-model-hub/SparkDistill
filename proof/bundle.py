@@ -97,6 +97,16 @@ def build_bundle(
             f"checkpoint directory {checkpoint_dir} does not exist; refusing to build a "
             "proof bundle whose checkpoint_manifest would be empty"
         )
+    # Reject an empty checkpoint *before* creating out_dir or writing any bundle file, so a
+    # rejected build leaves nothing behind — matching the missing-checkpoint path above.
+    # Computing the manifest after out_dir.mkdir / the eval_scores.json write leaked a partial,
+    # manifest-less bundle on rejection.
+    ckpt_manifest = checkpoint_manifest(checkpoint_dir)
+    if not ckpt_manifest:
+        raise ValueError(
+            f"checkpoint directory {checkpoint_dir} contains no files; the checkpoint_manifest "
+            "would be empty and the proof claim vacuous"
+        )
 
     out_dir.mkdir(parents=True, exist_ok=True)
     if include_checkpoint:
@@ -107,12 +117,6 @@ def build_bundle(
 
     created_at = datetime.now(UTC).isoformat()
     manifest: dict = {"run_id": run_id, "base_model": base_model, "created_at": created_at}
-    ckpt_manifest = checkpoint_manifest(checkpoint_dir)
-    if not ckpt_manifest:
-        raise ValueError(
-            f"checkpoint directory {checkpoint_dir} contains no files; the checkpoint_manifest "
-            "would be empty and the proof claim vacuous"
-        )
     manifest["checkpoint_manifest"] = ckpt_manifest
     if train_hours is not None:
         manifest["train_hours"] = train_hours
