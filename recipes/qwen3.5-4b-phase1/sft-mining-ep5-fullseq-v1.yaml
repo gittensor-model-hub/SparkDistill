@@ -1,0 +1,65 @@
+# Full-sequence mining recipe (no sample_packing truncation).
+#
+# Default sequence_len=4096 + packing truncates 57/213 canonical rows (max
+# tokenized length ~5.7k). Training at 8192 without packing preserves full
+# @triton.autotune launcher examples.
+#
+# Early-stop at step 459 (of 505 for 5 epochs) — local TritonBench quick
+# composite 0.453 (+6.0% vs Blackwell frontier 0.428 → eval:S). Final step
+# 505 only tied the frontier (0.428).
+#
+#   scripts/prepare_mining_sft.sh
+#   scripts/train.sh recipes/qwen3.5-4b-phase1/sft-mining-ep5-fullseq-v1.yaml
+
+base_model: Qwen/Qwen3.5-4B
+trust_remote_code: true
+
+chat_template: qwen3_5
+roles_to_train: ["assistant"]
+
+datasets:
+  - path: data/processed/sparkproof-mining_sft.jsonl
+    type: chat_template
+    field_messages: messages
+
+dataset_prepared_path: data/prepared/qwen3.5-4b-mining-ep5-fullseq-v1
+val_set_size: 0.05
+output_dir: outputs/qwen3.5-4b-mining-ep5-fullseq-v1
+
+sequence_len: 8192
+sample_packing: false
+pad_to_sequence_len: false
+
+adapter: lora
+lora_r: 64
+lora_alpha: 128
+lora_dropout: 0.05
+lora_target_modules:
+  - q_proj
+  - k_proj
+  - v_proj
+  - o_proj
+  - gate_proj
+  - up_proj
+  - down_proj
+
+gradient_accumulation_steps: 2
+micro_batch_size: 1
+num_epochs: 5
+max_steps: 459
+optimizer: adamw_torch
+lr_scheduler: cosine
+learning_rate: 1.0e-4
+warmup_ratio: 0.05
+weight_decay: 0.0
+
+bf16: true
+tf32: true
+gradient_checkpointing: true
+gradient_checkpointing_kwargs:
+  use_reentrant: false
+attn_implementation: flash_attention_2
+
+evals_per_epoch: 2
+saves_per_epoch: 2
+logging_steps: 1
