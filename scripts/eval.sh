@@ -4,7 +4,10 @@
 #
 #   scripts/eval.sh --checkpoint outputs/qwen3.5-4b-phase1 [--compare-frontier]
 #       [--frontier-scores eval/results/frontier.json | --repo-frontier]
-#       [--gpu-architecture blackwell|hopper]
+#       [--gpu-architecture blackwell|hopper] [--serve]
+#
+#   --serve  start vLLM once and score every benchmark through the shared endpoint
+#            (much faster than reloading the checkpoint per lm-eval subprocess)
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
@@ -27,7 +30,7 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$checkpoint" ]; then
-  echo "usage: scripts/eval.sh --checkpoint <path> [--compare-frontier] [--frontier-scores <path> | --repo-frontier] [--gpu-architecture blackwell|hopper]" >&2
+  echo "usage: scripts/eval.sh --checkpoint <path> [--compare-frontier] [--frontier-scores <path> | --repo-frontier] [--gpu-architecture blackwell|hopper] [--serve]" >&2
   exit 1
 fi
 

@@ -11,13 +11,29 @@ import sys
 from pathlib import Path
 
 from eval.benchmarks import BENCHMARKS, run_benchmark
+from eval.model_server import eval_session
 
 
-def run_harness(model_path: str, benchmarks: list[str], work_dir: Path, limit: int | None = None) -> dict[str, float]:
+def run_harness(
+    model_path: str,
+    benchmarks: list[str],
+    work_dir: Path,
+    limit: int | None = None,
+    *,
+    serve: bool = False,
+) -> dict[str, float]:
     scores: dict[str, float] = {}
-    for key in benchmarks:
-        benchmark = BENCHMARKS[key]
-        scores[key] = run_benchmark(benchmark, model_path, work_dir, limit=limit)
+    with eval_session(model_path, serve=serve) as session:
+        for key in benchmarks:
+            benchmark = BENCHMARKS[key]
+            scores[key] = run_benchmark(
+                benchmark,
+                model_path,
+                work_dir,
+                limit=limit,
+                endpoint=session.endpoint if session else None,
+                model_name=session.model_name if session else None,
+            )
     return scores
 
 
@@ -34,11 +50,16 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--work-dir", type=Path, default=Path("eval/results/_work"))
     parser.add_argument("--limit", type=int, default=None, help="cap examples per benchmark (cheap re-verification)")
+    parser.add_argument(
+        "--serve",
+        action="store_true",
+        help="serve the checkpoint once with vLLM and reuse the endpoint for every benchmark",
+    )
     parser.add_argument("--out", type=Path, required=True, help="where to write the resulting scores json")
     args = parser.parse_args(argv)
 
     benchmarks = args.benchmarks or sorted(BENCHMARKS)
-    scores = run_harness(args.checkpoint, benchmarks, args.work_dir, limit=args.limit)
+    scores = run_harness(args.checkpoint, benchmarks, args.work_dir, limit=args.limit, serve=args.serve)
 
     # run_harness keeps only each benchmark's single headline float, but the triton
     # adapter writes richer sub-metrics to <work_dir>/triton.json — notably

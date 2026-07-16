@@ -94,12 +94,36 @@ def assert_fraction_scores(scores: dict[str, float], source: str) -> None:
         )
 
 
-def run_benchmark(benchmark: Benchmark, model_path: str, output_dir: Path, limit: int | None = None) -> float:
+def _lm_eval_completions_url(endpoint: str) -> str:
+    base = endpoint.rstrip("/")
+    return base if base.endswith("/completions") else f"{base}/completions"
+
+
+def _lm_eval_model_args(model_path: str, endpoint: str, model_name: str) -> str:
+    return (
+        f"model={model_name},tokenizer={model_path},"
+        f"base_url={_lm_eval_completions_url(endpoint)},"
+        "tokenized_requests=False,num_concurrent=1,max_retries=3"
+    )
+
+
+def run_benchmark(
+    benchmark: Benchmark,
+    model_path: str,
+    output_dir: Path,
+    limit: int | None = None,
+    *,
+    endpoint: str | None = None,
+    model_name: str | None = None,
+) -> float:
     """Run a single benchmark via `lm-eval` and return the headline metric.
 
     `limit` caps the number of examples `lm-eval` samples (its own `--limit` flag) —
     use a small limit for cheap re-verification of a submitted claim, leave unset for
     a full basket run.
+
+    When `endpoint` is set, score through the shared OpenAI-compatible student
+    server (`local-completions`) instead of reloading the checkpoint with `--model hf`.
 
     Requires the `lm-eval` CLI on PATH (`pip install lm-eval`). Not invoked
     during import so the harness stays importable (and its `--help` usable)
@@ -108,21 +132,35 @@ def run_benchmark(benchmark: Benchmark, model_path: str, output_dir: Path, limit
     if benchmark.key == "triton":
         from eval.triton_bench import run_triton_benchmark
 
-        return run_triton_benchmark(model_path, output_dir, limit=limit)
+        return run_triton_benchmark(model_path, output_dir, limit=limit, endpoint=endpoint)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     result_path = output_dir / f"{benchmark.key}.json"
-    command = [
-        "lm-eval",
-        "--model",
-        "hf",
-        "--model_args",
-        f"pretrained={model_path}",
-        "--tasks",
-        benchmark.lm_eval_task,
-        "--output_path",
-        str(result_path),
-    ]
+    if endpoint:
+        served_name = model_name or Path(model_path).name or model_path
+        command = [
+            "lm-eval",
+            "--model",
+            "local-completions",
+            "--model_args",
+            _lm_eval_model_args(model_path, endpoint, served_name),
+            "--tasks",
+            benchmark.lm_eval_task,
+            "--output_path",
+            str(result_path),
+        ]
+    else:
+        command = [
+            "lm-eval",
+            "--model",
+            "hf",
+            "--model_args",
+            f"pretrained={model_path}",
+            "--tasks",
+            benchmark.lm_eval_task,
+            "--output_path",
+            str(result_path),
+        ]
     if limit is not None:
         command += ["--limit", str(limit)]
     subprocess.run(command, check=True)
