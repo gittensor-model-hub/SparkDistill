@@ -88,7 +88,7 @@ def write_registry_snapshot(
         download_proof=download_proof,
     )
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    with out_path.open("w", encoding="utf-8") as handle:
+    with out_path.open("w", encoding="utf-8", newline="\n") as handle:
         for row in accepted:
             handle.write(json.dumps(row, separators=(",", ":")) + "\n")
 

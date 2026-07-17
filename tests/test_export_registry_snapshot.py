@@ -136,6 +136,39 @@ def test_write_registry_snapshot_writes_task_id_index(tmp_path, monkeypatch):
     assert payload["task_ids"] == ["task_a"]
 
 
+def test_write_registry_snapshot_bytes_are_lf_only(tmp_path, monkeypatch):
+    """Snapshot bytes must match the sha-pinned LF serialization on every OS.
+
+    accepted_registry_snapshot_sha256 is computed over the exact file bytes; a
+    platform-dependent newline translation (CRLF from text-mode writes on Windows)
+    changes the digest and breaks pin verification for an honest export.
+    """
+    bundle = tmp_path / "a" / "proof"
+    bundle.mkdir(parents=True)
+    row = _traj("task_a", "prompt A")
+    (bundle / "trajectories.jsonl").write_text(json.dumps(row) + "\n")
+
+    entry = {
+        "miner": "alice",
+        "hf_url": "https://huggingface.co/datasets/org/a",
+        "trajectories_sha256": "a" * 64,
+        "rows_total": 1,
+        "dataset_version": "triton-distill-v0.2",
+        "gpu_architecture": "blackwell",
+    }
+    monkeypatch.setattr(
+        "eval.export_registry_snapshot.resolve_proof_dir",
+        lambda entry, proof_cache=None, download_proof=None: bundle,
+    )
+
+    out = tmp_path / "snapshot.jsonl"
+    write_registry_snapshot([entry], out_path=out, task_ids_path=tmp_path / "ids.json", sparkproof_root=None)
+
+    raw = out.read_bytes()
+    assert raw.endswith(b"\n")
+    assert b"\r" not in raw
+
+
 def test_snapshot_manifest_pins_and_verify(tmp_path, monkeypatch):
     bundle = tmp_path / "a" / "proof"
     bundle.mkdir(parents=True)

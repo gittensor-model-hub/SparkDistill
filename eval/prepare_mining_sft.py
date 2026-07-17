@@ -51,7 +51,7 @@ def export_mining_sft(
     ds = load_dataset(repo, split="train", token=hf_token)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     rows_written = 0
-    with out_path.open("w", encoding="utf-8") as handle:
+    with out_path.open("w", encoding="utf-8", newline="\n") as handle:
         for row in ds:
             messages = row.get("messages")
             if not isinstance(messages, list) or not messages:

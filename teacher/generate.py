@@ -99,7 +99,7 @@ def main(argv: list[str] | None = None) -> int:
     thinking_budget = args.thinking_budget or None
 
     count = 0
-    with args.out.open("w") as out_f:
+    with args.out.open("w", encoding="utf-8", newline="\n") as out_f:
         for trajectory in generate_trajectories(
             args.prompts,
             providers,

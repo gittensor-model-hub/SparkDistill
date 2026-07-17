@@ -318,7 +318,7 @@ def mix_registry_datasets(
     dedupe_counts = {"exact_skipped": 0, "near_skipped": 0, "intra_mix_skipped": 0}
     rows_written = 0
 
-    with out_path.open("w", encoding="utf-8") as out_f:
+    with out_path.open("w", encoding="utf-8", newline="\n") as out_f:
         for entry in entries:
             proof_dir = resolve_proof_dir(entry, proof_cache=proof_cache, download_proof=download_proof)
             trajectories = load_trajectories_jsonl(proof_dir / "trajectories.jsonl")
