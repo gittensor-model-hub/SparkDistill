@@ -336,3 +336,37 @@ def test_close_dataset_pr_posts_gate_comment(monkeypatch):
     assert close_dataset_pr(8, label="dataset:none", issues=["below 25 rows"]) == []
     assert "below the 25-row merge threshold" in calls[0][-1]
     assert "below 25 rows" in calls[0][-1]
+
+
+def test_main_skips_label_when_pr_already_merged(tmp_path, monkeypatch):
+    label_calls: list[tuple[int, str]] = []
+
+    monkeypatch.setattr(registry_gate, "_git_show", lambda ref, path: "")
+    monkeypatch.setattr(registry_gate, "_pr_state", lambda n: "MERGED")
+    monkeypatch.setattr(
+        registry_gate,
+        "update_pr_dataset_label",
+        lambda n, label: label_calls.append((n, label)) or [],
+    )
+
+    out = tmp_path / "report.json"
+    rc = registry_gate.main(
+        [
+            "--base-ref",
+            "base",
+            "--head-ref",
+            "head",
+            "--sparkproof-root",
+            ".",
+            "--out",
+            str(out),
+            "--apply-label",
+            "--close-on-reject",
+            "--merge-on-pass",
+            "--pr-number",
+            "174",
+            "--skip-mining-publish",
+        ]
+    )
+    assert rc == 0
+    assert label_calls == []

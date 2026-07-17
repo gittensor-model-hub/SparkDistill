@@ -188,6 +188,22 @@ def update_pr_dataset_label(pr_number: int, label: str) -> list[str]:
     return issues
 
 
+def _pr_state(pr_number: int) -> str | None:
+    """Return GitHub PR state (OPEN, MERGED, CLOSED) or None on lookup failure."""
+    result = subprocess.run(
+        ["gh", "pr", "view", str(pr_number), "--json", "state"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return None
+    try:
+        return json.loads(result.stdout or "{}").get("state")
+    except json.JSONDecodeError:
+        return None
+
+
 def close_dataset_pr(
     pr_number: int,
     *,
@@ -544,6 +560,10 @@ def main(argv: list[str] | None = None) -> int:
     if report.get("issues"):
         for issue in report["issues"]:
             print(f"  - {issue}", file=sys.stderr)
+
+    if args.pr_number is not None and _pr_state(args.pr_number) == "MERGED":
+        print(f"PR #{args.pr_number} already merged; skipping label/merge/close", file=sys.stderr)
+        return 0
 
     if args.apply_label:
         if args.pr_number is None:
