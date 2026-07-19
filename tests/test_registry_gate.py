@@ -137,6 +137,31 @@ def test_check_registry_duplicates_rejects_repeat_sha():
     assert any("duplicate trajectories_sha256" in issue for issue in issues)
 
 
+def test_check_registry_duplicates_tolerates_missing_hf_url():
+    # A line missing hf_url is reported by validate_registry_entry; the duplicate
+    # check must not crash on it (it used to raise KeyError).
+    existing = [_entry()]
+    malformed = {"miner": "bob", "trajectories_sha256": "b" * 64}
+    assert check_registry_duplicates(existing, [malformed]) == []
+
+
+def test_check_registry_duplicates_tolerates_malformed_hf_url():
+    existing = [_entry()]
+    malformed = _entry(miner="bob", hf_url="not-a-url", trajectories_sha256="c" * 64)
+    assert check_registry_duplicates(existing, [malformed]) == []
+
+
+def test_gate_registry_submission_cleanly_rejects_malformed_entry():
+    # Regression: a malformed hf_url must produce a clean dataset:REJECT with the
+    # validation issue, not crash the whole gate before it can report.
+    existing = [_entry()]
+    malformed = _entry(hf_url="not-a-url")
+    report = gate_registry_submission(malformed, sparkproof_root=Path("."), existing_registry=existing)
+    assert report["verified"] is False
+    assert report["label"] == "dataset:REJECT"
+    assert any("hf_url" in issue for issue in report["issues"])
+
+
 def test_gate_registry_pr_rejects_multi_line_append():
     entry = json.dumps(_entry())
     report = gate_registry_pr(

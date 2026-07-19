@@ -274,14 +274,24 @@ def check_registry_duplicates(
     seen_sha = {row["trajectories_sha256"] for row in existing if row.get("trajectories_sha256")}
 
     for entry in new_entries:
-        repo = hf_repo_from_url(entry["hf_url"])
-        sha = entry["trajectories_sha256"]
-        if repo in seen_hf:
-            issues.append(f"duplicate hf_url repo already in registry: {repo}")
-        if sha in seen_sha:
-            issues.append(f"duplicate trajectories_sha256 already in registry: {sha}")
-        seen_hf.add(repo)
-        seen_sha.add(sha)
+        # A missing or malformed hf_url / trajectories_sha256 is already reported by
+        # validate_registry_entry; skip it here so a bad line yields a clean
+        # dataset:REJECT instead of crashing the gate on the duplicate check.
+        raw_url = entry.get("hf_url")
+        try:
+            repo = hf_repo_from_url(raw_url) if raw_url else None
+        except ValueError:
+            repo = None
+        if repo is not None:
+            if repo in seen_hf:
+                issues.append(f"duplicate hf_url repo already in registry: {repo}")
+            seen_hf.add(repo)
+
+        sha = entry.get("trajectories_sha256")
+        if sha:
+            if sha in seen_sha:
+                issues.append(f"duplicate trajectories_sha256 already in registry: {sha}")
+            seen_sha.add(sha)
     return issues
 
 
@@ -296,7 +306,13 @@ def gate_registry_submission(
     if existing_registry is not None:
         issues.extend(check_registry_duplicates(existing_registry, [entry]))
 
-    hf_repo = hf_repo_from_url(entry["hf_url"]) if entry.get("hf_url") else ""
+    # A malformed hf_url is already reported by validate_registry_entry (so `issues`
+    # is non-empty and this function returns a clean dataset:REJECT below); don't let
+    # parsing it for the report field crash the gate first.
+    try:
+        hf_repo = hf_repo_from_url(entry["hf_url"]) if entry.get("hf_url") else ""
+    except ValueError:
+        hf_repo = ""
     report: dict[str, Any] = {
         "miner": entry.get("miner"),
         "hf_repo": hf_repo,

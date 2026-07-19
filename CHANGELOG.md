@@ -9,6 +9,13 @@ All notable changes to SparkDistill are documented here. The format follows
 - **Repair-tier mix dedupe fallback** (SparkProof [#29]): `_PromptDedupeRegistry` now
   fingerprints `metadata.prompt_meta.prompt` before top-level `prompt`, matching SparkProof
   `NoveltyRegistry` for repair-heavy bundles.
+- **Dataset registry gate rejects malformed lines cleanly instead of crashing**: a
+  registry line with a missing or malformed `hf_url` (or `trajectories_sha256`) made
+  `check_registry_duplicates` / `gate_registry_submission` raise `KeyError` / `ValueError`
+  before the collected validation issues could be returned, so CI failed with a traceback
+  instead of a `dataset:REJECT` label and a helpful close comment. The duplicate check and
+  the report's `hf_repo` lookup now tolerate fields that `validate_registry_entry` already
+  flags.
 
 ## [0.1.2] — 2026-07-15
 
