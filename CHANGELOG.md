@@ -16,6 +16,11 @@ All notable changes to SparkDistill are documented here. The format follows
   instead of a `dataset:REJECT` label and a helpful close comment. The duplicate check and
   the report's `hf_repo` lookup now tolerate fields that `validate_registry_entry` already
   flags.
+- **Dataset registry gate rejects invalid / non-object JSON cleanly**: an appended
+  registry line that is not valid JSON, or is valid JSON but not an object (array,
+  string, `null`, …), made `parse_added_registry_lines` / `gate_registry_pr` raise
+  `ValueError` / `AttributeError` before a rejection report could be returned. The
+  gate now catches those parse failures and returns `dataset:REJECT` with the issue.
 
 ## [0.1.2] — 2026-07-15
 

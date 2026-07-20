@@ -162,6 +162,44 @@ def test_gate_registry_submission_cleanly_rejects_malformed_entry():
     assert any("hf_url" in issue for issue in report["issues"])
 
 
+def test_parse_added_registry_lines_rejects_non_object_json():
+    try:
+        parse_added_registry_lines("", "[1, 2, 3]\n")
+        assert False, "expected ValueError for non-object JSON"
+    except ValueError as exc:
+        assert "must be a JSON object" in str(exc)
+
+
+def test_gate_registry_pr_cleanly_rejects_invalid_json_line():
+    # Follow-up to #173: garbage / non-object JSON must yield dataset:REJECT,
+    # not an uncaught ValueError / AttributeError traceback in CI.
+    report = gate_registry_pr(
+        base_registry_text="",
+        head_registry_text="not-json\n",
+        sparkproof_root=Path("."),
+        pr_body="- [x] **Dataset track submission**",
+        changed_paths=["datasets/registry.jsonl"],
+    )
+    assert report["verified"] is False
+    assert report["label"] == "dataset:REJECT"
+    assert report["submissions"] == []
+    assert any("invalid JSON" in issue for issue in report["issues"])
+
+
+def test_gate_registry_pr_cleanly_rejects_non_object_json_line():
+    report = gate_registry_pr(
+        base_registry_text="",
+        head_registry_text="[1, 2, 3]\n",
+        sparkproof_root=Path("."),
+        pr_body="- [x] **Dataset track submission**",
+        changed_paths=["datasets/registry.jsonl"],
+    )
+    assert report["verified"] is False
+    assert report["label"] == "dataset:REJECT"
+    assert report["submissions"] == []
+    assert any("must be a JSON object" in issue for issue in report["issues"])
+
+
 def test_gate_registry_pr_rejects_multi_line_append():
     entry = json.dumps(_entry())
     report = gate_registry_pr(
