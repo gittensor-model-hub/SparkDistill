@@ -6,6 +6,12 @@ All notable changes to SparkDistill are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- **Dataset registry gate tolerates malformed prior rows in duplicate check**: building
+  the `seen_hf` set from existing registry lines called `hf_repo_from_url(row["hf_url"])`
+  unconditionally, so a prior row with a malformed `hf_url` could raise `ValueError` and
+  crash CI before the new submission's validation issues were returned. Duplicate
+  detection now skips unparseable prior URLs the same way it already skips bad fields on
+  the appended line (follow-up to [#173](https://github.com/gittensor-model-hub/SparkDistill/pull/173)).
 - **Repair-tier mix dedupe fallback** (SparkProof [#29]): `_PromptDedupeRegistry` now
   fingerprints `metadata.prompt_meta.prompt` before top-level `prompt`, matching SparkProof
   `NoveltyRegistry` for repair-heavy bundles.

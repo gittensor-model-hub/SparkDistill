@@ -280,8 +280,21 @@ def check_registry_duplicates(
     new_entries: list[dict[str, Any]],
 ) -> list[str]:
     issues: list[str] = []
-    seen_hf = {hf_repo_from_url(row["hf_url"]) for row in existing if row.get("hf_url")}
-    seen_sha = {row["trajectories_sha256"] for row in existing if row.get("trajectories_sha256")}
+    seen_hf: set[str] = set()
+    seen_sha: set[str] = set()
+    for row in existing:
+        # Malformed hf_url / trajectories_sha256 on prior registry lines must not
+        # crash duplicate detection for a new submission (same class as #173).
+        raw_url = row.get("hf_url")
+        try:
+            repo = hf_repo_from_url(raw_url) if raw_url else None
+        except ValueError:
+            repo = None
+        if repo is not None:
+            seen_hf.add(repo)
+        sha = row.get("trajectories_sha256")
+        if sha:
+            seen_sha.add(sha)
 
     for entry in new_entries:
         # A missing or malformed hf_url / trajectories_sha256 is already reported by
