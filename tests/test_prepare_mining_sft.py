@@ -66,6 +66,47 @@ def test_export_mining_sft_writes_canonical_jsonl_format(tmp_path: Path, monkeyp
     assert mix_manifest["sft_sha256"] == "a" * 64
 
 
+def test_export_mining_sft_bytes_are_lf_only(tmp_path: Path, monkeypatch):
+    """The export's raw bytes must match the sha-pinned LF serialization on every OS.
+
+    mix_manifest.sft_sha256 is computed over the exact file bytes; a platform-dependent
+    newline translation (e.g. CRLF from text-mode writes on Windows) silently changes the
+    digest and fails the canonical pin check for an honest export.
+    """
+    rows = [
+        {"messages": [{"role": "user", "content": "a"}, {"role": "assistant", "content": "b"}]},
+        {"messages": [{"role": "user", "content": "c"}, {"role": "assistant", "content": "d"}]},
+    ]
+
+    class _Split:
+        def __iter__(self):
+            return iter(rows)
+
+        def __len__(self):
+            return len(rows)
+
+    monkeypatch.setattr("datasets.load_dataset", lambda *a, **k: _Split())
+    monkeypatch.setattr(
+        "eval.prepare_mining_sft.fetch_remote_mix_manifest",
+        lambda **kwargs: _stub_remote_manifest(),
+    )
+
+    out = tmp_path / "mining.jsonl"
+    export_mining_sft(
+        out_path=out,
+        repo_id="gittensor-model-hub/sparkproof-mining",
+        verify_pin=False,
+    )
+
+    raw = out.read_bytes()
+    expected = b"".join(
+        json.dumps({"messages": row["messages"]}, separators=(",", ":")).encode("utf-8") + b"\n"
+        for row in rows
+    )
+    assert raw == expected
+    assert b"\r" not in raw
+
+
 def test_export_mining_sft_writes_custom_mix_manifest_path(tmp_path: Path, monkeypatch):
     class _Split:
         def __iter__(self):

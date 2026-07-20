@@ -64,7 +64,7 @@ def main(argv: list[str] | None = None) -> int:
     convert = to_messages_record if args.format == "messages" else to_sft_record
 
     count = 0
-    with args.in_path.open() as in_f, args.out.open("w") as out_f:
+    with args.in_path.open(encoding="utf-8") as in_f, args.out.open("w", encoding="utf-8", newline="\n") as out_f:
         for line in in_f:
             line = line.strip()
             if not line:

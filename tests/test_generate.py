@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 import teacher.generate as generate
 from teacher.generate import _iter_prompts
 from teacher.providers import Trajectory
@@ -85,6 +87,62 @@ def test_model_flag_is_not_forwarded_to_get_teacher(monkeypatch, tmp_path):
     )
 
     assert calls == [("anthropic", None), ("openai", None)]
+
+
+class _FlakyTeacher:
+    """Teacher that raises on a chosen set of prompts, succeeds otherwise."""
+
+    def __init__(self, name: str, fail_prompts: set[str]) -> None:
+        self.name = name
+        self.model = "pinned"
+        self._fail_prompts = fail_prompts
+
+    def generate(self, prompt: str, **_kwargs) -> Trajectory:
+        if prompt in self._fail_prompts:
+            raise RuntimeError(f"simulated teacher API error for {prompt!r}")
+        return Trajectory(prompt=prompt, response="ok", provider=self.name, model=self.model)
+
+
+def test_one_failed_teacher_call_does_not_abort_the_batch(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        generate, "get_teacher", lambda provider, model=None: _FlakyTeacher(provider, {"b"})
+    )
+    prompts = _write(tmp_path, '{"prompt": "a"}\n{"prompt": "b"}\n{"prompt": "c"}\n{"prompt": "d"}\n')
+
+    got = list(
+        generate.generate_trajectories(
+            prompts,
+            ["anthropic"],
+            max_tokens=16,
+            temperature=0.0,
+            limit=None,
+            concurrency=1,
+            thinking_budget=None,
+        )
+    )
+
+    # The failing prompt "b" is skipped; the other three still come through.
+    assert sorted(t.prompt for t in got) == ["a", "c", "d"]
+
+
+def test_run_fails_loudly_when_every_teacher_call_fails(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        generate, "get_teacher", lambda provider, model=None: _FlakyTeacher(provider, {"a", "b"})
+    )
+    prompts = _write(tmp_path, '{"prompt": "a"}\n{"prompt": "b"}\n')
+
+    with pytest.raises(RuntimeError, match="no trajectories were generated"):
+        list(
+            generate.generate_trajectories(
+                prompts,
+                ["anthropic"],
+                max_tokens=16,
+                temperature=0.0,
+                limit=None,
+                concurrency=1,
+                thinking_budget=None,
+            )
+        )
 
 
 def test_main_with_model_flag_does_not_crash(monkeypatch, tmp_path):
