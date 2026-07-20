@@ -424,8 +424,15 @@ def _download_and_verify_bundle(
 def _attestation_issues_for_eval_tiering(
     changed_paths: list[str] | None,
     attestation: dict | None,
+    bundle_dir: Path | None,
 ) -> list[str]:
-    """Training-track eval tiering requires a passed attestation committed in the PR."""
+    """Training-track eval tiering requires a cryptographically valid PR attestation.
+
+    Presence of ``passed: true`` is not enough — CI verifies the NRAS GPU token
+    against NVIDIA's JWKS and the claim_sha256 nonce binding without a GPU. When
+    a TDX blob is present, both REPORTDATA binding and DCAP/PCS verification are
+    required as well.
+    """
     if find_attestation_path(changed_paths) is None:
         return [
             "training-track eval tiering requires runs/<run-id>/attestation.json in the PR "
@@ -433,9 +440,11 @@ def _attestation_issues_for_eval_tiering(
         ]
     if attestation is None:
         return ["could not read attestation.json from the PR head for eval tiering"]
-    if not attestation.get("passed"):
-        return ["attestation.json must report passed: true for eval tiering"]
-    return []
+    if bundle_dir is None:
+        return ["proof bundle directory missing for attestation integrity checks"]
+    from eval.verify import check_attestation_integrity
+
+    return check_attestation_integrity(bundle_dir, attestation, require_tdx=False)
 
 
 def verify_remote_proof_bundle_scores(
@@ -456,18 +465,19 @@ def verify_remote_proof_bundle_scores(
     gittensor-model-hub/SparkDistill#120 sit with a stale gsm8k claim (and no
     eval:* label at all) until review.
 
-    Never needs a GPU: proof bundles are weights-free (no checkpoint on HF), so
-    any claimed benchmark that isn't covered by an attested sample always ends in
-    verify_submission's "checkpoint_required" reason rather than an actual harness
-    re-run. Reward-tier labels (`eval:XL` / `eval:L` / …) may only be derived from
-    those deferred claims when the PR also commits `runs/<run-id>/attestation.json`
-    with a passing GPU CC attestation that binds the bundle — otherwise the
-    submission is `eval:REJECT` (unattested claimed scores are not tiered).
+    Never needs a GPU: proof bundles are weights-free (no checkpoint on HF). When
+    attested eval samples cover every claimed benchmark and the PR commits a
+    cryptographically valid GPU (+ TDX when present/required) attestation bound
+    to ``claim_sha256``, ``eval.verify`` completes entirely on CPU. Otherwise
+    verification ends in ``checkpoint_required``; reward-tier labels may only be
+    derived from deferred claims when the PR attestation passes JWKS + claim
+    binding (and TDX checks when a quote is present) — forged ``passed: true``
+    JSON is ``eval:REJECT``.
 
     Returns `(issues, eval_label)` — `eval_label` is the reward-tier label
     eval.verify computed (e.g. "eval:BASELINE", "eval:XL", "eval:REJECT"), or
     a tier derived from claimed scores when verify is deferred *and* attestation
-    is present ("checkpoint_required"), or None when nothing could be computed
+    crypto passes ("checkpoint_required"), or None when nothing could be computed
     (download failure).
     """
     report, attestation, error, bundle_dir = _download_and_verify_bundle(
@@ -482,6 +492,7 @@ def verify_remote_proof_bundle_scores(
             attestation_issues = _attestation_issues_for_eval_tiering(
                 changed_paths,
                 attestation,
+                bundle_dir,
             )
             if attestation_issues:
                 return attestation_issues, "eval:REJECT"
