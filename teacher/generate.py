@@ -57,9 +57,41 @@ def generate_trajectories(
         )
 
     with ThreadPoolExecutor(max_workers=concurrency) as pool:
-        futures = [pool.submit(_run, teacher, record) for teacher in teachers for record in prompts]
-        for future in as_completed(futures):
-            yield future.result()
+        # Keep the (provider, prompt) for each future so a failed call can be
+        # reported without aborting the whole batch. Teacher APIs routinely
+        # return transient errors (rate limits, 5xx) mid-run; letting one such
+        # error propagate here would discard every other already-completed
+        # trajectory from an expensive generation pass.
+        future_to_prompt = {
+            pool.submit(_run, teacher, record): (teacher.name, record.get("prompt", ""))
+            for teacher in teachers
+            for record in prompts
+        }
+        succeeded = 0
+        failed = 0
+        for future in as_completed(future_to_prompt):
+            provider, prompt = future_to_prompt[future]
+            try:
+                trajectory = future.result()
+            except Exception as exc:  # noqa: BLE001 - one flaky teacher call must not abort the batch
+                failed += 1
+                preview = prompt if len(prompt) <= 60 else f"{prompt[:57]}..."
+                print(
+                    f"warning: {provider} teacher call failed, skipping prompt {preview!r}: {exc}",
+                    file=sys.stderr,
+                )
+                continue
+            succeeded += 1
+            yield trajectory
+
+        # A single flaky call is tolerated, but a run where *nothing* succeeded
+        # (e.g. a bad API key or no connectivity) must still fail loudly rather
+        # than silently writing an empty output file.
+        if failed and not succeeded:
+            raise RuntimeError(
+                f"all {failed} teacher call(s) failed; no trajectories were generated "
+                "(check teacher API keys and connectivity)"
+            )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -99,7 +131,7 @@ def main(argv: list[str] | None = None) -> int:
     thinking_budget = args.thinking_budget or None
 
     count = 0
-    with args.out.open("w") as out_f:
+    with args.out.open("w", encoding="utf-8", newline="\n") as out_f:
         for trajectory in generate_trajectories(
             args.prompts,
             providers,

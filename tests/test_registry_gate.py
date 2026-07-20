@@ -151,6 +151,15 @@ def test_check_registry_duplicates_tolerates_malformed_hf_url():
     assert check_registry_duplicates(existing, [malformed]) == []
 
 
+def test_check_registry_duplicates_tolerates_malformed_hf_url_in_existing():
+    # Follow-up to #173: indexing prior registry rows used hf_repo_from_url(row["hf_url"])
+    # and could raise ValueError before the new line's issues were collected.
+    existing = [_entry(hf_url="not-a-url")]
+    duplicate_sha = _entry(miner="bob")
+    issues = check_registry_duplicates(existing, [duplicate_sha])
+    assert any("duplicate trajectories_sha256" in issue for issue in issues)
+
+
 def test_gate_registry_submission_cleanly_rejects_malformed_entry():
     # Regression: a malformed hf_url must produce a clean dataset:REJECT with the
     # validation issue, not crash the whole gate before it can report.

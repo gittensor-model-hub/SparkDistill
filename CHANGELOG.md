@@ -15,6 +15,20 @@ All notable changes to SparkDistill are documented here. The format follows
 - **Repair-tier mix dedupe fallback** (SparkProof [#29]): `_PromptDedupeRegistry` now
   fingerprints `metadata.prompt_meta.prompt` before top-level `prompt`, matching SparkProof
   `NoveltyRegistry` for repair-heavy bundles.
+- **Dataset registry gate tolerates malformed prior rows when indexing duplicates**
+  (follow-up to [#173](https://github.com/gittensor-model-hub/SparkDistill/pull/173) /
+  [#189](https://github.com/gittensor-model-hub/SparkDistill/pull/189)): building
+  `seen_hf` / `seen_sha` from existing registry lines no longer calls
+  `hf_repo_from_url` unconditionally, so one bad historical `hf_url` cannot crash the
+  gate with a traceback before `dataset:REJECT`.
+- **Sha-pinned jsonl exports write LF + UTF-8 on every platform**: mining SFT export,
+  registry mix, accepted-registry snapshot, and teacher trajectory writers open text
+  files with `newline="\n"` so Windows `\r\n` translation cannot desync byte hashes
+  from Linux CI / validators.
+- **Teacher generation skips a single flaky call instead of aborting the batch**:
+  `generate_trajectories` catches per-prompt teacher API failures (rate limit / 5xx),
+  logs a warning, and continues; a run where every call fails still raises so an empty
+  output is never treated as success.
 - **Dataset registry gate rejects malformed lines cleanly instead of crashing**: a
   registry line with a missing or malformed `hf_url` (or `trajectories_sha256`) made
   `check_registry_duplicates` / `gate_registry_submission` raise `KeyError` / `ValueError`
