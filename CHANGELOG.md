@@ -6,6 +6,12 @@ All notable changes to SparkDistill are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- **Training CI fail-closes GPU + TDX attestation crypto** (no GPU required): forged
+  `{"passed": true}` attestation JSON no longer earns eval tiers. `eval.verify` and the
+  training-track gate now require NRAS JWKS signature + claim_sha256 nonce binding; when
+  a TDX quote is present (or attested eval samples require it), both REPORTDATA binding
+  and Intel DCAP/PCS verification must pass. Proof-only bundles whose attested samples
+  cover every claimed benchmark still verify entirely on CPU.
 - **Repair-tier mix dedupe fallback** (SparkProof [#29]): `_PromptDedupeRegistry` now
   fingerprints `metadata.prompt_meta.prompt` before top-level `prompt`, matching SparkProof
   `NoveltyRegistry` for repair-heavy bundles.

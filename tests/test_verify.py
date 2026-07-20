@@ -258,14 +258,17 @@ def test_attested_gsm8k_skips_harness_without_checkpoint(tmp_path, monkeypatch):
     digest = claim_sha256(bundle)
     attestation = {
         "passed": True,
+        "token": "nras-token-placeholder",
         "claims": {"eat_nonce": digest},
-        "tdx": {"report_data": tdx_report_data(digest).hex()},
+        "tdx": {"report_data": tdx_report_data(digest).hex(), "quote_b64": "AAAA"},
     }
 
     def fail_harness(*_args, **_kwargs):
         raise AssertionError("run_harness should not run for attested gsm8k-only bundles")
 
     monkeypatch.setattr(v, "run_harness", fail_harness)
+    # JWKS/DCAP fail-closed path is covered in tests/test_attestation_ci.py.
+    monkeypatch.setattr(v, "check_attestation_integrity", lambda *a, **k: [])
 
     report = v.verify_submission(bundle, frontier={"gsm8k": 0.5}, attestation=attestation)
     assert report["verified"] is True

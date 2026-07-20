@@ -1,10 +1,12 @@
 """Cheap verification of a submitted proof-of-training bundle.
 
 Instead of a full retrain, a proof bundle is checked by: (1) optionally requiring a
-passed GPU CC attestation, (2) re-running each claimed benchmark on a small held-out
-sample against the bundle's checkpoint and comparing to the claimed scores within a
-tolerance, and only if both pass, (3) scoring the (now-trusted) claimed scores against
-the frontier via `eval.score`. A mismatch beyond tolerance is treated as a fabricated
+passed GPU CC (+ TDX) attestation with fail-closed JWKS/DCAP crypto and claim
+binding (CPU-only, no GPU), (2) re-checking attested eval samples on CPU when
+present, else re-running each claimed benchmark on a small held-out sample against
+the bundle's checkpoint and comparing to the claimed scores within a tolerance,
+and only if both pass, (3) scoring the (now-trusted) claimed scores against the
+frontier via `eval.score`. A mismatch beyond tolerance is treated as a fabricated
 or stale claim and rejected outright — cheap verification does not re-run the full
 basket, so it must not silently trust an unverified number either.
 
@@ -274,6 +276,53 @@ def check_tdx_signature(attestation: dict | None, pccs_url: str | None = None) -
     return verify_tdx_quote(attestation["tdx"].get("quote_b64") or "", pccs_url)
 
 
+def check_attestation_integrity(
+    bundle_dir: Path,
+    attestation: dict | None,
+    *,
+    require_tdx: bool = False,
+) -> list[str]:
+    """CPU-only fail-closed checks for GPU CC + optional Intel TDX attestation.
+
+    Designed for CI (no GPU): forged ``{"passed": true}`` JSON must not pass.
+    Always requires a verifiable NRAS GPU token (JWKS) and claim_sha256 nonce
+    binding. When ``require_tdx`` is set or a ``tdx`` blob is present, also
+    requires TDX REPORTDATA binding and DCAP/PCS quote verification.
+    """
+    if attestation is None:
+        return ["attestation is required for integrity verification"]
+    if not attestation.get("passed"):
+        return ["attestation must report passed: true"]
+
+    issues: list[str] = []
+    gpu_sig = check_gpu_signature(attestation)
+    if gpu_sig is None:
+        issues.append("attestation missing NRAS GPU token for JWKS signature verification")
+    elif not gpu_sig.get("verified"):
+        detail = "; ".join(str(item) for item in (gpu_sig.get("issues") or [])) or "unverified"
+        issues.append(f"GPU attestation JWKS signature failed: {detail}")
+
+    if check_claim_binding(bundle_dir, attestation) is not True:
+        issues.append("GPU attestation eat_nonce does not bind claim_sha256 for this bundle")
+
+    has_tdx = bool(attestation.get("tdx"))
+    if require_tdx or has_tdx:
+        if not has_tdx:
+            issues.append("TDX quote is required for no-GPU attested verification")
+        else:
+            if check_tdx_binding(bundle_dir, attestation) is not True:
+                issues.append("TDX REPORTDATA does not bind claim_sha256 for this bundle")
+            tdx_sig = check_tdx_signature(attestation)
+            if tdx_sig is None:
+                issues.append("TDX quote missing for DCAP/PCS signature verification")
+            elif not tdx_sig.get("verified"):
+                status = tdx_sig.get("status") or "unverified"
+                advisories = tdx_sig.get("advisory_ids") or []
+                suffix = f" (advisories={advisories})" if advisories else ""
+                issues.append(f"TDX quote DCAP/PCS verification failed: {status}{suffix}")
+    return issues
+
+
 def check_checkpoint_manifest(manifest: dict, checkpoint_path: Path | None) -> bool | None:
     """Compare a local checkpoint against the bundle's per-file sha256 manifest.
 
@@ -311,6 +360,25 @@ def verify_submission(
 
     if attestation is not None and not attestation.get("passed"):
         return {"verified": False, "reason": "attestation_failed", "label": "eval:REJECT", "run_id": manifest.get("run_id")}
+
+    # Fail-closed CPU crypto when attestation is present. Attested-sample
+    # bundles require TDX as well (GPU nonce alone is not enough for no-GPU
+    # verification); bare attestation without samples still needs a real NRAS
+    # token + claim binding so forged {"passed": true} cannot pass CI.
+    if attestation is not None:
+        integrity_issues = check_attestation_integrity(
+            bundle_dir,
+            attestation,
+            require_tdx=has_attested_samples(bundle_dir),
+        )
+        if integrity_issues:
+            return {
+                "verified": False,
+                "reason": "attestation_integrity_failed",
+                "issues": integrity_issues,
+                "label": "eval:REJECT",
+                "run_id": manifest.get("run_id"),
+            }
 
     training_issues = check_training_claims(manifest, attestation)
     if training_issues:
@@ -415,9 +483,8 @@ def verify_submission(
     report["gpu_architecture"] = gpu_architecture
     report["attested_eval_benchmarks"] = sorted(attested_keys)
     report["attested_gsm8k_regression"] = REGRESSION_BENCHMARK_KEY in attested_keys
-    # Informational trust signals: claim_bound distinguishes an attestation that
-    # cryptographically commits to this bundle from a legacy unbound one, and
-    # checkpoint_hash_match records local-reproduction fidelity.
+    # Trust signals — also fail-closed earlier via check_attestation_integrity
+    # when attestation is present; retained here for ledger / human review.
     report["claim_bound"] = check_claim_binding(bundle_dir, attestation)
     report["gpu_signature"] = check_gpu_signature(attestation)
     report["tdx_bound"] = check_tdx_binding(bundle_dir, attestation)

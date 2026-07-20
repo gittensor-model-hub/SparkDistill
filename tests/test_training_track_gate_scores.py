@@ -33,6 +33,60 @@ def _fake_snapshot(bundle_dir: Path):
     return fake_snapshot_download
 
 
+def test_verify_remote_proof_bundle_scores_rejects_forged_passed_true(tmp_path, monkeypatch):
+    """{"passed": true} without JWKS/claim binding must not earn an eval tier."""
+    import eval.training_track_gate as gate
+    from eval.canonical_dataset import canonical_hf_url
+
+    bundle = tmp_path / "bundle"
+    bundle.mkdir()
+    (bundle / "manifest.json").write_text(json.dumps({"run_id": "r1", "dataset_url": canonical_hf_url()}))
+    (bundle / "eval_scores.json").write_text(json.dumps({"scores": {"triton": 0.5444}}))
+
+    monkeypatch.setattr("huggingface_hub.snapshot_download", _fake_snapshot(bundle))
+    monkeypatch.setattr(
+        gate,
+        "_git_show",
+        lambda ref, path: json.dumps({"passed": True}) if path.endswith("attestation.json") else "",
+    )
+
+    issues, eval_label = verify_remote_proof_bundle_scores(
+        "org/repo",
+        head_ref="HEAD",
+        changed_paths=["recipes/foo.yaml", "runs/r1/attestation.json"],
+    )
+    assert eval_label == "eval:REJECT"
+    assert any("JWKS" in i or "token" in i or "eat_nonce" in i for i in issues)
+
+
+def test_verify_remote_proof_bundle_scores_tiers_claims_when_attestation_crypto_passes(tmp_path, monkeypatch):
+    import eval.training_track_gate as gate
+    import eval.verify as verify_mod
+    from eval.canonical_dataset import canonical_hf_url
+
+    bundle = tmp_path / "bundle"
+    bundle.mkdir()
+    (bundle / "manifest.json").write_text(json.dumps({"run_id": "r1", "dataset_url": canonical_hf_url()}))
+    (bundle / "eval_scores.json").write_text(json.dumps({"scores": {"triton": 0.421}}))
+
+    monkeypatch.setattr("huggingface_hub.snapshot_download", _fake_snapshot(bundle))
+    monkeypatch.setattr(
+        gate,
+        "_git_show",
+        lambda ref, path: json.dumps({"passed": True, "token": "x"}) if path.endswith("attestation.json") else "",
+    )
+    monkeypatch.setattr(verify_mod, "check_attestation_integrity", lambda *a, **k: [])
+
+    issues, eval_label = verify_remote_proof_bundle_scores(
+        "org/repo",
+        head_ref="HEAD",
+        changed_paths=["recipes/foo.yaml", "runs/r1/attestation.json"],
+    )
+    # proof-only bundles defer checkpoint re-run; tier claimed scores only after crypto passes.
+    assert issues == []
+    assert eval_label == "eval:none"
+
+
 def test_verify_remote_proof_bundle_scores_rejects_without_attestation(tmp_path, monkeypatch):
     from eval.canonical_dataset import canonical_hf_url
 
@@ -50,32 +104,6 @@ def test_verify_remote_proof_bundle_scores_rejects_without_attestation(tmp_path,
     )
     assert eval_label == "eval:REJECT"
     assert any("attestation.json" in issue for issue in issues)
-
-
-def test_verify_remote_proof_bundle_scores_tiers_claims_on_checkpoint_required(tmp_path, monkeypatch):
-    import eval.training_track_gate as gate
-    from eval.canonical_dataset import canonical_hf_url
-
-    bundle = tmp_path / "bundle"
-    bundle.mkdir()
-    (bundle / "manifest.json").write_text(json.dumps({"run_id": "r1", "dataset_url": canonical_hf_url()}))
-    (bundle / "eval_scores.json").write_text(json.dumps({"scores": {"triton": 0.421}}))
-
-    monkeypatch.setattr("huggingface_hub.snapshot_download", _fake_snapshot(bundle))
-    monkeypatch.setattr(
-        gate,
-        "_git_show",
-        lambda ref, path: json.dumps({"passed": True}) if path.endswith("attestation.json") else "",
-    )
-
-    issues, eval_label = verify_remote_proof_bundle_scores(
-        "org/repo",
-        head_ref="HEAD",
-        changed_paths=["recipes/foo.yaml", "runs/r1/attestation.json"],
-    )
-    # proof-only bundles defer checkpoint re-run; tier claimed scores when attestation binds the PR.
-    assert issues == []
-    assert eval_label == "eval:none"
 
 
 def test_verify_remote_proof_bundle_scores_surfaces_attested_mismatch(tmp_path, monkeypatch):

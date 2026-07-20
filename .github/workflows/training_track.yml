@@ -50,9 +50,10 @@ jobs:
           enable-cache: true
 
       - name: Install SparkDistill
-        # --extra proof pulls in pyjwt[crypto] and dcap-qvl — eval.verify's
-        # no-GPU attested-sample checks validate the GPU attestation's NRAS/JWKS
-        # signature and (when available) the TDX quote's Intel DCAP chain.
+        # --extra proof pulls in pyjwt[crypto] and dcap-qvl — CI fail-closes on
+        # NRAS JWKS (GPU) + Intel DCAP/PCS (TDX) attestation crypto and
+        # claim_sha256 binding without a GPU. Attested eval samples covering
+        # every claimed benchmark complete verify_submission entirely on CPU.
         run: uv sync --extra dev --extra proof --frozen
 
       - name: Verify training-track policy
