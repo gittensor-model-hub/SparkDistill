@@ -21,6 +21,11 @@ All notable changes to SparkDistill are documented here. The format follows
   string, `null`, …), made `parse_added_registry_lines` / `gate_registry_pr` raise
   `ValueError` / `AttributeError` before a rejection report could be returned. The
   gate now catches those parse failures and returns `dataset:REJECT` with the issue.
+- **GPU corroboration matches hwmodel claims only** ([#149](https://github.com/gittensor-model-hub/SparkDistill/pull/149)):
+  `attestation_corroborates_training_gpu` no longer matches grindable hex fields in the
+  full claims blob (e.g. `eat_nonce` containing `b200`). Only per-device `hwmodel`
+  values corroborate the declared `train_gpu`; non-empty claims without `hwmodel` fail
+  closed.
 
 ## [0.1.2] — 2026-07-15
 
