@@ -57,7 +57,12 @@ def _load_registry_lines(path: Path) -> list[dict[str, Any]]:
 
 
 def parse_added_registry_lines(base_text: str, head_text: str) -> list[dict[str, Any]]:
-    """Return JSON objects newly appended in `head_text` relative to `base_text`."""
+    """Return JSON objects newly appended in `head_text` relative to `base_text`.
+
+    Raises ValueError for invalid JSON or a non-object JSON value. Callers that
+    drive the CI gate (``gate_registry_pr``) must catch that and return a clean
+    ``dataset:REJECT`` instead of letting the traceback fail the job.
+    """
     base_lines = {line.strip() for line in base_text.splitlines() if line.strip()}
     added: list[dict[str, Any]] = []
     for line_no, line in enumerate(head_text.splitlines(), start=1):
@@ -65,9 +70,14 @@ def parse_added_registry_lines(base_text: str, head_text: str) -> list[dict[str,
         if not line or line in base_lines:
             continue
         try:
-            added.append(json.loads(line))
+            obj = json.loads(line)
         except json.JSONDecodeError as exc:
             raise ValueError(f"added registry line {line_no}: invalid JSON: {exc}") from exc
+        if not isinstance(obj, dict):
+            raise ValueError(
+                f"added registry line {line_no}: must be a JSON object, got {type(obj).__name__}"
+            )
+        added.append(obj)
     return added
 
 
@@ -381,7 +391,20 @@ def gate_registry_pr(
         if line:
             existing.append(json.loads(line))
 
-    added = parse_added_registry_lines(base_registry_text, head_registry_text)
+    # Invalid / non-object JSON in the appended line used to raise ValueError /
+    # AttributeError out of the gate; catch it so CI gets dataset:REJECT + a
+    # helpful close comment instead of a traceback (same class as #173).
+    try:
+        added = parse_added_registry_lines(base_registry_text, head_registry_text)
+    except ValueError as exc:
+        return {
+            "verified": False,
+            "reward_eligible": False,
+            "merge_eligible": False,
+            "label": "dataset:REJECT",
+            "issues": [str(exc)],
+            "submissions": [],
+        }
     if not added:
         return {
             "verified": False,
