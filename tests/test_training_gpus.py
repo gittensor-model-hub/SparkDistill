@@ -57,6 +57,10 @@ def test_claims_without_hwmodel_do_not_corroborate():
         "NVIDIA B200",
         {"passed": True, "claims": {"eat_nonce": "deadbeef"}},
     )
+    assert not attestation_corroborates_training_gpu(
+        "NVIDIA B200",
+        {"passed": True, "claims": {"eat_nonce": "deadbeefb200cafe"}},
+    )
 
 
 def test_absent_attestation_or_claims_still_skips_corroboration():

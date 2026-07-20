@@ -62,6 +62,11 @@ def attestation_corroborates_training_gpu(train_gpu: str, attestation: dict | No
     if not claims:
         return True
     models = claimed_hwmodels(claims) if isinstance(claims, dict) else []
+    if isinstance(claims, dict) and claims and not models:
+        # No hardware identity to check — fail closed so a nonce/claims grind
+        # cannot stand in for hwmodel (unlike an empty claims dict above, which
+        # preserves the legacy "no claims decoded" pass-through).
+        return False
 
     def attests(*tokens: str) -> bool:
         return any(token in model for model in models for token in tokens)
@@ -80,4 +85,4 @@ def attestation_corroborates_training_gpu(train_gpu: str, attestation: dict | No
         return attests("b200", "b300", "gb200", "gb102")
     if "pro 6000" in gpu or "gb20" in gpu:
         return attests("pro 6000", "gb20")
-    return is_accepted_training_gpu(train_gpu)
+    return False
