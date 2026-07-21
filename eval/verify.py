@@ -204,25 +204,44 @@ def _no_student_endpoint_env():
             os.environ["SPARKDISTILL_STUDENT_ENDPOINT"] = saved
 
 
-def check_claim_binding(bundle_dir: Path, attestation: dict | None) -> bool | None:
-    """Whether the attestation's `eat_nonce` commits to this exact bundle.
+def check_claim_binding(
+    bundle_dir: Path,
+    attestation: dict | None,
+    *,
+    gpu_sig: dict | None = None,
+) -> bool | None:
+    """Whether a *JWKS-signed* NRAS ``eat_nonce`` commits to this exact bundle.
 
-    Returns True when the NRAS-signed nonce equals the bundle's `claim_sha256`
-    (see `proof.bundle`), False when an attestation is present but unbound
-    (legacy random-nonce attestations), and None when there is no attestation.
+    Returns True when a signed platform or per-device JWT carries ``eat_nonce``
+    equal to the bundle's ``claim_sha256`` (see ``proof.bundle``), False when an
+    attestation is present but unbound / unsigned / mismatched, and None when
+    there is no attestation.
 
-    The nonce lives in the per-device submodule tokens (where NRAS also asserts
-    `x-nvidia-gpu-attestation-report-nonce-match`), not necessarily the overall
-    JWT — observed live on NRAS v3.
+    Critical: do **not** trust ``attestation["claims"]`` — that JSON is miner-
+    editable. Binding must come from JWTs verified against NVIDIA's JWKS (the
+    same rule SparkProof enforces in ``verify_nras_token(..., expected_nonce=)``).
+    NRAS v3 often places the nonce on per-device submodule tokens rather than
+    the platform JWT.
     """
     if attestation is None:
         return None
+    token = attestation.get("token")
+    if not token:
+        return False
+
     from proof.bundle import claim_sha256
 
-    claims = attestation.get("claims") or {}
+    expected = claim_sha256(bundle_dir)
+    if gpu_sig is None:
+        from eval.attestation import verify_gpu_token
+
+        gpu_sig = verify_gpu_token(token)
+    if not gpu_sig.get("verified"):
+        return False
+
+    claims = gpu_sig.get("claims") or {}
     nonces = [claims.get("eat_nonce")]
     nonces += [device.get("eat_nonce") for device in (claims.get("devices") or {}).values()]
-    expected = claim_sha256(bundle_dir)
     return any(str(nonce).lower().removeprefix("0x") == expected for nonce in nonces if nonce)
 
 
@@ -302,8 +321,11 @@ def check_attestation_integrity(
         detail = "; ".join(str(item) for item in (gpu_sig.get("issues") or [])) or "unverified"
         issues.append(f"GPU attestation JWKS signature failed: {detail}")
 
-    if check_claim_binding(bundle_dir, attestation) is not True:
-        issues.append("GPU attestation eat_nonce does not bind claim_sha256 for this bundle")
+    # Binding must use signed JWT eat_nonce from gpu_sig, never editable JSON claims.
+    if check_claim_binding(bundle_dir, attestation, gpu_sig=gpu_sig) is not True:
+        issues.append(
+            "GPU attestation signed eat_nonce does not bind claim_sha256 for this bundle"
+        )
 
     has_tdx = bool(attestation.get("tdx"))
     if require_tdx or has_tdx:

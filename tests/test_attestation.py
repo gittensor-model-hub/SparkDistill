@@ -129,20 +129,23 @@ def test_verify_tdx_quote_maps_status(monkeypatch):
     assert result["advisory_ids"] == ["INTEL-SA-00837"]
 
 
-def _es384_token_fixture():
+def _es384_token_fixture(*, device_eat_nonce: str | None = None):
     from cryptography.hazmat.primitives.asymmetric import ec
 
     key = ec.generate_private_key(ec.SECP384R1())
     encode = lambda payload: jwt.encode(  # noqa: E731
         payload, key, algorithm="ES384", headers={"kid": "nv-eat-kid-test"}
     )
+    device = {"iss": "https://nras.attestation.nvidia.com", "hwmodel": "GB20X"}
+    if device_eat_nonce is not None:
+        device["eat_nonce"] = device_eat_nonce
     token = json.dumps(
         [
             ["JWT", jwt.encode({"sub": "overall"}, "k", algorithm="HS256")],
             {
                 "REMOTE_GPU_CLAIMS": [
                     ["JWT", encode({"iss": "https://nras.attestation.nvidia.com", "sub": "platform"})],
-                    {"GPU-0": encode({"iss": "https://nras.attestation.nvidia.com", "hwmodel": "GB20X"})},
+                    {"GPU-0": encode(device)},
                 ]
             },
         ]
@@ -171,6 +174,30 @@ def test_verify_gpu_token_accepts_valid_signatures(monkeypatch):
     assert result["verified"] is True
     assert result["tokens_checked"] == 2
     assert result["issues"] == []
+    assert result["claims"]["devices"]["GPU-0"]["hwmodel"] == "GB20X"
+
+
+def test_verify_gpu_token_expected_nonce_checks_signed_eat_nonce(monkeypatch):
+    from eval.attestation import verify_gpu_token
+
+    key, token = _es384_token_fixture(device_eat_nonce="aa" * 32)
+
+    class FakeKey:
+        def __init__(self, k):
+            self.key = k.public_key()
+
+    class FakeJWKClient:
+        def __init__(self, url):
+            pass
+
+        def get_signing_key_from_jwt(self, encoded):
+            return FakeKey(key)
+
+    monkeypatch.setattr(jwt, "PyJWKClient", FakeJWKClient)
+    assert verify_gpu_token(token, expected_nonce="aa" * 32)["verified"] is True
+    bad = verify_gpu_token(token, expected_nonce="bb" * 32)
+    assert bad["verified"] is False
+    assert any("eat_nonce" in i for i in bad["issues"])
 
 
 def test_verify_gpu_token_rejects_wrong_key(monkeypatch):

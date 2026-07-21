@@ -5,6 +5,13 @@ All notable changes to SparkDistill are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- **Claim binding uses signed NRAS ``eat_nonce``, not editable JSON** : `check_claim_binding`
+  / `check_attestation_integrity` require `eat_nonce` from JWKS-verified platform or
+  per-device JWTs (`REMOTE_GPU_CLAIMS`) to equal `claim_sha256(bundle)`. Miner-editable
+  `attestation["claims"]` can no longer rebind a stolen valid NRAS token to another
+  bundle. Aligns with SparkProof `verify_nras_token(..., expected_nonce=)`.
+
 ## [0.1.3] — 2026-07-21
 
 Training-track CI fail-closes forged attestation JSON; dataset/registry gates no longer

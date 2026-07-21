@@ -12,12 +12,62 @@ from eval.attested_samples import (
 from eval.regression_sample import build_regression_sample, load_regression_problems
 
 
-def _bound_attestation(bundle_dir, digest: str) -> dict:
+def _bound_attestation(bundle_dir, digest: str, monkeypatch) -> dict:
+    """GPU+TDX attestation whose *signed* JWT eat_nonce matches claim_sha256."""
+    import json
+
+    import jwt
+    from cryptography.hazmat.primitives.asymmetric import ec
+
     from eval.attestation import tdx_report_data
+
+    key = ec.generate_private_key(ec.SECP384R1())
+
+    def encode(payload):
+        return jwt.encode(
+            payload, key, algorithm="ES384", headers={"kid": "nv-eat-kid-test"}
+        )
+
+    token = json.dumps(
+        [
+            ["JWT", jwt.encode({"sub": "overall"}, "k", algorithm="HS256")],
+            {
+                "REMOTE_GPU_CLAIMS": [
+                    [
+                        "JWT",
+                        encode({"iss": "https://nras.attestation.nvidia.com", "sub": "platform"}),
+                    ],
+                    {
+                        "GPU-0": encode(
+                            {
+                                "iss": "https://nras.attestation.nvidia.com",
+                                "hwmodel": "GH100",
+                                "eat_nonce": digest,
+                            }
+                        )
+                    },
+                ]
+            },
+        ]
+    )
+
+    class FakeKey:
+        def __init__(self, k):
+            self.key = k.public_key()
+
+    class FakeJWKClient:
+        def __init__(self, url):
+            pass
+
+        def get_signing_key_from_jwt(self, encoded):
+            return FakeKey(key)
+
+    monkeypatch.setattr(jwt, "PyJWKClient", FakeJWKClient)
 
     return {
         "passed": True,
-        "claims": {"eat_nonce": digest},
+        "token": token,
+        "claims": {"eat_nonce": "must-be-ignored"},
         "tdx": {"report_data": tdx_report_data(digest).hex()},
     }
 
@@ -34,7 +84,7 @@ def _tdx_binding(bundle_dir, attestation):
     return check_tdx_binding(bundle_dir, attestation)
 
 
-def test_verify_attested_samples_requires_gpu_and_tdx_bindings(tmp_path):
+def test_verify_attested_samples_requires_gpu_and_tdx_bindings(tmp_path, monkeypatch):
     responses = [
         {"problem_id": int(row["problem_id"]), "model_response": f"#### {row['answer'].split('####')[-1].strip()}"}
         for row in load_regression_problems()
@@ -63,6 +113,7 @@ def test_verify_attested_samples_requires_gpu_and_tdx_bindings(tmp_path):
     from proof.bundle import claim_sha256
 
     digest = claim_sha256(bundle)
+    # JSON-only "binding" is no longer accepted.
     gpu_only = {"passed": True, "claims": {"eat_nonce": digest}}
     verified, issues = verify_attested_eval_samples(
         bundle,
@@ -73,10 +124,10 @@ def test_verify_attested_samples_requires_gpu_and_tdx_bindings(tmp_path):
         tdx_binding=_tdx_binding,
     )
     assert verified == set()
-    assert any("TDX quote" in issue for issue in issues)
+    assert any("claim_sha256-bound GPU attestation" in issue for issue in issues)
 
 
-def test_verify_attested_lm_eval_and_triton_entries(tmp_path):
+def test_verify_attested_lm_eval_and_triton_entries(tmp_path, monkeypatch):
     lm_payload = {
         "results": {
             "humaneval": {"pass@1,none": 0.75},
@@ -107,7 +158,7 @@ def test_verify_attested_lm_eval_and_triton_entries(tmp_path):
     from proof.bundle import claim_sha256
 
     digest = claim_sha256(bundle)
-    attestation = _bound_attestation(bundle, digest)
+    attestation = _bound_attestation(bundle, digest, monkeypatch)
 
     verified, issues = verify_attested_eval_samples(
         bundle,

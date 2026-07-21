@@ -16,27 +16,29 @@ import pytest
 jwt = pytest.importorskip("jwt")
 
 
-def _es384_token_fixture():
+def _es384_token_fixture(*, eat_nonce: str | None = None, device_eat_nonce: str | None = None):
     from cryptography.hazmat.primitives.asymmetric import ec
 
     key = ec.generate_private_key(ec.SECP384R1())
     encode = lambda payload: jwt.encode(  # noqa: E731
         payload, key, algorithm="ES384", headers={"kid": "nv-eat-kid-ci-test"}
     )
+    platform_payload: dict = {"iss": "https://nras.attestation.nvidia.com", "sub": "platform"}
+    if eat_nonce is not None:
+        platform_payload["eat_nonce"] = eat_nonce
+    device_payload: dict = {
+        "iss": "https://nras.attestation.nvidia.com",
+        "hwmodel": "GH100 A01 GSP BROM",
+    }
+    if device_eat_nonce is not None:
+        device_payload["eat_nonce"] = device_eat_nonce
     token = json.dumps(
         [
             ["JWT", jwt.encode({"sub": "overall"}, "k", algorithm="HS256")],
             {
                 "REMOTE_GPU_CLAIMS": [
-                    ["JWT", encode({"iss": "https://nras.attestation.nvidia.com", "sub": "platform"})],
-                    {
-                        "GPU-0": encode(
-                            {
-                                "iss": "https://nras.attestation.nvidia.com",
-                                "hwmodel": "GH100 A01 GSP BROM",
-                            }
-                        )
-                    },
+                    ["JWT", encode(platform_payload)],
+                    {"GPU-0": encode(device_payload)},
                 ]
             },
         ]
@@ -188,24 +190,52 @@ def test_check_attestation_integrity_requires_gpu_jwks_and_claim_binding(tmp_pat
     from proof.bundle import claim_sha256
 
     bundle = _bundle(tmp_path)
-    key, token = _es384_token_fixture()
-    _patch_jwks(monkeypatch, key)
     digest = claim_sha256(bundle)
 
-    # Forged passed:true with no token / wrong nonce.
+    # Forged passed:true with no token.
     assert any("JWKS" in i or "token" in i for i in check_attestation_integrity(bundle, {"passed": True}))
+
+    # Valid JWKS token but eat_nonce only in editable JSON claims — must NOT bind.
+    key, unbound_token = _es384_token_fixture()
+    _patch_jwks(monkeypatch, key)
     assert any(
         "eat_nonce" in i
         for i in check_attestation_integrity(
-            bundle, {"passed": True, "token": token, "claims": {"eat_nonce": "deadbeef"}}
+            bundle,
+            {"passed": True, "token": unbound_token, "claims": {"eat_nonce": digest}},
         )
     )
 
+    # Signed device JWT carries eat_nonce == claim_sha256 → bind.
+    key2, bound_token = _es384_token_fixture(device_eat_nonce=digest)
+    _patch_jwks(monkeypatch, key2)
     ok = check_attestation_integrity(
         bundle,
-        {"passed": True, "token": token, "claims": {"devices": {"GPU-0": {"eat_nonce": digest}}}},
+        {
+            "passed": True,
+            "token": bound_token,
+            # Misleading JSON must be ignored when signed JWT binds correctly.
+            "claims": {"eat_nonce": "deadbeef"},
+        },
     )
     assert ok == []
+
+
+def test_check_attestation_integrity_rejects_json_rebinding_of_stolen_token(tmp_path, monkeypatch):
+    """Any valid NRAS token + edited JSON claims must not rebind to another bundle."""
+    from eval.verify import check_attestation_integrity
+    from proof.bundle import claim_sha256
+
+    bundle = _bundle(tmp_path)
+    digest = claim_sha256(bundle)
+    # Token was issued for a different nonce (stolen/replayed).
+    key, stolen = _es384_token_fixture(device_eat_nonce="ab" * 32)
+    _patch_jwks(monkeypatch, key)
+    issues = check_attestation_integrity(
+        bundle,
+        {"passed": True, "token": stolen, "claims": {"devices": {"GPU-0": {"eat_nonce": digest}}}},
+    )
+    assert any("eat_nonce" in i for i in issues)
 
 
 def test_check_attestation_integrity_requires_both_tdx_checks_when_quote_present(tmp_path, monkeypatch):
@@ -217,9 +247,9 @@ def test_check_attestation_integrity_requires_both_tdx_checks_when_quote_present
     from proof.bundle import claim_sha256
 
     bundle = _bundle(tmp_path)
-    key, token = _es384_token_fixture()
-    _patch_jwks(monkeypatch, key)
     digest = claim_sha256(bundle)
+    key, token = _es384_token_fixture(device_eat_nonce=digest)
+    _patch_jwks(monkeypatch, key)
 
     class Report:
         status = "UpToDate"
@@ -239,7 +269,6 @@ def test_check_attestation_integrity_requires_both_tdx_checks_when_quote_present
         {
             "passed": True,
             "token": token,
-            "claims": {"eat_nonce": digest},
             "tdx": {"report_data": "11" * 64, "quote_b64": "AAAA"},
         },
     )
@@ -250,7 +279,6 @@ def test_check_attestation_integrity_requires_both_tdx_checks_when_quote_present
         {
             "passed": True,
             "token": token,
-            "claims": {"eat_nonce": digest},
             "tdx": {"report_data": tdx_report_data(digest).hex(), "quote_b64": "AAAA"},
         },
     )
@@ -262,10 +290,10 @@ def test_check_attestation_integrity_require_tdx_for_attested_samples_path(tmp_p
     from proof.bundle import claim_sha256
 
     bundle = _bundle(tmp_path)
-    key, token = _es384_token_fixture()
-    _patch_jwks(monkeypatch, key)
     digest = claim_sha256(bundle)
-    att = {"passed": True, "token": token, "claims": {"eat_nonce": digest}}
+    key, token = _es384_token_fixture(eat_nonce=digest)
+    _patch_jwks(monkeypatch, key)
+    att = {"passed": True, "token": token}
     assert check_attestation_integrity(bundle, att, require_tdx=False) == []
     assert any("TDX quote is required" in i for i in check_attestation_integrity(bundle, att, require_tdx=True))
 
