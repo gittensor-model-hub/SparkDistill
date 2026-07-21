@@ -5,47 +5,46 @@ All notable changes to SparkDistill are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.3] — 2026-07-21
+
+Training-track CI fail-closes forged attestation JSON; dataset/registry gates no longer
+crash on bad prior rows or invalid JSON; sha-pinned exports stay LF+UTF-8 across platforms;
+teacher generation survives a single flaky API call. Pairs with
+[SparkProof v0.1.3](https://github.com/gittensor-model-hub/SparkProof/releases/tag/v0.1.3)
+(Sol→Fable CoT recovery for encrypted GPT Sol reasoning).
+
+Package version **0.1.3** (was still `0.1.1` in `pyproject.toml` after the v0.1.2 tag).
+
 ### Fixed
-- **Training CI fail-closes GPU + TDX attestation crypto** (no GPU required): forged
-  `{"passed": true}` attestation JSON no longer earns eval tiers. `eval.verify` and the
-  training-track gate now require NRAS JWKS signature + claim_sha256 nonce binding; when
+- **Training CI fail-closes GPU + TDX attestation crypto** ([#194](https://github.com/gittensor-model-hub/SparkDistill/pull/194)):
+  forged `{"passed": true}` attestation JSON no longer earns eval tiers. `eval.verify` and
+  the training-track gate require NRAS JWKS signature + `claim_sha256` nonce binding; when
   a TDX quote is present (or attested eval samples require it), both REPORTDATA binding
   and Intel DCAP/PCS verification must pass. Proof-only bundles whose attested samples
   cover every claimed benchmark still verify entirely on CPU.
-- **Repair-tier mix dedupe fallback** (SparkProof [#29]): `_PromptDedupeRegistry` now
-  fingerprints `metadata.prompt_meta.prompt` before top-level `prompt`, matching SparkProof
-  `NoveltyRegistry` for repair-heavy bundles.
+- **Unattested training PRs cannot earn eval tiers**: training-track eval labeling requires
+  a committed `runs/<run-id>/attestation.json` that passes integrity checks.
+- **Repair-tier mix dedupe fallback** (SparkProof [#29](https://github.com/gittensor-model-hub/SparkProof/pull/29)):
+  `_PromptDedupeRegistry` fingerprints `metadata.prompt_meta.prompt` before top-level
+  `prompt`, matching SparkProof `NoveltyRegistry` for repair-heavy bundles.
 - **Dataset registry gate tolerates malformed prior rows when indexing duplicates**
-  (follow-up to [#173](https://github.com/gittensor-model-hub/SparkDistill/pull/173) /
-  [#189](https://github.com/gittensor-model-hub/SparkDistill/pull/189)): building
-  `seen_hf` / `seen_sha` from existing registry lines no longer calls
-  `hf_repo_from_url` unconditionally, so one bad historical `hf_url` cannot crash the
-  gate with a traceback before `dataset:REJECT`.
-- **Sha-pinned jsonl exports write LF + UTF-8 on every platform**: mining SFT export,
-  registry mix, accepted-registry snapshot, and teacher trajectory writers open text
-  files with `newline="\n"` so Windows `\r\n` translation cannot desync byte hashes
-  from Linux CI / validators.
-- **Teacher generation skips a single flaky call instead of aborting the batch**:
-  `generate_trajectories` catches per-prompt teacher API failures (rate limit / 5xx),
-  logs a warning, and continues; a run where every call fails still raises so an empty
-  output is never treated as success.
-- **Dataset registry gate rejects malformed lines cleanly instead of crashing**: a
-  registry line with a missing or malformed `hf_url` (or `trajectories_sha256`) made
-  `check_registry_duplicates` / `gate_registry_submission` raise `KeyError` / `ValueError`
-  before the collected validation issues could be returned, so CI failed with a traceback
-  instead of a `dataset:REJECT` label and a helpful close comment. The duplicate check and
-  the report's `hf_repo` lookup now tolerate fields that `validate_registry_entry` already
-  flags.
-- **Dataset registry gate rejects invalid / non-object JSON cleanly**: an appended
-  registry line that is not valid JSON, or is valid JSON but not an object (array,
-  string, `null`, …), made `parse_added_registry_lines` / `gate_registry_pr` raise
-  `ValueError` / `AttributeError` before a rejection report could be returned. The
-  gate now catches those parse failures and returns `dataset:REJECT` with the issue.
-- **GPU corroboration matches hwmodel claims only** ([#149](https://github.com/gittensor-model-hub/SparkDistill/pull/149)):
-  `attestation_corroborates_training_gpu` no longer matches grindable hex fields in the
-  full claims blob (e.g. `eat_nonce` containing `b200`). Only per-device `hwmodel`
-  values corroborate the declared `train_gpu`; non-empty claims without `hwmodel` fail
-  closed.
+  ([#195](https://github.com/gittensor-model-hub/SparkDistill/pull/195), follow-up to
+  [#173](https://github.com/gittensor-model-hub/SparkDistill/pull/173) /
+  [#189](https://github.com/gittensor-model-hub/SparkDistill/pull/189)): building `seen_hf` /
+  `seen_sha` from existing registry lines no longer calls `hf_repo_from_url` unconditionally.
+- **Sha-pinned jsonl exports write LF + UTF-8 on every platform** ([#195](https://github.com/gittensor-model-hub/SparkDistill/pull/195)):
+  mining SFT export, registry mix, accepted-registry snapshot, and teacher trajectory writers
+  open text files with `newline="\n"` so Windows `\r\n` cannot desync byte hashes.
+- **Teacher generation skips a single flaky call instead of aborting the batch**
+  ([#195](https://github.com/gittensor-model-hub/SparkDistill/pull/195)): per-prompt API
+  failures are logged and skipped; all-fail still raises.
+- **Dataset registry gate rejects malformed lines / invalid JSON cleanly**
+  ([#173](https://github.com/gittensor-model-hub/SparkDistill/pull/173),
+  [#189](https://github.com/gittensor-model-hub/SparkDistill/pull/189)): returns
+  `dataset:REJECT` instead of crashing CI with a traceback.
+- **GPU corroboration matches hwmodel claims only**
+  ([#149](https://github.com/gittensor-model-hub/SparkDistill/pull/149)): only per-device
+  `hwmodel` values corroborate `train_gpu`; non-empty claims without `hwmodel` fail closed.
 
 ## [0.1.2] — 2026-07-15
 
@@ -285,7 +284,8 @@ and verify it from public artifacts alone.
 [#133]: https://github.com/gittensor-model-hub/SparkDistill/pull/133
 [#134]: https://github.com/gittensor-model-hub/SparkDistill/pull/134
 
-[Unreleased]: https://github.com/gittensor-model-hub/SparkDistill/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/gittensor-model-hub/SparkDistill/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/gittensor-model-hub/SparkDistill/releases/tag/v0.1.3
 [0.1.2]: https://github.com/gittensor-model-hub/SparkDistill/releases/tag/v0.1.2
 [0.1.1]: https://github.com/gittensor-model-hub/SparkDistill/releases/tag/v0.1.1
 [0.1.0]: https://github.com/gittensor-model-hub/SparkDistill/releases/tag/v0.1.0
