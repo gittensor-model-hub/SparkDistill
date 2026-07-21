@@ -109,6 +109,16 @@ def test_ci_gpu_attestation_missing_token_is_none():
 # --- 2a. TDX binding (REPORTDATA ↔ claim_sha256) ------------------------------
 
 
+def _fake_tdx_quote_b64(nonce_or_digest: str) -> str:
+    """Minimal TDX-shaped quote embedding REPORTDATA at the v4 offset."""
+    import base64
+
+    from eval.attestation import _TDX_REPORT_DATA_OFFSET, tdx_report_data
+
+    quote = b"\x00" * _TDX_REPORT_DATA_OFFSET + tdx_report_data(nonce_or_digest) + b"\x00" * 128
+    return base64.b64encode(quote).decode()
+
+
 def test_ci_tdx_binding_accepts_matching_report_data(tmp_path):
     from eval.attestation import tdx_report_data
     from eval.verify import check_tdx_binding
@@ -116,9 +126,10 @@ def test_ci_tdx_binding_accepts_matching_report_data(tmp_path):
 
     bundle = _bundle(tmp_path)
     digest = claim_sha256(bundle)
+    quote_b64 = _fake_tdx_quote_b64(digest)
     att = {
         "passed": True,
-        "tdx": {"report_data": tdx_report_data(digest).hex(), "quote_b64": "AAAA"},
+        "tdx": {"report_data": tdx_report_data(digest).hex(), "quote_b64": quote_b64},
     }
     assert check_tdx_binding(bundle, att) is True
 
@@ -127,7 +138,43 @@ def test_ci_tdx_binding_rejects_mismatched_report_data(tmp_path):
     from eval.verify import check_tdx_binding
 
     bundle = _bundle(tmp_path)
-    att = {"passed": True, "tdx": {"report_data": "00" * 64, "quote_b64": "AAAA"}}
+    att = {"passed": True, "tdx": {"report_data": "00" * 64, "quote_b64": _fake_tdx_quote_b64("11" * 32)}}
+    assert check_tdx_binding(bundle, att) is False
+
+
+def test_ci_tdx_binding_rejects_forged_json_with_genuine_quote(tmp_path):
+    """Quote bound to digest A + JSON report_data for digest B must fail."""
+    from eval.attestation import tdx_report_data
+    from eval.verify import check_tdx_binding
+    from proof.bundle import claim_sha256
+
+    bundle = _bundle(tmp_path)
+    digest = claim_sha256(bundle)
+    other = "ab" * 32
+    att = {
+        "passed": True,
+        "tdx": {
+            "quote_b64": _fake_tdx_quote_b64(other),
+            "report_data": tdx_report_data(digest).hex(),
+        },
+    }
+    assert check_tdx_binding(bundle, att) is False
+
+
+def test_ci_tdx_binding_rejects_json_sidecar_mismatch(tmp_path):
+    from eval.attestation import tdx_report_data
+    from eval.verify import check_tdx_binding
+    from proof.bundle import claim_sha256
+
+    bundle = _bundle(tmp_path)
+    digest = claim_sha256(bundle)
+    att = {
+        "passed": True,
+        "tdx": {
+            "quote_b64": _fake_tdx_quote_b64(digest),
+            "report_data": tdx_report_data("cd" * 32).hex(),
+        },
+    }
     assert check_tdx_binding(bundle, att) is False
 
 
@@ -269,7 +316,7 @@ def test_check_attestation_integrity_requires_both_tdx_checks_when_quote_present
         {
             "passed": True,
             "token": token,
-            "tdx": {"report_data": "11" * 64, "quote_b64": "AAAA"},
+            "tdx": {"report_data": "11" * 64, "quote_b64": _fake_tdx_quote_b64(digest)},
         },
     )
     assert any("REPORTDATA" in i for i in bad_bind)
@@ -279,7 +326,10 @@ def test_check_attestation_integrity_requires_both_tdx_checks_when_quote_present
         {
             "passed": True,
             "token": token,
-            "tdx": {"report_data": tdx_report_data(digest).hex(), "quote_b64": "AAAA"},
+            "tdx": {
+                "report_data": tdx_report_data(digest).hex(),
+                "quote_b64": _fake_tdx_quote_b64(digest),
+            },
         },
     )
     assert good == []

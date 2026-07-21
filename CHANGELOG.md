@@ -11,6 +11,10 @@ All notable changes to SparkDistill are documented here. The format follows
   per-device JWTs (`REMOTE_GPU_CLAIMS`) to equal `claim_sha256(bundle)`. Miner-editable
   `attestation["claims"]` can no longer rebind a stolen valid NRAS token to another
   bundle. Aligns with SparkProof `verify_nras_token(..., expected_nonce=)`.
+- **TDX binding reads REPORTDATA from ``quote_b64``, not JSON**: `check_tdx_binding` and
+  dataset-track TDX checks extract the 64-byte REPORTDATA from the quote at the TDX v4
+  offset and compare to `tdx_report_data(claim_sha256|nonce)`. Forged `tdx.report_data`
+  JSON can no longer rebind a genuine quote; JSON/quote mismatches are rejected.
 
 ## [0.1.3] — 2026-07-21
 
