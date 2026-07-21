@@ -135,8 +135,11 @@ def test_proof_only_bundle_requires_local_checkpoint(tmp_path):
     assert report["reason"] == "checkpoint_required"
 
 
-def test_claim_binding_matches_bound_nonce(tmp_path):
+def test_claim_binding_matches_bound_nonce(tmp_path, monkeypatch):
     import json
+
+    import jwt
+    from cryptography.hazmat.primitives.asymmetric import ec
 
     from eval.verify import check_claim_binding
     from proof.bundle import claim_sha256
@@ -147,12 +150,53 @@ def test_claim_binding_matches_bound_nonce(tmp_path):
     (bundle / "eval_scores.json").write_text(json.dumps({"scores": {"gsm8k": 0.6}}))
     digest = claim_sha256(bundle)
 
-    bound = {"passed": True, "claims": {"eat_nonce": digest.upper()}}
-    unbound = {"passed": True, "claims": {"eat_nonce": "ab" * 32}}
-    # NRAS v3 puts the nonce in the per-device submodule tokens, not the overall JWT.
-    device_bound = {"passed": True, "claims": {"devices": {"GPU-0": {"eat_nonce": digest}}}}
+    key = ec.generate_private_key(ec.SECP384R1())
+
+    def encode(payload):
+        return jwt.encode(payload, key, algorithm="ES384", headers={"kid": "k"})
+
+    def make_token(*, device_nonce: str | None = None, platform_nonce: str | None = None) -> str:
+        platform = {"iss": "https://nras.attestation.nvidia.com", "sub": "platform"}
+        if platform_nonce is not None:
+            platform["eat_nonce"] = platform_nonce
+        device = {"iss": "https://nras.attestation.nvidia.com", "hwmodel": "GH100"}
+        if device_nonce is not None:
+            device["eat_nonce"] = device_nonce
+        return json.dumps(
+            [
+                ["JWT", jwt.encode({"sub": "overall"}, "k", algorithm="HS256")],
+                {"REMOTE_GPU_CLAIMS": [["JWT", encode(platform)], {"GPU-0": encode(device)}]},
+            ]
+        )
+
+    class FakeKey:
+        def __init__(self, k):
+            self.key = k.public_key()
+
+    class FakeJWKClient:
+        def __init__(self, url):
+            pass
+
+        def get_signing_key_from_jwt(self, encoded):
+            return FakeKey(key)
+
+    monkeypatch.setattr(jwt, "PyJWKClient", FakeJWKClient)
+
+    # Editable JSON claims alone must never bind.
+    assert check_claim_binding(bundle, {"passed": True, "claims": {"eat_nonce": digest}}) is False
+    assert (
+        check_claim_binding(
+            bundle,
+            {"passed": True, "token": make_token(), "claims": {"eat_nonce": digest}},
+        )
+        is False
+    )
+
+    bound = {"passed": True, "token": make_token(device_nonce=digest.upper())}
+    platform_bound = {"passed": True, "token": make_token(platform_nonce=digest)}
+    unbound = {"passed": True, "token": make_token(device_nonce="ab" * 32)}
     assert check_claim_binding(bundle, bound) is True
-    assert check_claim_binding(bundle, device_bound) is True
+    assert check_claim_binding(bundle, platform_bound) is True
     assert check_claim_binding(bundle, unbound) is False
     assert check_claim_binding(bundle, None) is None
 
@@ -256,6 +300,13 @@ def test_attested_gsm8k_skips_harness_without_checkpoint(tmp_path, monkeypatch):
     (bundle / REGRESSION_SAMPLE_FILENAME).write_text(json.dumps(sample, indent=2))
 
     digest = claim_sha256(bundle)
+    # Integrity is stubbed; claim_bound still goes through check_claim_binding.
+    monkeypatch.setattr(v, "check_attestation_integrity", lambda *a, **k: [])
+    monkeypatch.setattr(v, "check_claim_binding", lambda *_a, **_k: True)
+    monkeypatch.setattr(v, "check_tdx_binding", lambda *_a, **_k: True)
+    monkeypatch.setattr(v, "check_gpu_signature", lambda *_a, **_k: {"verified": True, "claims": {}})
+    monkeypatch.setattr(v, "check_tdx_signature", lambda *_a, **_k: {"verified": True, "status": "UpToDate"})
+
     attestation = {
         "passed": True,
         "token": "nras-token-placeholder",
@@ -267,8 +318,6 @@ def test_attested_gsm8k_skips_harness_without_checkpoint(tmp_path, monkeypatch):
         raise AssertionError("run_harness should not run for attested gsm8k-only bundles")
 
     monkeypatch.setattr(v, "run_harness", fail_harness)
-    # JWKS/DCAP fail-closed path is covered in tests/test_attestation_ci.py.
-    monkeypatch.setattr(v, "check_attestation_integrity", lambda *a, **k: [])
 
     report = v.verify_submission(bundle, frontier={"gsm8k": 0.5}, attestation=attestation)
     assert report["verified"] is True

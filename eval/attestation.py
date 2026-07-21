@@ -192,7 +192,13 @@ def tdx_quote(nonce_hex: str, report_path: Path | None = None) -> dict | None:
     }
 
 
-def verify_gpu_token(token: str, jwks_url: str = DEFAULT_NRAS_JWKS_URL, issuer: str = DEFAULT_NRAS_ISSUER) -> dict:
+def verify_gpu_token(
+    token: str,
+    jwks_url: str = DEFAULT_NRAS_JWKS_URL,
+    issuer: str = DEFAULT_NRAS_ISSUER,
+    *,
+    expected_nonce: str | None = None,
+) -> dict:
     """Verify the NRAS-signed JWTs in a GPU attestation token against NVIDIA's JWKS.
 
     The EAT's platform and per-device tokens are ES384-signed by NRAS (`kid`
@@ -201,12 +207,19 @@ def verify_gpu_token(token: str, jwks_url: str = DEFAULT_NRAS_JWKS_URL, issuer: 
     NOT counted as evidence. Without this check a validator would be trusting
     the committed attestation JSON on the miner's word.
 
-    Returns {"verified": bool, "tokens_checked": int, "issues": [...]}.
+    When ``expected_nonce`` is set (typically ``claim_sha256(bundle)``), also
+    require that a *signed* ``eat_nonce`` on the platform JWT or a per-device JWT
+    matches — never the editable ``attestation["claims"]`` JSON sidecar.
+
+    Returns ``{"verified": bool, "tokens_checked": int, "issues": [...], "claims": {...}}``
+    where ``claims`` are decoded from JWKS-verified JWTs only (plus ``devices``).
     """
     import jwt
 
     issues: list[str] = []
     checked = 0
+    platform_claims: dict = {}
+    devices: dict[str, dict] = {}
     try:
         parsed = json.loads(token)
         client = jwt.PyJWKClient(jwks_url)
@@ -221,19 +234,43 @@ def verify_gpu_token(token: str, jwks_url: str = DEFAULT_NRAS_JWKS_URL, issuer: 
                     if isinstance(entry, list) and len(entry) == 2 and entry[0] == "JWT":
                         signed_tokens.append(("platform", entry[1]))
                     elif isinstance(entry, dict):
-                        signed_tokens.extend(entry.items())
+                        signed_tokens.extend((str(k), str(v)) for k, v in entry.items())
                     for name, encoded in signed_tokens:
                         try:
                             key = client.get_signing_key_from_jwt(encoded)
-                            jwt.decode(encoded, key.key, algorithms=["ES384"], issuer=issuer)
+                            decoded = jwt.decode(encoded, key.key, algorithms=["ES384"], issuer=issuer)
                             checked += 1
+                            if name == "platform":
+                                platform_claims = decoded
+                            else:
+                                devices[name] = decoded
                         except Exception as exc:
                             issues.append(f"{name}: {exc}")
     except Exception as exc:
         issues.append(f"token unparseable: {exc}")
     if checked == 0 and not issues:
         issues.append("no NRAS-signed tokens found in attestation")
-    return {"verified": checked > 0 and not issues, "tokens_checked": checked, "issues": issues}
+
+    signed_claims = dict(platform_claims)
+    if devices:
+        signed_claims["devices"] = devices
+
+    if expected_nonce is not None:
+        expected = str(expected_nonce).lower().removeprefix("0x")
+        nonces = [signed_claims.get("eat_nonce")]
+        nonces += [device.get("eat_nonce") for device in devices.values()]
+        if not any(str(nonce).lower().removeprefix("0x") == expected for nonce in nonces if nonce):
+            issues.append(
+                "signed eat_nonce does not match the expected claim_sha256-bound nonce — "
+                "token was not produced for this bundle's content"
+            )
+
+    return {
+        "verified": checked > 0 and not issues,
+        "tokens_checked": checked,
+        "issues": issues,
+        "claims": signed_claims,
+    }
 
 
 def verify_tdx_quote(quote_b64: str, pccs_url: str | None = None) -> dict:
