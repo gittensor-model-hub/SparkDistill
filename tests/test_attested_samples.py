@@ -14,12 +14,13 @@ from eval.regression_sample import build_regression_sample, load_regression_prob
 
 def _bound_attestation(bundle_dir, digest: str, monkeypatch) -> dict:
     """GPU+TDX attestation whose *signed* JWT eat_nonce matches claim_sha256."""
+    import base64
     import json
 
     import jwt
     from cryptography.hazmat.primitives.asymmetric import ec
 
-    from eval.attestation import tdx_report_data
+    from eval.attestation import _TDX_REPORT_DATA_OFFSET, tdx_report_data
 
     key = ec.generate_private_key(ec.SECP384R1())
 
@@ -64,11 +65,15 @@ def _bound_attestation(bundle_dir, digest: str, monkeypatch) -> dict:
 
     monkeypatch.setattr(jwt, "PyJWKClient", FakeJWKClient)
 
+    quote = b"\x00" * _TDX_REPORT_DATA_OFFSET + tdx_report_data(digest) + b"\x00" * 64
     return {
         "passed": True,
         "token": token,
         "claims": {"eat_nonce": "must-be-ignored"},
-        "tdx": {"report_data": tdx_report_data(digest).hex()},
+        "tdx": {
+            "report_data": tdx_report_data(digest).hex(),
+            "quote_b64": base64.b64encode(quote).decode(),
+        },
     }
 
 

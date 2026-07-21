@@ -158,22 +158,53 @@ def test_missing_tdx_on_new_bundle_rejects(tmp_path):
 
 
 def test_bound_tdx_passes(tmp_path):
-    from eval.attestation import tdx_report_data
+    import base64
+
+    from eval.attestation import _TDX_REPORT_DATA_OFFSET, tdx_report_data
 
     nonce = "ab" * 32
     proof, sha = _write_proof_dir(tmp_path)
+    quote = b"\x00" * _TDX_REPORT_DATA_OFFSET + tdx_report_data(nonce) + b"\x00" * 64
     (proof / "gpu_attestation.json").write_text(
         json.dumps(
             {
                 "passed": True,
                 "nonce": nonce,
-                "tdx": {"quote_b64": "AAAA", "report_data": tdx_report_data(nonce).hex()},
+                "tdx": {
+                    "quote_b64": base64.b64encode(quote).decode(),
+                    "report_data": tdx_report_data(nonce).hex(),
+                },
             }
         )
     )
     issues, rows, gpu_architecture = check_proof_dir(proof, claimed_sha256=sha)
     assert issues == []
     assert rows == 3
+
+
+def test_tdx_rejects_forged_json_report_data(tmp_path):
+    import base64
+
+    from eval.attestation import _TDX_REPORT_DATA_OFFSET, tdx_report_data
+
+    nonce_quote = "ab" * 32
+    nonce_json = "cd" * 32
+    proof, sha = _write_proof_dir(tmp_path)
+    quote = b"\x00" * _TDX_REPORT_DATA_OFFSET + tdx_report_data(nonce_quote) + b"\x00" * 64
+    (proof / "gpu_attestation.json").write_text(
+        json.dumps(
+            {
+                "passed": True,
+                "nonce": nonce_json,
+                "tdx": {
+                    "quote_b64": base64.b64encode(quote).decode(),
+                    "report_data": tdx_report_data(nonce_json).hex(),
+                },
+            }
+        )
+    )
+    issues, _rows, _arch = check_proof_dir(proof, claimed_sha256=sha)
+    assert any("REPORTDATA" in i or "report_data" in i for i in issues)
 
 
 def test_sparkproof_verify_runs_online_trust_anchors(monkeypatch, tmp_path):

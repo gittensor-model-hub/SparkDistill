@@ -93,15 +93,26 @@ def _check_dataset_tdx_attestation(attestation: dict) -> list[str]:
     nonce = attestation.get("nonce") or ""
     if not nonce:
         return ["gpu_attestation.tdx present but dataset nonce missing"]
-    from eval.attestation import tdx_report_data
+    from eval.attestation import extract_report_data_from_quote, tdx_report_data
 
-    expected = tdx_report_data(nonce).hex()
-    if str(tdx.get("report_data") or "").lower() != expected:
-        return [
-            "gpu_attestation.tdx report_data does not match dataset attestation nonce"
-        ]
-    if not tdx.get("quote_b64"):
+    quote_b64 = tdx.get("quote_b64") or ""
+    if not quote_b64:
         return ["gpu_attestation.tdx missing quote_b64"]
+    quote_report_data = extract_report_data_from_quote(quote_b64)
+    if quote_report_data is None:
+        return [
+            "gpu_attestation.tdx quote_b64 is too short or unparseable to extract REPORTDATA"
+        ]
+    expected = tdx_report_data(nonce).hex()
+    if quote_report_data.lower() != expected:
+        return [
+            "gpu_attestation.tdx quote REPORTDATA does not match dataset attestation nonce"
+        ]
+    json_report_data = str(tdx.get("report_data") or "").lower()
+    if json_report_data and json_report_data != quote_report_data.lower():
+        return [
+            "gpu_attestation.tdx report_data JSON does not match REPORTDATA inside quote_b64"
+        ]
     return []
 
 

@@ -41,6 +41,17 @@ def test_garbage_token_decodes_to_empty():
     assert _decode_overall_claims("not json") == {}
 
 
+def test_extract_report_data_from_quote():
+    import base64
+
+    from eval.attestation import _TDX_REPORT_DATA_OFFSET, extract_report_data_from_quote, tdx_report_data
+
+    digest = "ef" * 32
+    quote = b"\x00" * _TDX_REPORT_DATA_OFFSET + tdx_report_data(digest) + b"\x00" * 32
+    assert extract_report_data_from_quote(base64.b64encode(quote).decode()) == tdx_report_data(digest).hex()
+    assert extract_report_data_from_quote("AAAA") is None
+
+
 def test_tdx_report_data_pads_digest():
     from eval.attestation import tdx_report_data
 

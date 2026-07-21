@@ -241,9 +241,10 @@ def test_no_frontier_yields_baseline_label(tmp_path, monkeypatch):
 
 
 def test_tdx_binding_matches_report_data(tmp_path):
+    import base64
     import json
 
-    from eval.attestation import tdx_report_data
+    from eval.attestation import _TDX_REPORT_DATA_OFFSET, tdx_report_data
     from eval.verify import check_tdx_binding
     from proof.bundle import claim_sha256
 
@@ -252,12 +253,16 @@ def test_tdx_binding_matches_report_data(tmp_path):
     (bundle / "manifest.json").write_text(json.dumps({"run_id": "r1"}))
     (bundle / "eval_scores.json").write_text(json.dumps({"scores": {"gsm8k": 0.6}}))
     digest = claim_sha256(bundle)
+    quote = b"\x00" * _TDX_REPORT_DATA_OFFSET + tdx_report_data(digest) + b"\x00" * 64
+    quote_b64 = base64.b64encode(quote).decode()
 
-    bound = {"passed": True, "tdx": {"report_data": tdx_report_data(digest).hex()}}
-    unbound = {"passed": True, "tdx": {"report_data": "ff" * 64}}
+    bound = {"passed": True, "tdx": {"report_data": tdx_report_data(digest).hex(), "quote_b64": quote_b64}}
+    unbound = {"passed": True, "tdx": {"report_data": "ff" * 64, "quote_b64": quote_b64}}
+    json_only = {"passed": True, "tdx": {"report_data": tdx_report_data(digest).hex()}}
     no_tdx = {"passed": True, "tdx": None}
     assert check_tdx_binding(bundle, bound) is True
     assert check_tdx_binding(bundle, unbound) is False
+    assert check_tdx_binding(bundle, json_only) is False
     assert check_tdx_binding(bundle, no_tdx) is None
     assert check_tdx_binding(bundle, None) is None
 

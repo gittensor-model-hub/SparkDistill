@@ -246,23 +246,36 @@ def check_claim_binding(
 
 
 def check_tdx_binding(bundle_dir: Path, attestation: dict | None) -> bool | None:
-    """Whether the attestation's Intel TDX quote commits to this exact bundle.
+    """Whether the attestation's Intel TDX *quote bytes* commit to this bundle.
 
-    The TDX quote's 64-byte REPORTDATA must be the bundle's `claim_sha256`
-    (zero-padded) — the measured-VM counterpart of `check_claim_binding`'s GPU
-    nonce. Returns None when no TDX quote was captured (non-TDX host or
-    unprovisioned configfs-tsm node); GPU binding remains the minimum bar.
+    Extracts 64-byte REPORTDATA from ``tdx.quote_b64`` at the TDX v4 offset and
+    requires it equal ``tdx_report_data(claim_sha256)``. Does **not** trust the
+    miner-editable ``tdx.report_data`` JSON field alone (a genuine quote could
+    otherwise be rebound by forging that sidecar). When JSON ``report_data`` is
+    present it must also match the quote slice.
 
-    Honest scope: this checks the binding, not the quote's Intel signature
-    chain — full DCAP/Trust Authority verification is the validator follow-up.
+    Returns None when no TDX blob was captured; GPU binding remains the minimum bar.
+    Quote signature (DCAP/PCS) is checked separately by ``check_tdx_signature``.
     """
     if attestation is None or not attestation.get("tdx"):
         return None
-    from eval.attestation import tdx_report_data
+    from eval.attestation import extract_report_data_from_quote, tdx_report_data
     from proof.bundle import claim_sha256
 
+    tdx = attestation["tdx"]
+    quote_b64 = tdx.get("quote_b64") or ""
+    if not quote_b64:
+        return False
+    quote_report_data = extract_report_data_from_quote(quote_b64)
+    if quote_report_data is None:
+        return False
     expected = tdx_report_data(claim_sha256(bundle_dir)).hex()
-    return str(attestation["tdx"].get("report_data") or "").lower() == expected
+    if quote_report_data.lower() != expected:
+        return False
+    json_report_data = str(tdx.get("report_data") or "").lower()
+    if json_report_data and json_report_data != quote_report_data.lower():
+        return False
+    return True
 
 
 def check_gpu_signature(attestation: dict | None) -> dict | None:
