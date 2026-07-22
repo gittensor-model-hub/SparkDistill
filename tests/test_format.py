@@ -66,3 +66,23 @@ def test_to_messages_record_uses_qwen3_chat_roles():
     assert record["messages"][1]["role"] == "user"
     assert record["messages"][2]["role"] == "assistant"
     assert "<think>" in record["messages"][2]["content"]
+
+
+def test_to_sft_record_tolerates_null_response():
+    # A null response must not raise AttributeError on `.strip()`; it coerces to "".
+    record = to_sft_record({"prompt": "p", "response": None})
+    assert record["response"] == ""
+
+
+def test_to_messages_record_tolerates_missing_response():
+    from teacher.format import to_messages_record
+
+    record = to_messages_record({"prompt": "p"})  # no "response" key
+    assert record["messages"][-1] == {"role": "assistant", "content": ""}
+
+
+def test_null_response_keeps_reasoning_think_block():
+    from teacher.format import to_messages_record
+
+    record = to_messages_record({"prompt": "p", "response": None, "reasoning": "because"})
+    assert record["messages"][-1]["content"] == "<think>\nbecause\n</think>\n\n"

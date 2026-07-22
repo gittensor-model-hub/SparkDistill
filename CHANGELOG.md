@@ -6,6 +6,13 @@ All notable changes to SparkDistill are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- **Teacher trajectory formatting tolerates a null/missing ``response``**: `_assistant_content`
+  did `trajectory["response"].strip()`, so a row whose `response` was `null` (e.g. an OpenAI
+  completion whose `choice.message.content` came back `None`, or a partial/hand-authored row)
+  raised `AttributeError: 'NoneType' object has no attribute 'strip'`, aborting `teacher.format`
+  mid-file — and the same helper feeds `eval.mix_registry`'s canonical-mix aggregation. It now
+  coerces a null/absent response to an empty string so one degenerate record can't crash the
+  conversion.
 - **Claim binding uses signed NRAS ``eat_nonce``, not editable JSON** : `check_claim_binding`
   / `check_attestation_integrity` require `eat_nonce` from JWKS-verified platform or
   per-device JWTs (`REMOTE_GPU_CLAIMS`) to equal `claim_sha256(bundle)`. Miner-editable

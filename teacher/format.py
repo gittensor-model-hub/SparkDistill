@@ -21,8 +21,12 @@ from typing import Any
 
 
 def _assistant_content(trajectory: dict[str, Any]) -> str:
+    # A trajectory's `response` can be null/absent — e.g. an OpenAI completion whose
+    # `choice.message.content` came back None, or a partial/hand-authored row. Coerce
+    # to an empty string so a single degenerate record can't crash the whole SFT
+    # conversion (this helper also feeds eval.mix_registry's canonical-mix aggregation).
     reasoning = trajectory.get("reasoning")
-    response = trajectory["response"].strip()
+    response = (trajectory.get("response") or "").strip()
     if reasoning and reasoning.strip():
         return f"<think>\n{reasoning.strip()}\n</think>\n\n{response}"
     return response
