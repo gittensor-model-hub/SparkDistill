@@ -20,6 +20,12 @@ All notable changes to SparkDistill are documented here. The format follows
   never filled its architecture bucket. `record_merged_ledger_entry` now calls
   `apply_verified_report_to_frontiers` (and backfills the Hopper frontier from
   `2026-07-15-magicrails-hopper-v2`).
+- **Canonical-dataset gate no longer skips non-mapping recipe dataset entries**:
+  `assert_recipe_uses_canonical_dataset` only inspected dict entries with a string
+  `path`, so a bare-string dataset entry (`datasets: ["some-org/private-set"]`) or a
+  mapping without a `path` silently passed the canonical-only training-track rule. It
+  now resolves the path from either shape and flags anything that is not exactly the
+  canonical mining path, closing a route to train on a non-canonical dataset.
 
 ## [0.1.3] — 2026-07-21
 
