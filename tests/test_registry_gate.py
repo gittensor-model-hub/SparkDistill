@@ -98,6 +98,14 @@ def test_validate_registry_entry_rejects_unsupported_architecture():
     assert any("gpu_architecture" in issue for issue in issues)
 
 
+def test_validate_registry_entry_rejects_non_object():
+    # A valid-JSON but non-object line must yield a clean issue, not an
+    # AttributeError on .get() (same class as parse_added_registry_lines).
+    for bad in ([1, 2, 3], "just-a-string", 42):
+        issues = validate_registry_entry(bad)
+        assert any("must be a JSON object" in issue for issue in issues), bad
+
+
 def test_gate_registry_submission_rejects_gpu_architecture_mismatch(monkeypatch):
     monkeypatch.setattr(
         "eval.registry_gate.verify_dataset_submission",
