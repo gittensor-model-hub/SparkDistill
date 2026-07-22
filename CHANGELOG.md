@@ -15,6 +15,11 @@ All notable changes to SparkDistill are documented here. The format follows
   dataset-track TDX checks extract the 64-byte REPORTDATA from the quote at the TDX v4
   offset and compare to `tdx_report_data(claim_sha256|nonce)`. Forged `tdx.report_data`
   JSON can no longer rebind a genuine quote; JSON/quote mismatches are rejected.
+- **Training-track merge now seeds / raises ``runs/frontiers.json``**: the ledger
+  workflow only wrote `ledger.jsonl` + `result.json`, so Hopper `eval:BASELINE` (#120)
+  never filled its architecture bucket. `record_merged_ledger_entry` now calls
+  `apply_verified_report_to_frontiers` (and backfills the Hopper frontier from
+  `2026-07-15-magicrails-hopper-v2`).
 
 ## [0.1.3] — 2026-07-21
 

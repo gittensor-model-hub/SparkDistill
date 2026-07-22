@@ -3,10 +3,11 @@ name: Training track ledger
 on:
   # Runs once a training-track PR has actually merged — separate from the
   # pre-merge gate (training_track.yml), which only labels/closes. The ledger
-  # is an immutable record of merged runs (see runs/README.md), so it's written
-  # after merge, not at every push. Fires on every merged PR regardless of
-  # track; eval.record_training_ledger no-ops silently when the PR body cites
-  # no HF proof-bundle repo.
+  # is an immutable record of merged runs (see runs/README.md), and frontiers.json
+  # is seeded/raised from verified non-REJECT scores, so both are written after
+  # merge — not at every push. Fires on every merged PR regardless of track;
+  # eval.record_training_ledger no-ops silently when the PR body cites no HF
+  # proof-bundle repo.
   pull_request_target:
     types: [closed]
     paths-ignore:
@@ -63,12 +64,12 @@ jobs:
             --head-ref main \
             --changed-paths-file /tmp/changed_paths.txt
 
-      - name: Commit ledger entry if changed
+      - name: Commit ledger / frontier updates if changed
         run: |
           if git status --porcelain -- runs/ | grep -q .; then
             git add runs/
-            git commit -m "Record ledger entry for #${{ github.event.pull_request.number }}"
+            git commit -m "Record ledger/frontier for #${{ github.event.pull_request.number }}"
             git push origin HEAD:main
           else
-            echo "no ledger changes to commit"
+            echo "no ledger/frontier changes to commit"
           fi

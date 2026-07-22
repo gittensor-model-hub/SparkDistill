@@ -352,8 +352,9 @@ domain improvement signal for mining recipes. The general basket (GSM8K, BFCL,
 HumanEval, …) is regression-guarded: any drop beyond its floor yields `eval:REJECT`
 and a `regression-*` label, but **GSM8K/BFCL improvements alone do not earn a tier**.
 
-Given the current Blackwell frontier (`runs/frontiers.json` → `blackwell`, `triton ≈ 0.428`, `gsm8k = 0.6`; Hopper bucket is empty until the first verified Hopper run),
-approximate **triton** scores needed when GSM8K holds at ≥ 0.588 (2% relaxed floor) or
+Given the current frontiers (`runs/frontiers.json` → `blackwell` `triton ≈ 0.428` /
+`gsm8k = 0.6`; `hopper` `triton ≈ 0.372` / `gsm8k = 0.74`), approximate **Blackwell
+triton** scores needed when GSM8K holds at ≥ 0.588 (2% relaxed floor) or
 ≥ 0.594 (1% default floor):
 
 | label | triton composite (approx.) | relative gain vs frontier |

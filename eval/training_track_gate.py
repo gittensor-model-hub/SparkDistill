@@ -515,6 +515,7 @@ def record_merged_ledger_entry(
     changed_paths: list[str] | None,
     hf_token: str | None = None,
     ledger_path: Path = Path("runs/ledger.jsonl"),
+    frontiers_path: Path | None = None,
 ) -> list[str]:
     """Append the merged training-track PR's result to runs/ledger.jsonl.
 
@@ -523,7 +524,12 @@ def record_merged_ledger_entry(
     skips silently if run_id is already present in the ledger, so a re-run
     (e.g. workflow retry) never double-appends. Non-training-track PRs (no
     cited HF proof-bundle repo) are a silent no-op — nothing to log.
+
+    Also seeds / raises ``runs/frontiers.json`` for verified non-REJECT runs
+    (including ``eval:BASELINE``). Frontier updates still run when the ledger
+    entry already exists, so a retry can heal a previously missed frontier write.
     """
+    from eval.frontiers import apply_verified_report_to_frontiers
     from eval.ledger import append_entry, build_entry
 
     repo_id = parse_proof_bundle_hf_repo(pr_body)
@@ -542,26 +548,31 @@ def record_merged_ledger_entry(
     if not run_id:
         return ["proof bundle manifest.json is missing run_id — nothing to log"]
 
+    proof_bundle = f"https://huggingface.co/{repo_id}"
     existing_run_ids = set()
     if ledger_path.exists():
         for line in ledger_path.read_text(encoding="utf-8").splitlines():
             if line.strip():
                 existing_run_ids.add(json.loads(line).get("run_id"))
-    if run_id in existing_run_ids:
-        return []
+    if run_id not in existing_run_ids:
+        entry = build_entry(run_id, pr_url, proof_bundle, report, attestation)
+        append_entry(ledger_path, entry)
 
-    entry = build_entry(run_id, pr_url, f"https://huggingface.co/{repo_id}", report, attestation)
-    append_entry(ledger_path, entry)
+        run_dir = ledger_path.parent / run_id
+        run_dir.mkdir(parents=True, exist_ok=True)
+        (run_dir / "result.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+        # attestation.json for a training-track PR is already committed by the miner as part
+        # of the PR itself (runs/<run_id>/attestation.json) — never rewrite that file here,
+        # only add it if this run somehow doesn't already have one on disk.
+        attestation_dest = run_dir / "attestation.json"
+        if attestation is not None and not attestation_dest.exists():
+            attestation_dest.write_text(json.dumps(attestation, indent=2) + "\n", encoding="utf-8")
 
-    run_dir = ledger_path.parent / run_id
-    run_dir.mkdir(parents=True, exist_ok=True)
-    (run_dir / "result.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-    # attestation.json for a training-track PR is already committed by the miner as part
-    # of the PR itself (runs/<run_id>/attestation.json) — never rewrite that file here,
-    # only add it if this run somehow doesn't already have one on disk.
-    attestation_dest = run_dir / "attestation.json"
-    if attestation is not None and not attestation_dest.exists():
-        attestation_dest.write_text(json.dumps(attestation, indent=2) + "\n", encoding="utf-8")
+    apply_verified_report_to_frontiers(
+        report,
+        proof_bundle=proof_bundle,
+        path=frontiers_path if frontiers_path is not None else ledger_path.parent / "frontiers.json",
+    )
     return []
 
 

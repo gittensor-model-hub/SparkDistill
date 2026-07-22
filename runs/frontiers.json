@@ -14,8 +14,15 @@
   },
   "hopper": {
     "gpu_architecture": "hopper",
-    "run_id": null,
-    "proof_bundle": null,
-    "scores": {}
+    "run_id": "2026-07-15-magicrails-hopper-v2",
+    "proof_bundle": "https://huggingface.co/ssnowman/sparkdistill-2026-07-15-magicrails-hopper-v2",
+    "scores": {
+      "gsm8k": 0.74,
+      "triton": 0.3719444444444444,
+      "triton_quick": 0.3719444444444444,
+      "triton_exec_pass_rate": 0.0,
+      "triton_correctness": 0.0,
+      "triton_syntax_pass_rate": 0.6666666666666666
+    }
   }
 }

@@ -253,6 +253,11 @@ def test_record_merged_ledger_entry_appends_and_writes_result(tmp_path, monkeypa
         "best_pct_delta": None,
         "regressions": [],
         "run_id": "run-1",
+        "gpu_architecture": "hopper",
+        "per_benchmark": {
+            "gsm8k": {"candidate": 0.74, "frontier": None},
+            "triton": {"candidate": 0.37, "frontier": None},
+        },
     }
     monkeypatch.setattr(gate, "_download_and_verify_bundle", lambda *a, **k: (report, {"passed": True}, None, None))
 
@@ -277,11 +282,24 @@ def test_record_merged_ledger_entry_appends_and_writes_result(tmp_path, monkeypa
     assert json.loads((run_dir / "result.json").read_text()) == report
     assert json.loads((run_dir / "attestation.json").read_text()) == {"passed": True}
 
+    frontiers = json.loads((tmp_path / "frontiers.json").read_text())
+    assert frontiers["hopper"]["run_id"] == "run-1"
+    assert frontiers["hopper"]["scores"]["gsm8k"] == 0.74
+
 
 def test_record_merged_ledger_entry_is_idempotent(tmp_path, monkeypatch):
     import eval.training_track_gate as gate
 
-    report = {"verified": True, "label": "eval:BASELINE", "best_benchmark": None, "best_pct_delta": None, "regressions": [], "run_id": "run-1"}
+    report = {
+        "verified": True,
+        "label": "eval:BASELINE",
+        "best_benchmark": None,
+        "best_pct_delta": None,
+        "regressions": [],
+        "run_id": "run-1",
+        "gpu_architecture": "hopper",
+        "per_benchmark": {"triton": {"candidate": 0.37, "frontier": None}},
+    }
     monkeypatch.setattr(gate, "_download_and_verify_bundle", lambda *a, **k: (report, None, None, None))
 
     ledger_path = tmp_path / "ledger.jsonl"
@@ -297,12 +315,23 @@ def test_record_merged_ledger_entry_is_idempotent(tmp_path, monkeypatch):
     assert issues == []
     assert len(ledger_path.read_text().splitlines()) == 1  # no duplicate appended
     assert not (tmp_path / "run-1").exists()  # never even reached the write step
+    # Frontier still heals on retry when ledger already had the run.
+    assert json.loads((tmp_path / "frontiers.json").read_text())["hopper"]["scores"]["triton"] == 0.37
 
 
 def test_record_merged_ledger_entry_never_overwrites_committed_attestation(tmp_path, monkeypatch):
     import eval.training_track_gate as gate
 
-    report = {"verified": True, "label": "eval:BASELINE", "best_benchmark": None, "best_pct_delta": None, "regressions": [], "run_id": "run-1"}
+    report = {
+        "verified": True,
+        "label": "eval:BASELINE",
+        "best_benchmark": None,
+        "best_pct_delta": None,
+        "regressions": [],
+        "run_id": "run-1",
+        "gpu_architecture": "blackwell",
+        "per_benchmark": {"gsm8k": {"candidate": 0.6, "frontier": None}},
+    }
     monkeypatch.setattr(gate, "_download_and_verify_bundle", lambda *a, **k: (report, {"passed": True, "new": True}, None, None))
 
     ledger_path = tmp_path / "ledger.jsonl"
@@ -320,7 +349,11 @@ def test_record_merged_ledger_entry_never_overwrites_committed_attestation(tmp_p
     assert json.loads((run_dir / "attestation.json").read_text()) == {"committed": True}
 
 
-def test_score_claimed_eval_label_hopper_without_frontier(tmp_path):
+def test_score_claimed_eval_label_empty_arch_bucket_is_baseline(tmp_path, monkeypatch):
+    import eval.frontiers as frontiers_mod
+
+    monkeypatch.setattr(frontiers_mod, "load_frontier_scores", lambda *a, **k: None)
+
     bundle = tmp_path / "bundle"
     bundle.mkdir()
     (bundle / "manifest.json").write_text(json.dumps({"run_id": "r1", "train_gpu": "hopper"}))

@@ -3,11 +3,11 @@
 Run once, after merge (not at PR-gate time, unlike eval.training_track_gate) —
 reads the PR body for its cited HF proof-bundle repo, re-runs eval.verify's
 no-GPU attested checks against the merged commit, and if a report was
-produced, appends the run to runs/ledger.jsonl and writes
-runs/<run-id>/result.json (+ attestation.json when present). Idempotent:
-skips silently when run_id is already in the ledger, so a workflow retry never
-double-appends. Non-training-track PRs (no cited HF proof-bundle repo) are a
-silent no-op.
+produced, appends the run to runs/ledger.jsonl, writes
+runs/<run-id>/result.json (+ attestation.json when present), and seeds / raises
+runs/frontiers.json for the run's GPU architecture. Idempotent: skips ledger
+double-append when run_id is already present (frontier highs may still heal).
+Non-training-track PRs (no cited HF proof-bundle repo) are a silent no-op.
 
     python -m eval.record_training_ledger --pr-url <merged PR URL> \\
         --pr-body-file /tmp/pr_body.md --head-ref HEAD \\
