@@ -511,6 +511,8 @@ def verify_submission(
             "best_pct_delta": None,
             "regressions": [],
             "per_benchmark": {key: {"candidate": claimed[key], "frontier": None} for key in claimed},
+            "frontier_updates": sorted(claimed),
+            "frontier_scores": dict(claimed),
         }
     report["verified"] = True
     report["reason"] = None

@@ -11,8 +11,9 @@ was merged. Written by the eval bot at merge time — miners don't write here di
   keeps its own scores — a Hopper run is never tiered against Blackwell numbers.
   `eval.verify` resolves the bundle's architecture from `gpu_architecture` or
   `train_gpu` and loads the matching bucket (empty bucket → `eval:BASELINE`).
-  Updated (overwritten, not appended) at merge time when a run raises a benchmark
-  high within that architecture.
+  Updated at merge time by `eval.record_training_ledger` / `apply_verified_report_to_frontiers`
+  whenever a verified non-REJECT training run raises a per-benchmark high (including
+  seeding an empty architecture bucket from `eval:BASELINE`).
 - **`frontier.json`** — legacy single-file Blackwell frontier kept for backward
   compatibility; `eval.frontiers` falls back to it when `frontiers.json` is absent.
 - **`<run-id>/`** — one directory per merged run, holding the artifacts the ledger
