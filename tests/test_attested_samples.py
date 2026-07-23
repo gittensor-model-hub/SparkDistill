@@ -8,6 +8,7 @@ from eval.attested_samples import (
     build_triton_entry,
     read_attested_samples,
     verify_attested_eval_samples,
+    verify_benchmark_entry,
 )
 from eval.regression_sample import build_regression_sample, load_regression_problems
 
@@ -191,3 +192,55 @@ def test_read_attested_samples_wraps_legacy_gsm8k_file(tmp_path):
     wrapped = read_attested_samples(bundle)
     assert wrapped is not None
     assert "gsm8k" in wrapped["benchmarks"]
+
+
+def _all_correct_gsm8k_responses() -> list[dict]:
+    return [
+        {
+            "problem_id": int(row["problem_id"]),
+            "model_response": f"#### {row['answer'].split('####')[-1].strip()}",
+        }
+        for row in load_regression_problems()
+    ]
+
+
+def test_regression_entry_only_verifies_gsm8k_key():
+    """A gsm8k regression sample must not attest a *different* benchmark key.
+
+    The attested_eval_samples benchmarks map is miner-controlled. verify_benchmark_entry
+    marks whatever map key it is called with as verified, but regression_responses only
+    ever checks gsm8k. Registering a valid gsm8k sample under e.g. "triton" would otherwise
+    return no issues, so the caller marks "triton" attested and skips its cheap re-run,
+    letting a fabricated triton (the tier-driving score) bypass verification entirely.
+    """
+    entry = build_gsm8k_regression_entry(_all_correct_gsm8k_responses())
+    claimed = {"gsm8k": 1.0, "triton": 0.99}
+
+    # Correct home key still verifies.
+    score, issues = verify_benchmark_entry("gsm8k", entry, claimed=claimed, frontier=None)
+    assert issues == []
+    assert score == 1.0
+
+    # Same sample smuggled under the triton key must be rejected, not silently verified.
+    score, issues = verify_benchmark_entry("triton", entry, claimed=claimed, frontier=None)
+    assert score is None
+    assert issues
+    assert any("triton" in issue for issue in issues)
+
+
+def test_tritonbench_entry_only_verifies_triton_key():
+    """A TritonBench report must not attest a non-triton benchmark key."""
+    report = {
+        "summary": {"avg_composite": 0.5, "exec_pass_rate": 0.0, "avg_correctness": 0.0, "syntax_pass_rate": 1.0},
+        "details": [
+            {"level": 1, "composite_score": 0.5},
+            {"level": "bugfix", "composite_score": 0.5},
+        ],
+    }
+    entry = build_triton_entry(report)
+    claimed = {"triton": 0.5, "triton_quick": 0.5, "mmlu_pro": 0.99}
+
+    score, issues = verify_benchmark_entry("mmlu_pro", entry, claimed=claimed, frontier=None)
+    assert score is None
+    assert issues
+    assert any("mmlu_pro" in issue for issue in issues)

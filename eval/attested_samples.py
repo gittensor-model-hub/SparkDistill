@@ -218,10 +218,27 @@ def verify_benchmark_entry(
 ) -> tuple[float | None, list[str]]:
     sample_type = entry.get("type")
     if sample_type == "regression_responses":
+        # regression_responses only ever re-grades the frozen gsm8k set, but the caller
+        # marks whatever *map key* this entry is filed under as verified. Reject a gsm8k
+        # sample smuggled in under another benchmark's key so it cannot attest -- and skip
+        # the cheap re-run of -- a benchmark it never actually checked (e.g. a fabricated
+        # triton tier score).
+        if benchmark_key != REGRESSION_BENCHMARK_KEY:
+            return None, [
+                f"{benchmark_key}: regression_responses attested samples verify "
+                f"{REGRESSION_BENCHMARK_KEY!r} only, not {benchmark_key!r}"
+            ]
         return verify_regression_responses(entry, claimed=claimed, frontier=frontier)
     if sample_type == "lm_eval_results":
         return verify_lm_eval_results(entry, benchmark_key=benchmark_key, claimed=claimed, frontier=frontier)
     if sample_type == "tritonbench_report":
+        # Same guard: a TritonBench report only recomputes the triton composite, so it
+        # must not attest a different (miner-chosen) benchmark key.
+        if benchmark_key != "triton":
+            return None, [
+                f"{benchmark_key}: tritonbench_report attested samples verify "
+                f"'triton' only, not {benchmark_key!r}"
+            ]
         return verify_tritonbench_report(entry, claimed=claimed, frontier=frontier)
     return None, [f"{benchmark_key}: unknown attested sample type {sample_type!r}"]
 

@@ -6,6 +6,7 @@ All notable changes to SparkDistill are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- **Attested eval samples can no longer attest the wrong benchmark key**: `verify_benchmark_entry` marked whatever *map key* an entry was filed under in the miner-controlled `attested_eval_samples.json` `benchmarks` map as verified, but a `regression_responses` entry only ever re-grades the frozen gsm8k set and a `tritonbench_report` entry only recomputes the triton composite. A valid gsm8k regression sample (or triton report) filed under another benchmark's key therefore returned no issues, so the caller marked that key attested and dropped it from the cheap re-run set -- letting a fabricated score for a benchmark that was never checked (e.g. the tier-driving `triton` claim) bypass verification. `verify_benchmark_entry` now requires `regression_responses` to sit under the `gsm8k` key and `tritonbench_report` under the `triton` key, rejecting cross-key smuggling.
 - **Registry mix export uses SparkProof publish path**: `eval.mix_registry` now delegates
   to SparkProof's `trajectory_to_messages_record` (same as HF publish) instead of
   `teacher.format`. Empty or failed-validation trajectories are skipped (not coerced
