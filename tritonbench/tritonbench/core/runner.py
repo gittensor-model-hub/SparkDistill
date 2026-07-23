@@ -88,14 +88,12 @@ class TritonBench:
         if total == 0:
             raise RuntimeError(f"no problems found under {self._problems_root()}")
 
-        # Keep torch/triton/CUDA warm across problems — avoids a per-kernel process cold start.
-        with self.validator.session():
-            for i, problem in enumerate(self.problems):
-                print(f"\n[{i + 1}/{total}] {problem['id']} (level {problem['level']})")
-                result = self._evaluate_problem(problem)
-                results.append(result)
-                passed = sum(1 for r in results if r["exec_pass"])
-                print(f"  composite={result['composite_score']:.2f} | running pass {passed}/{len(results)}")
+        for i, problem in enumerate(self.problems):
+            print(f"\n[{i + 1}/{total}] {problem['id']} (level {problem['level']})")
+            result = self._evaluate_problem(problem)
+            results.append(result)
+            passed = sum(1 for r in results if r["exec_pass"])
+            print(f"  composite={result['composite_score']:.2f} | running pass {passed}/{len(results)}")
 
         return self.reporter.generate(results, self.config)
 
