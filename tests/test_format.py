@@ -66,3 +66,15 @@ def test_to_messages_record_uses_qwen3_chat_roles():
     assert record["messages"][1]["role"] == "user"
     assert record["messages"][2]["role"] == "assistant"
     assert "<think>" in record["messages"][2]["content"]
+
+
+def test_to_messages_record_coerces_null_response():
+    from teacher.format import to_messages_record
+
+    record = to_messages_record({"prompt": "p", "response": None})
+    assert record["messages"][-1]["content"] == ""
+
+
+def test_to_sft_record_coerces_missing_response():
+    record = to_sft_record({"prompt": "p"})
+    assert record["response"] == ""

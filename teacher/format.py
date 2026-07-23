@@ -22,9 +22,12 @@ from typing import Any
 
 def _assistant_content(trajectory: dict[str, Any]) -> str:
     reasoning = trajectory.get("reasoning")
-    response = trajectory["response"].strip()
-    if reasoning and reasoning.strip():
-        return f"<think>\n{reasoning.strip()}\n</think>\n\n{response}"
+    # Null/absent response must not AttributeError — coerce so one bad row
+    # cannot abort teacher.format / mix aggregation (#212).
+    raw = trajectory.get("response")
+    response = ("" if raw is None else str(raw)).strip()
+    if reasoning and str(reasoning).strip():
+        return f"<think>\n{str(reasoning).strip()}\n</think>\n\n{response}"
     return response
 
 
