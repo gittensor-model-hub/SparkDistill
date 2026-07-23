@@ -1,0 +1,60 @@
+id: matrix_transpose
+level: 2
+category: kernel_generation
+title: Matrix Transpose
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `matrix_transpose.py` (repo: ELS-RD/kernl).
+
+
+  Task description:
+
+  The Triton operator is defined to transpose a matrix using a kernel function and a wrapper function.
+  The kernel function named ''kernel'' is decorated with ''@triton.jit'' for just-in-time compilation
+  and performs matrix transposition by directly manipulating pointers based on the given strides and dimensions.
+  It accepts input parameters such as a matrix ''M'', an output buffer ''Out'', the strides of ''M'' and
+  ''Out'', and the dimensions ''SIZE_M'' and ''D_HEAD''. The kernel computes the pointers for elements
+  of ''M'' using ''matrix_stridex'' and ''matrix_stridey'', and for ''Out'' using ''out_stridex'' and
+  ''out_stridey''. The transposition is achieved by loading elements from ''M'' and storing them into
+  ''Out'' in a transposed layout. The wrapper function named ''wrapper'' initializes ''matrix'' with random
+  float16 values and ''out'' with zeros, both on CUDA. It defines the grid configuration as a tuple with
+  a single element, then calls the kernel with these matrices and their properties. Finally, it returns
+  the transposed matrix ''out''.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- rope
+source:
+  channel: G
+  file: matrix_transpose.py
+  repo: ELS-RD/kernl
+  difficulty: '2'
+  star: 1537
+  simp_instru_len: 144
+  comp_instru_len: 250
+  output_triton_len: 387
+gold_kernel: data/TritonBench_G_v1/matrix_transpose.py

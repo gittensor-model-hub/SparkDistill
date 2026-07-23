@@ -1,0 +1,63 @@
+id: chunk_cumsum_kernel
+level: 4
+category: kernel_generation
+title: Chunk Cumsum Kernel
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `chunk_cumsum_kernel.py` (repo: sustcsonglin/flash-linear-attention).
+
+
+  Task description:
+
+  The Triton kernel `chunk_global_cumsum_scalar_kernel` is designed to perform a cumulative sum operation
+  on a 3D tensor, where the dimensions are Batch (B), Head (H), and Time (T). This kernel processes the
+  tensor in chunks defined by block size `BT`, and each block''s result is stored in the output tensor
+  `o`. The kernel uses a loop to iterate over these chunks, loading a block of data using `tl.make_block_ptr`
+  and `tl.load`, performing cumulative sum with `tl.cumsum`, and updating a running sum with `tl.sum`
+  to carry over between chunks. `chunk_global_cumsum_scalar` acts as the kernel''s wrapper function, preparing
+  and launching it with the appropriate grid configuration based on the input tensor''s dimensions. It
+  accepts a PyTorch tensor `s` and an optional `dtype`, defaulting to the dtype of `s`. It initializes
+  an empty output tensor `z` with the same shape and dtype as `s` to hold the computation results. The
+  grid configuration is determined by the batch size and head count, ensuring each program instance processes
+  one sequence.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- attention
+- matmul
+- elementwise
+- reduction
+source:
+  channel: G
+  file: chunk_cumsum_kernel.py
+  repo: sustcsonglin/flash-linear-attention
+  difficulty: '3'
+  star: 1382
+  simp_instru_len: 138
+  comp_instru_len: 266
+  output_triton_len: 600
+gold_kernel: data/TritonBench_G_v1/chunk_cumsum_kernel.py

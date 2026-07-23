@@ -1,0 +1,69 @@
+id: pseudoinverse_svd
+level: 4
+category: kernel_translation
+title: Pseudoinverse Svd
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `pseudoinverse_svd`.\n\
+  \nOperator description:\nComputes the Moore-Penrose pseudoinverse of a matrix using Singular Value Decomposition\
+  \ (SVD). It decomposes the input matrix A into its singular value components, inverts the non-zero singular\
+  \ values above a certain threshold to avoid numerical instability, and reconstructs the pseudoinverse\
+  \ using these components. Supports input of float, double, cfloat, and cdouble dtypes, and can handle\
+  \ batches of matrices.\n\nTarget Python signature / call pattern:\ndef pseudoinverse_svd(A, *, full_matrices=True,\
+  \ rcond=1e-15, out=None) -> Tensor\n\nArgs:\n    A (Tensor): Input tensor of shape `(*, m, n)` where\
+  \ `*` is zero or more batch dimensions.\n\nKeyword args:\n    full_matrices (bool, optional): If `True`\
+  \ (default), compute the full SVD. If `False`, compute the reduced SVD.\n    rcond (float, optional):\
+  \ Relative condition number threshold. Singular values smaller than `rcond * largest_singular_value`\
+  \ are set to zero. Default: `1e-15`.\n    out (Tensor, optional): Output tensor. Ignored if `None`.\
+  \ Default: `None`.\n\nMathematical definition:\nA^{+} = V^{\\mathrm{H}} \\Sigma^{+} U^{\\mathrm{H}};\
+  \ \\sigma_i^{+} = \\begin{cases} \\dfrac{1}{\\sigma_i}, & \\text{if } \\sigma_i > \\text{rcond} \\times\
+  \ \\sigma_{\\max} \\\\ 0, & \\text{otherwise} \\end{cases}\n\nPyTorch reference snippet:\n```python\n\
+  U, S, Vh = torch.linalg.svd(A, full_matrices=full_matrices)\ncutoff = rcond * S.max(dim=-1, keepdim=True).values\n\
+  S_inv = torch.where(S > cutoff, 1 / S, torch.zeros_like(S))\nS_inv_mat = torch.diag_embed(S_inv)\nA_pinv\
+  \ = Vh.transpose(-2, -1).conj() @ S_inv_mat @ U.transpose(-2, -1).conj()\nif out is not None:\n    out.copy_(A_pinv)\n\
+  \    return out\nreturn A_pinv\n```\n\nExample / usage notes:\n>>> import torch\n>>> def pseudoinverse_svd(A,\
+  \ *, full_matrices=True, rcond=1e-15, out=None):\n...     U, S, Vh = torch.linalg.svd(A, full_matrices=full_matrices)\n\
+  ...     # Invert singular values larger than rcond * max(S)\n...     cutoff = rcond * S.max(dim=-1,\
+  \ keepdim=True).values\n...     S_inv = torch.where(S > cutoff, 1 / S, torch.zeros_like(S))\n...   \
+  \  # Create diagonal matrix of inverted singular values\n...     S_inv_mat = torch.diag_embed(S_inv)\n\
+  ...     # Compute pseudoinverse\n...     A_pinv = Vh.transpose(-2, -1).conj() @ S_inv_mat @ U.transpose(-2,\
+  \ -1).conj()\n...     if out is not None:\n...         out.copy_(A_pinv)\n...         return out\n...\
+  \     return A_pinv\n>>> # Example with a 2x3 matrix\n>>> A = torch.tensor([[1., 2., 3.],\n...     \
+  \              [4., 5., 6.]])\n>>> A_pinv = pseudoinverse_svd(A)\n>>> A_pinv\ntensor([[-0.9444,  0.4444],\n\
+  \        [-0.1111,  0.1111],\n        [ 0.7222, -0.2222]])\n>>> # Verify the pseudoinverse properties\n\
+  >>> # A @ A_pinv @ A ≈ A\n>>> torch.allclose(A @ A_pinv @ A, A)\nTrue\n>>> # A_pinv @ A @ A_pinv ≈ A_pinv\n\
+  >>> torch.allclose(A_pinv @ A @ A_pinv, A_pinv)\nTrue\n>>> # Example with a batch of matrices\n>>> A_batch\
+  \ = torch.randn(2, 4, 3)\n>>> A_pinv_batch = pseudoinverse_svd(A_batch)\n>>> A_pinv_batch.shape\ntorch.Size([2,\
+  \ 3, 4])\n>>> # Verify for the batch\n>>> torch.allclose(A_batch @ A_pinv_batch @ A_batch, A_batch)\n\
+  True\n\nAdditional constraints:\nSupports input of float, double, cfloat, and cdouble dtypes; Handles\
+  \ batches of matrices\n\nRequirements (SparkDistill / TritonBench harness):\n- Translate the PyTorch\
+  \ reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics: include torch.allclose\
+  \ vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor\
+  \ over tl.make_block_ptr\n- Add @triton.autotune when there are meaningful tile/block choices\n- Provide\
+  \ a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 4
+  torch_cnt: 6
+  func_inputs: "def pseudoinverse_svd(A, *, full_matrices=True, rcond=1e-15, out=None) -> Tensor\n\nArgs:\n\
+    \    A (Tensor): Input tensor of shape `(*, m, n)` where `*` is zero or more batch dimensions.\n\n\
+    Keyword args:\n    full_matrices (bool, optional): If `True` (default), compute the full SVD. If `False`,\
+    \ compute the reduced SVD.\n    rcond (float, optional): Relative condition number threshold. Singular\
+    \ values smaller than `rcond * largest_singular_value` are set to zero. Default: `1e-15`.\n    out\
+    \ (Tensor, optiona"
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- reduction
+- embedding
+source:
+  channel: T
+  file: pseudoinverse_svd.py
+  name: pseudoinverse_svd
+  difficulty: '4'
+  params_cnt: 4
+  torch_cnt: 6
+gold_kernel: data/TritonBench_T_v1/pseudoinverse_svd.py

@@ -1,0 +1,53 @@
+id: bmm_chunk_fwd
+level: 4
+category: kernel_generation
+title: Bmm Chunk Fwd
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `bmm_chunk_fwd.py` (repo: MzeroMiko/VMamba).\n\nTask description:\nThe Triton kernel `_bmm_chunk_fwd_kernel`\
+  \ is responsible for computing a batched matrix multiplication (BMM) with support for chunking, causal\
+  \ masking, and sequence indexing. The function takes pointers to input tensors `a` and `b`, an output\
+  \ tensor `out`, and several parameters dictating the shapes, strides, and other characteristics needed\
+  \ for efficient computation on GPUs.\n\n            Key parameters include:\n            - `BLOCK_SIZE_M`,\
+  \ `BLOCK_SIZE_N`, `BLOCK_SIZE_K`: constants defining the size of each processing block for the M, N,\
+  \ and K dimensions.\n            - `IS_CAUSAL`: a compile-time constant indicating whether causal masking\
+  \ is applied.\n            - `HAS_SEQ_IDX`: a compile-time constant indicating whether sequence indexing\
+  \ is applied.\n\n            The kernel uses program IDs (`pid`) to determine the specific data block\
+  \ each thread processes, defined by combinations of batch, chunk, group, and head indices. The kernel\
+  \ then computes the dot product of corresponding sub-matrices from `a` and `b`, accumulating the result\
+  \ in `acc`, a local accumulation tensor.\n\n            Once the accumulation is complete, if `HAS_SEQ_IDX`\
+  \ is enabled, the sequence indices are loaded and used to zero out contributions from mismatched indices.\
+  \ The resulting matrix product is stored back into the global memory.\n\n            The `_bmm_chunk_fwd`\
+  \ function is a Python wrapper that sets up kernel arguments, determines execution grid size, and launches\
+  \ the kernel. It handles cases where input tensors are non-contiguous, ensures output tensor allocation\
+  \ based on the computed dimensions, and adjusts for optional parameters like sequence indexing and causality.\
+  \ This function is designed to facilitate BMM operations in various configurations, making it versatile\
+  \ for different input tensor shapes and application needs.\n\nRequirements (SparkDistill / TritonBench\
+  \ harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor\
+  \ over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include\
+  \ @triton.autotune with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid\
+  \ and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short\
+  \ note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+source:
+  channel: G
+  file: bmm_chunk_fwd.py
+  repo: MzeroMiko/VMamba
+  difficulty: '4'
+  star: 2235
+  simp_instru_len: 185
+  comp_instru_len: 414
+  output_triton_len: 2593
+gold_kernel: data/TritonBench_G_v1/bmm_chunk_fwd.py

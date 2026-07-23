@@ -1,0 +1,54 @@
+id: triton_argmax
+level: 2
+category: kernel_generation
+title: Triton Argmax
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `triton_argmax.py` (repo: FlagOpen/FlagGems).\n\nTask description:\nThis code implements a GPU-based\
+  \ argmax operation using Triton to optimize performance for different tensor shapes and dimensionalities.\
+  \ \n\n        The primary function, `argmax`, executes one of two pathways based on whether a specific\
+  \ dimension is specified. Without a dimension (`dim=None`), it treats the input tensor as a flat array,\
+  \ applying a two-stage reduction:\n        \n        - `argmax_kernel_1`: This kernel iterates over\
+  \ blocks of the input tensor, calculating the maximum value and its corresponding index within each\
+  \ block. The kernel parameters include:\n          - `inp`: The input tensor.\n          - `mid_value`,\
+  \ `mid_index`: Buffers to store intermediate max values and their indices.\n          - `M`: Total number\
+  \ of elements.\n          - `BLOCK_SIZE`: Defines the block of elements each instance processes.\n \
+  \         - `INT64_INDEX`: Flags whether indices require 64-bit representation based on input size.\n\
+  \        \n        - `argmax_kernel_2`: This kernel finalizes the maximum index from the intermediate\
+  \ results. It reads from `mid_value` and `mid_index` to determine the overall maximum index and store\
+  \ it in the output.\n          - `mid_value`, `mid_index`: Intermediate results from the first kernel.\n\
+  \          - `out`: The tensor where the final maximum index is stored.\n          - `mid_size`: The\
+  \ number of blocks processed.\n          - `BLOCK_MID`: Defines the intermediate block size for reduction.\n\
+  \        \n        When a dimension is specified, the `argmax_kernel` is employed, which operates as\
+  \ follows:\n        - Iterates over the specified dimension to find the maximum value index across rows/columns.\n\
+  \        - `M`, `N`, `K`: Represent the product of dimensions before, along, and after the specified\
+  \ dimension.\n        - `BLOCK_M`, `BLOCK_N`: Define the number of elements each block of threads should\
+  \ process in these dimensions.\n        \n        The function ensures correct memory use with either\
+  \ int32 or int64 indices based on the tensor's total number of elements by calling `can_use_int32_index`.\
+  \ It adjusts the execution grid dynamically to accommodate tensor size and block configuration.\n\n\
+  Requirements (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA\
+  \ SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use @triton.jit\
+  \ kernels with correct boundary masking\n- Include @triton.autotune with at least 3 configs when tile\
+  \ sizes matter\n- Provide a Python launcher + grid and a torch.allclose correctness test\n- Use fp32\
+  \ accumulators for tl.dot reductions\n- Print a short note if you intentionally skip autotune for a\
+  \ tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- reduction
+source:
+  channel: G
+  file: triton_argmax.py
+  repo: FlagOpen/FlagGems
+  difficulty: '2'
+  star: 347
+  simp_instru_len: 199
+  comp_instru_len: 508
+  output_triton_len: 1878
+gold_kernel: data/TritonBench_G_v1/triton_argmax.py

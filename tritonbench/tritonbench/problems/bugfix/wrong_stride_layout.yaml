@@ -1,0 +1,22 @@
+id: wrong_stride_layout
+level: bugfix
+category: kernel_debugging
+title: Wrong Stride on Row-Major Tensor
+prompt: Row-wise scale kernel corrupts outputs for non-contiguous inputs. Fix stride usage.
+input_code: "@triton.jit\ndef scale_rows_kernel(x_ptr, out_ptr, scales_ptr, M, N, BLOCK: tl.constexpr):\n\
+  \    row = tl.program_id(0)\n    cols = tl.arange(0, BLOCK)\n    mask = cols < N\n    # BUG: ignores\
+  \ actual row stride; assumes tightly packed rows\n    x = tl.load(x_ptr + row * N + cols, mask=mask)\n\
+  \    s = tl.load(scales_ptr + row)\n    tl.store(out_ptr + row * N + cols, x * s, mask=mask)\n"
+expected_fix: Index with row * stride_row + col, not row * N always
+required_patterns:
+- '@triton.jit'
+tags:
+- debugging
+- layout
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+source:
+  channel: synthetic
+  file: wrong_stride_layout.py
+  difficulty: bugfix

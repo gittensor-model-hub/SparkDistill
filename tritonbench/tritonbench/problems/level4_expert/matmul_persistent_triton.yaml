@@ -1,0 +1,52 @@
+id: matmul_persistent_triton
+level: 4
+category: kernel_generation
+title: Matmul Persistent Triton
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `matmul_persistent_triton.py` (repo: triton-lang/triton).\n\nTask description:\nThe `matmul_kernel_persistent`\
+  \ function is a Triton JIT-compiled kernel designed for matrix multiplication with persistent thread\
+  \ execution across different tiles of the matrices. The function takes pointers to input matrices `a_ptr`,\
+  \ `b_ptr`, and an output matrix `c_ptr`, along with the dimensions `M`, `N`, `K`, and strides for each\
+  \ matrix. It uses configurable block sizes for partitioning the matrices and utilizes GPU resources\
+  \ effectively by leveraging multiple streaming multiprocessors (NUM_SMS).\n\n        The kernel divides\
+  \ the matrices into blocks of size `BLOCK_SIZE_M x BLOCK_SIZE_N` and iterates over `BLOCK_SIZE_K` tiles\
+  \ of the shared dimension `K`. Each tile is processed independently, and results are accumulated in\
+  \ the `accumulator` array. The kernel employs mask handling to manage edge cases where block indices\
+  \ exceed matrix dimensions and uses `tl.load` and `tl.store` operations with masks to safely access\
+  \ global memory. The accumulated results are converted to the appropriate data type before storing them\
+  \ in the output matrix.\n\n        The `matmul_persistent` function acts as a wrapper to initialize\
+  \ and launch the Triton kernel. It validates input tensor shapes and data types and computes the appropriate\
+  \ grid size based on the input dimensions and hardware capabilities. The function configures kernel\
+  \ parameters such as block sizes, number of stages, and warps based on the input data type, and executes\
+  \ the `matmul_kernel_persistent` with these parameters. The output is an allocated tensor `c` which\
+  \ contains the resulting product of matrices `a` and `b`.\n\nRequirements (SparkDistill / TritonBench\
+  \ harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor\
+  \ over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include\
+  \ @triton.autotune with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid\
+  \ and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short\
+  \ note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+- convolution
+source:
+  channel: G
+  file: matmul_persistent_triton.py
+  repo: triton-lang/triton
+  difficulty: '4'
+  star: 13556
+  simp_instru_len: 190
+  comp_instru_len: 360
+  output_triton_len: 2169
+gold_kernel: data/TritonBench_G_v1/matmul_persistent_triton.py

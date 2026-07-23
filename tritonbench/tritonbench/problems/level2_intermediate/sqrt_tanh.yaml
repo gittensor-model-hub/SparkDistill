@@ -1,0 +1,95 @@
+id: sqrt_tanh
+level: 2
+category: kernel_translation
+title: Sqrt Tanh
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `sqrt_tanh`.
+
+
+  Operator description:
+
+  Computes the square root of each element in the input tensor, and then applies the hyperbolic tangent
+  (tanh) function to the square-rooted values. The function returns a tensor where each element is the
+  result of applying sqrt followed by tanh to each element of the input.
+
+
+  Target Python signature / call pattern:
+
+  def sqrt_tanh(input, out=None) -> Tensor: input (Tensor): The input tensor. out (Tensor, optional):
+  The output tensor.
+
+
+  Mathematical definition:
+
+  \text{out}_{i} = \tanh(\sqrt{\text{input}_{i}})
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  torch.sqrt(input); torch.tanh(sqrt_result, out=out)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> import torch
+
+  >>> a = torch.tensor([0.25, 1.0, 4.0, 9.0])
+
+  >>> result = sqrt_tanh(a)
+
+  >>> result
+
+  tensor([0.4805, 0.7616, 0.9640, 0.9951])
+
+
+  >>> a = torch.tensor([0.25, -1.0, 4.0, -9.0])
+
+  >>> result = sqrt_tanh(a)
+
+  >>> result
+
+  tensor([ 0.4805,     nan,  0.9640,     nan])
+
+
+  Additional constraints:
+
+  Using a tensor with some negative values results in NaN for those elements.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 2
+  torch_cnt: 2
+  func_inputs: 'def sqrt_tanh(input, out=None) -> Tensor: input (Tensor): The input tensor. out (Tensor,
+    optional): The output tensor.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+source:
+  channel: T
+  file: sqrt_tanh.py
+  name: sqrt_tanh
+  difficulty: '3'
+  params_cnt: 2
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/sqrt_tanh.py

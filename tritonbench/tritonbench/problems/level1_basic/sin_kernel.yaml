@@ -1,0 +1,43 @@
+id: sin_kernel
+level: 1
+category: kernel_generation
+title: Sin Kernel
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `sin_kernel.py` (repo: pytorch/pytorch).\n\nTask description:\nThe code implements a Triton\
+  \ kernel named `kernel_function`, which processes input data using block-wise operations. \n       \
+  \     The kernel takes pointers to input and output data (`x_ptr` and `output_ptr`), the total number\
+  \ of elements to process (`n_elements`), and a constant block size (`BLOCK_SIZE`). \n            Inside\
+  \ the kernel, each program instance calculates its starting point (`block_start`) and creates an `offsets`\
+  \ tensor for element indexing. \n            A mask ensures operations only occur on valid indices within\
+  \ the input bounds. The kernel loads data from `x_ptr`, computes the sine using `tl.math.sin`, and stores\
+  \ the result in `output_ptr`. \n            The `call_kernel` function prepares to execute the kernel\
+  \ by calculating the total number of elements (`n_elements`) and creates an output tensor. \n      \
+  \      It defines a grid configuration function using lambda to handle thread block calculations based\
+  \ on `BLOCK_SIZE`, ensuring the entire input is processed. \n            The kernel is then launched\
+  \ with the grid configuration, input, output, and element count.\n\nRequirements (SparkDistill / TritonBench\
+  \ harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor\
+  \ over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include\
+  \ @triton.autotune with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid\
+  \ and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short\
+  \ note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags: []
+source:
+  channel: G
+  file: sin_kernel.py
+  repo: pytorch/pytorch
+  difficulty: '1'
+  star: 84636
+  simp_instru_len: 63
+  comp_instru_len: 255
+  output_triton_len: 330
+gold_kernel: data/TritonBench_G_v1/sin_kernel.py

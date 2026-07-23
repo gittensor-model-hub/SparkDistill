@@ -1,0 +1,116 @@
+id: fused_masked_select_add_gelu
+level: 4
+category: kernel_translation
+title: Fused Masked Select Add Gelu
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `fused_masked_select_add_gelu`.
+
+
+  Operator description:
+
+  This function performs a fused operation combining masked selection, addition, and GELU activation.
+  It first selects elements from the input tensor based on a boolean mask, then adds a scalar or tensor
+  (scaled by alpha) to the selected values, and finally applies the GELU (Gaussian Error Linear Unit)
+  activation function element-wise to the result.
+
+
+  Target Python signature / call pattern:
+
+  fused_masked_select_add_gelu(input, mask, other, *, alpha=1, approximate=''none'', out=None) -> Tensor
+
+
+  Mathematical definition:
+
+  Z = masked_select(X, M)
+
+  S = Z + alpha * O
+
+  Y = GELU(S)
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  Z = torch.masked_select(input, mask)
+
+  S = torch.add(Z, other, alpha=alpha)
+
+  Y = torch.nn.functional.gelu(S, approximate=approximate)
+
+  ```
+
+
+  Example / usage notes:
+
+  import torch
+
+  import torch.nn.functional as F
+
+
+  input = torch.randn(3, 4)
+
+  print(''Input tensor:'')
+
+  print(input)
+
+
+  mask = input.ge(0)
+
+  print(''\nMask tensor:'')
+
+  print(mask)
+
+
+  other = torch.tensor(1.0)
+
+  output = fused_masked_select_add_gelu(input, mask, other)
+
+  print(''\nOutput tensor after fused operation:'')
+
+  print(output)
+
+
+  Additional constraints:
+
+  The function is differentiable and supports autograd. The mask and other tensor must be broadcastable
+  to the shape of the selected elements. The ''approximate'' parameter can be set to ''tanh'' for a faster,
+  approximate GELU computation.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 6
+  torch_cnt: 3
+  func_inputs: fused_masked_select_add_gelu(input, mask, other, *, alpha=1, approximate='none', out=None)
+    -> Tensor
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- mask
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- fused
+source:
+  channel: T
+  file: fused_masked_select_add_gelu.py
+  name: fused_masked_select_add_gelu
+  difficulty: '3'
+  params_cnt: 6
+  torch_cnt: 3
+gold_kernel: data/TritonBench_T_v1/fused_masked_select_add_gelu.py

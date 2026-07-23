@@ -1,0 +1,50 @@
+id: batched_vecmat_mult
+level: 3
+category: kernel_generation
+title: Batched Vecmat Mult
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `batched_vecmat_mult.py` (repo: triton-lang/triton).\n\nTask description:\nThe code implements\
+  \ a batched vector-matrix multiplication using Triton. The primary kernel function is `batched_vecmat_kernel`,\
+  \ which performs the core operations. This kernel function is designed to handle inputs `A` (shape [dim_m,\
+  \ dim_k]) and `B` (shape [dim_m, dim_n, dim_k]), where the goal is to compute the vector-matrix product\
+  \ for each vector-matrix pair defined by corresponding slices in A and B. The kernel operates in blocks,\
+  \ defined by `block_m`, `block_n`, and `block_k`, which partition the matrices for parallel processing.\n\
+  \n    Inside the kernel, `m_index` and `n_index` are the block indices for the current program instance,\
+  \ determined by Triton's grid structure. `output_tile` computes the output matrix indices that this\
+  \ block will modify. The `vecmat` variable accumulates the results for the block. The loop iterates\
+  \ over `k_blocks`, partitioning the K dimension, loading slices of `A` and `B`, broadcasting `a` to\
+  \ match `b`'s shape, and computing the dot product for the block using `tl.sum`. The result for each\
+  \ block is stored using `tl.store`.\n\n    The `batched_vecmat` function initializes tensors A, B, and\
+  \ the output on the GPU using PyTorch. It checks that the dimensions are divisible by the respective\
+  \ block sizes and computes the grid dimensions. The Triton kernel is then launched over this grid, passing\
+  \ the initialized tensors and configuration parameters, ensuring that the vector-matrix multiplication\
+  \ is performed for all specified blocks in the input dimensions, and the result is stored in `output`.\n\
+  \nRequirements (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell\
+  \ (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use\
+  \ @triton.jit kernels with correct boundary masking\n- Include @triton.autotune with at least 3 configs\
+  \ when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose correctness test\n\
+  - Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally skip autotune\
+  \ for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+source:
+  channel: G
+  file: batched_vecmat_mult.py
+  repo: triton-lang/triton
+  difficulty: '3'
+  star: 13556
+  simp_instru_len: 144
+  comp_instru_len: 374
+  output_triton_len: 863
+gold_kernel: data/TritonBench_G_v1/batched_vecmat_mult.py

@@ -1,0 +1,54 @@
+id: torch_cuda_amp_autocast
+level: 1
+category: kernel_translation
+title: Torch Cuda Amp Autocast
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.cuda.amp.autocast`.\n\
+  \nOperator description:\nThe function `torch.cuda.amp.autocast` is deprecated and replaced by `torch.amp.autocast(\"\
+  cuda\", args...)`. It allows scripts to run in mixed precision, improving performance while maintaining\
+  \ accuracy. `autocast` serves as a context manager or decorator, wrapping the forward pass(es) of a\
+  \ network and any related loss computations. Tensors can be any type when entering an autocast region,\
+  \ and it is not necessary to manually cast models or inputs to `half()` or `bfloat16()`. The function\
+  \ selects op-specific data types for operations within an autocast region. Backward operations should\
+  \ not be run under autocast, as they execute in the same data type chosen for the corresponding forward\
+  \ operations.\n\nTarget Python signature / call pattern:\nautocast(device_type, enabled=True, dtype=None,\
+  \ cache_enabled=True) -> ContextManager\n\nPyTorch reference snippet:\n```python\ntorch.autocast(device_type=\"\
+  cuda\")\n```\n\nExample / usage notes:\nCUDA Devices:\n\n# Creates model and optimizer in default precision\n\
+  model = Net().cuda()\noptimizer = optim.SGD(model.parameters(), ...)\n\nfor input, target in data:\n\
+  \    optimizer.zero_grad()\n\n    # Enables autocasting for the forward pass (model + loss)\n    with\
+  \ torch.autocast(device_type=\"cuda\"):\n        output = model(input)\n        loss = loss_fn(output,\
+  \ target)\n\n    # Exits the context manager before backward()\n    loss.backward()\n    optimizer.step()\n\
+  \nCUDA Example:\n\n# Creates some tensors in default dtype (here assumed to be float32)\na_float32 =\
+  \ torch.rand((8, 8), device=\"cuda\")\nb_float32 = torch.rand((8, 8), device=\"cuda\")\nc_float32 =\
+  \ torch.rand((8, 8), device=\"cuda\")\nd_float32 = torch.rand((8, 8), device=\"cuda\")\n\nwith torch.autocast(device_type=\"\
+  cuda\"):\n    e_float16 = torch.mm(a_float32, b_float32)\n    f_float16 = torch.mm(d_float32, e_float16)\n\
+  \ng_float32 = torch.mm(d_float32, f_float16.float())\n\nAdditional constraints:\nDeprecated in favor\
+  \ of torch.amp.autocast(\"cuda\"). Recommended to use for forward pass and loss computation only. Avoid\
+  \ using for backward passes. State is thread-local. Can be nested with `autocast(enabled=False)` to\
+  \ force a subregion to run in a specific dtype. The use of autocast in a new thread requires invoking\
+  \ the context manager or decorator in that thread.\n\nRequirements (SparkDistill / TritonBench harness):\n\
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics:\
+  \ include torch.allclose vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary\
+  \ masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n- Add @triton.autotune when there\
+  \ are meaningful tile/block choices\n- Provide a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 4
+  torch_cnt: 10
+  func_inputs: autocast(device_type, enabled=True, dtype=None, cache_enabled=True) -> ContextManager
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+source:
+  channel: T
+  file: autocast.py
+  name: torch.cuda.amp.autocast
+  difficulty: '2'
+  params_cnt: 4
+  torch_cnt: 10
+gold_kernel: data/TritonBench_T_v1/autocast.py

@@ -1,0 +1,48 @@
+id: relu_strided_buffer
+level: 2
+category: kernel_generation
+title: Relu Strided Buffer
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `relu_strided_buffer.py` (repo: FlagOpen/FlagGems).\n\nTask description:\nThe code implements\
+  \ an efficient ReLU operation using Triton, a library for writing high-performance GPU kernels. Here\
+  \ is a detailed breakdown:\n            - The `heuristics_for_tile_size` function calculates appropriate\
+  \ tile sizes to partition the computational work. It does so by considering the maximum allowed tile\
+  \ size and the dimensions of the input data.\n            - The `heuristics_for_num_warps` function\
+  \ determines the number of warps needed for efficient execution based on the calculated tile size. Smaller\
+  \ tile sizes require fewer warps, ensuring optimal resource use.\n            - The `StridedBuffer`\
+  \ class is designed to work with tensors having custom strides. This is crucial for supporting operations\
+  \ that need non-standard memory layouts, like tensors with negative strides (e.g., flipping).\n    \
+  \        - `relu_forward_wrapper_rank_1` acts as a dispatcher for the kernel execution. It calculates\
+  \ grid and block dimensions, sets up the kernel's parameters like strides, sizes, and launches the `relu_forward_kernel_rank_1`.\n\
+  \            - `relu_forward_kernel_rank_1` is the core Triton kernel that performs the ReLU computation\
+  \ on 1D tensors. It efficiently handles tasks using either a monolithic or grid-stride-loop approach,\
+  \ loading data, applying the ReLU function using `tl.where`, and storing the results back.\n       \
+  \     Each function and class are crafted to integrate with Triton's execution model, maximizing GPU\
+  \ performance for the ReLU operation.\n\nRequirements (SparkDistill / TritonBench harness):\n- Target\
+  \ Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over\
+  \ deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include @triton.autotune\
+  \ with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose\
+  \ correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally\
+  \ skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: G
+  file: relu_strided_buffer.py
+  repo: FlagOpen/FlagGems
+  difficulty: '3'
+  star: 347
+  simp_instru_len: 232
+  comp_instru_len: 329
+  output_triton_len: 2311
+gold_kernel: data/TritonBench_G_v1/relu_strided_buffer.py

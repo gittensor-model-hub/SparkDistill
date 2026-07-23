@@ -1,0 +1,137 @@
+id: least_squares_qr
+level: 3
+category: kernel_translation
+title: Least Squares Qr
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `least_squares_qr`.
+
+
+  Operator description:
+
+  Solves the least squares problem for an overdetermined system of linear equations using QR decomposition.
+  It computes the least squares solution x that minimizes the Euclidean 2-norm |Ax - b|_2, where A is
+  the coefficient matrix and b is the right-hand side vector or matrix.
+
+
+  Target Python signature / call pattern:
+
+  def least_squares_qr(A, b, *, mode=''reduced'', out=None) -> Tensor: A (Tensor): Coefficient matrix
+  of shape (*, m, n), where * is zero or more batch dimensions. b (Tensor): Right-hand side vector or
+  matrix of shape (*, m) or (*, m, k), where k is the number of right-hand sides. mode (str, optional):
+  Determines the type of QR decomposition to use. One of ''reduced'' (default) or ''complete''. See torch.linalg.qr
+  for details. out (Tensor, optional): Output tensor. Ignored if None. Default: None.
+
+
+  Mathematical definition:
+
+  The QR decomposition of A is given by A = QR, where Q is a matrix with orthonormal columns and R is
+  an upper triangular matrix. The least squares solution is x = R^{-1} Q^H b.
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  Q, R = torch.linalg.qr(A, mode=mode)
+
+  QTb = torch.matmul(Q.transpose(-2, -1).conj(), b)
+
+  x = torch.linalg.solve(R, QTb)
+
+  ```
+
+
+  Example / usage notes:
+
+  import torch
+
+
+  # Define an overdetermined system Ax = b
+
+  A = torch.tensor([[1.0, 1.0],[1.0, 2.0],[1.0, 3.0]])
+
+  b = torch.tensor([1.0, 2.0, 2.0])
+
+
+  # Solve for x using least_squares_qr
+
+  x = least_squares_qr(A, b)
+
+
+  print("Least squares solution x:")
+
+  print(x)
+
+  # Output:
+
+  # tensor([0.3333, 0.6667])
+
+
+  # Verify that the residual norm is minimized
+
+  residual = torch.norm(A @ x - b)
+
+  print("Residual norm:", residual.item())
+
+  # Output:
+
+  # Residual norm: 0.4714045524597168
+
+
+  # Compare with torch.linalg.lstsq
+
+  lstsq_solution = torch.linalg.lstsq(A, b.unsqueeze(-1)).solution
+
+  print("Solution from torch.linalg.lstsq:")
+
+  print(lstsq_solution.squeeze())
+
+  # Output:
+
+  # tensor([0.3333, 0.6667])
+
+
+  Additional constraints:
+
+  The function utilizes QR decomposition to efficiently solve overdetermined linear systems by finding
+  the least squares solution.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 4
+  torch_cnt: 3
+  func_inputs: 'def least_squares_qr(A, b, *, mode=''reduced'', out=None) -> Tensor: A (Tensor): Coefficient
+    matrix of shape (*, m, n), where * is zero or more batch dimensions. b (Tensor): Right-hand side vector
+    or matrix of shape (*, m) or (*, m, k), where k is the number of right-hand sides. mode (str, optional):
+    Determines the type of QR decomposition to use. One of ''reduced'' (default) or ''complete''. See
+    torch.linalg.qr for details. out (Tensor, optional): Output tensor. Ignored if None. Default: None.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+source:
+  channel: T
+  file: least_squares_qr.py
+  name: least_squares_qr
+  difficulty: '3'
+  params_cnt: 4
+  torch_cnt: 3
+gold_kernel: data/TritonBench_T_v1/least_squares_qr.py

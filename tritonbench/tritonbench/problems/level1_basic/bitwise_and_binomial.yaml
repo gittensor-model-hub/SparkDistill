@@ -1,0 +1,102 @@
+id: bitwise_and_binomial
+level: 1
+category: kernel_translation
+title: Bitwise And Binomial
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `bitwise_and_binomial`.
+
+
+  Operator description:
+
+  Computes the bitwise AND operation between two tensors and then applies a Binomial distribution sampling
+  based on the resulting tensor''s values. First, it computes the bitwise AND of `input` and `other`.
+  Then, the result is used as input for the Binomial distribution, with each element representing the
+  number of trials with the probability specified in `probs` or `logits`.
+
+
+  Target Python signature / call pattern:
+
+  def bitwise_and_binomial(input: torch.Tensor, other: torch.Tensor, total_count: torch.Tensor, probs:
+  torch.Tensor = None, logits: torch.Tensor = None) -> torch.Tensor: input (Tensor): The first input tensor
+  of integral or Boolean type. other (Tensor): The second input tensor of integral or Boolean type. total_count
+  (Tensor): Number of Bernoulli trials, must be broadcastable with `probs` or `logits`. probs (Tensor,
+  optional): Event probabilities. Only one of `probs` or `logits` should be provided. logits (Tensor,
+  optional): Event log-odds.
+
+
+  Mathematical definition:
+
+  \text{output} = \text{Binomial}( \text{bitwise\_and}(\text{input}, \text{other}))
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  and_result = torch.bitwise_and(input, other)
+
+  binomial_dist = torch.distributions.Binomial(total_count=total_count, probs=probs, logits=logits)
+
+  return binomial_dist.sample() * and_result/n
+
+  ```
+
+
+  Example / usage notes:
+
+  input = torch.tensor([3, 7, 15], dtype=torch.int8)
+
+  other = torch.tensor([1, 2, 8], dtype=torch.int8)
+
+  total_count = torch.tensor([10, 20, 30])
+
+  probs = torch.tensor([0.2, 0.5, 0.8])
+
+  bitwise_and_binomial(input, other, total_count, probs=probs)
+
+  tensor([2., 10., 24.])
+
+
+  Additional constraints:
+
+  The function performs a bitwise AND on the input tensors and uses the result to conduct Binomial sampling
+  with specified probabilities or logits. The `total_count` indicates the number of Bernoulli trials,
+  and either `probs` or `logits` must be provided for the Binomial distribution.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 5
+  torch_cnt: 3
+  func_inputs: 'def bitwise_and_binomial(input: torch.Tensor, other: torch.Tensor, total_count: torch.Tensor,
+    probs: torch.Tensor = None, logits: torch.Tensor = None) -> torch.Tensor: input (Tensor): The first
+    input tensor of integral or Boolean type. other (Tensor): The second input tensor of integral or Boolean
+    type. total_count (Tensor): Number of Bernoulli trials, must be broadcastable with `probs` or `logits`.
+    probs (Tensor, optional): Event probabilities. Only one of `probs` or `logits` should be provided'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+source:
+  channel: T
+  file: bitwise_and_binomial.py
+  name: bitwise_and_binomial
+  difficulty: '2'
+  params_cnt: 5
+  torch_cnt: 3
+gold_kernel: data/TritonBench_T_v1/bitwise_and_binomial.py

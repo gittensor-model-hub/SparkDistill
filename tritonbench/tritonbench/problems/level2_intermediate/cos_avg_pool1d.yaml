@@ -1,0 +1,56 @@
+id: cos_avg_pool1d
+level: 2
+category: kernel_translation
+title: Cos Avg Pool1D
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `cos_avg_pool1d`.\n\
+  \nOperator description:\nApplies the cosine function element-wise to the input tensor, followed by a\
+  \ 1D average pooling. The function first computes the cosine of each element in the input tensor, then\
+  \ applies 1D average pooling over the resulting tensor with the specified kernel size, stride, padding,\
+  \ ceil mode, and padding inclusion.\n\nTarget Python signature / call pattern:\ndef cos_avg_pool1d(input:\
+  \ torch.Tensor, kernel_size: int, stride: int = None, padding: int = 0, ceil_mode: bool = False, count_include_pad:\
+  \ bool = True) -> torch.Tensor\n    \n    input (Tensor): The input tensor of shape (minibatch, in_channels,\
+  \ iW).\n    kernel_size (int): Size of the pooling window.\n    stride (int, optional): Stride of the\
+  \ pooling window. Defaults to `kernel_size`.\n    padding (int, optional): Zero-padding added to both\
+  \ sides of the input. Default is 0.\n    ceil_mode (bool, optional): If True, uses ceil instead of floor\
+  \ to compute the output shape. Default is False.\n    count_include_pad (bool, optional): If True, includes\
+  \ the zero-padding in the averaging calculation. Default is True.\n\nMathematical definition:\n\\text{output}\
+  \ = \\text{avg\\_pool1d}(\\cos(\\text{input}))\n\nPyTorch reference snippet:\n```python\ncos_result\
+  \ = torch.cos(input)\nreturn torch.nn.functional.avg_pool1d(cos_result, kernel_size=kernel_size, stride=stride,\
+  \ padding=padding, ceil_mode=ceil_mode, count_include_pad=count_include_pad)\n```\n\nExample / usage\
+  \ notes:\n>>> input = torch.tensor([[[1.0, 2.0, 3.0, 4.0, 5.0]]])\n>>> cos_avg_pool1d(input, kernel_size=2,\
+  \ stride=1)\ntensor([[[-0.4161, -0.8135, -0.8576, -0.2751]]])\n\nAdditional constraints:\nThe function\
+  \ involves computing the cosine transformation followed by pooling, and handles parameters like stride,\
+  \ padding, and ceil mode.\n\nRequirements (SparkDistill / TritonBench harness):\n- Translate the PyTorch\
+  \ reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics: include torch.allclose\
+  \ vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor\
+  \ over tl.make_block_ptr\n- Add @triton.autotune when there are meaningful tile/block choices\n- Provide\
+  \ a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 5
+  torch_cnt: 2
+  func_inputs: "def cos_avg_pool1d(input: torch.Tensor, kernel_size: int, stride: int = None, padding:\
+    \ int = 0, ceil_mode: bool = False, count_include_pad: bool = True) -> torch.Tensor\n    \n    input\
+    \ (Tensor): The input tensor of shape (minibatch, in_channels, iW).\n    kernel_size (int): Size of\
+    \ the pooling window.\n    stride (int, optional): Stride of the pooling window. Defaults to `kernel_size`.\n\
+    \    padding (int, optional): Zero-padding added to both sides of the input. Default is 0.\n    ceil_mode\
+    \ (bool, opt"
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+- convolution
+source:
+  channel: T
+  file: cos_avg_pool1d.py
+  name: cos_avg_pool1d
+  difficulty: '3'
+  params_cnt: 5
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/cos_avg_pool1d.py

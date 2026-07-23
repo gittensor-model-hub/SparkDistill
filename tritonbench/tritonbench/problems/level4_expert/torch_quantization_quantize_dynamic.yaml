@@ -1,0 +1,52 @@
+id: torch_quantization_quantize_dynamic
+level: 4
+category: kernel_translation
+title: Torch Quantization Quantize Dynamic
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.quantization.quantize_dynamic`.\n\
+  \nOperator description:\nConverts a float model to a dynamic quantized model by replacing specified\
+  \ modules with their dynamic weight-only quantized versions. Provides simple usage with a dtype argument\
+  \ (either float16 or qint8), and fine-grained control with qconfig and mapping parameters. The process\
+  \ is performed in-place if specified, transforming the original model.\n\nTarget Python signature /\
+  \ call pattern:\nquantize_dynamic(model, qconfig_spec=None, inplace=False, mapping=None) -> Model\n\
+  Args:\n    model: input model\n    qconfig_spec: Either a dictionary mapping submodule names/types to\
+  \ quantization configurations or a set of types/names for dynamic quantization\n    inplace: carry out\
+  \ model transformations in-place, mutating the original module\n    mapping: maps submodule types to\
+  \ dynamically quantized versions\n\nPyTorch reference snippet:\n```python\ntorch.quantization.quantize_dynamic\n\
+  ```\n\nAdditional constraints:\nDynamic quantization is typically performed on layers with large weight\
+  \ sizes such as Linear and RNN variants. The qconfig_spec can be a dictionary mapping submodule types\
+  \ or names to quantization configurations, or a set specifying which submodules to apply dynamic quantization\
+  \ to. If qconfig is provided, it overrides dtype.\n\nRequirements (SparkDistill / TritonBench harness):\n\
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics:\
+  \ include torch.allclose vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary\
+  \ masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n- Add @triton.autotune when there\
+  \ are meaningful tile/block choices\n- Provide a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 4
+  torch_cnt: 1
+  func_inputs: "quantize_dynamic(model, qconfig_spec=None, inplace=False, mapping=None) -> Model\nArgs:\n\
+    \    model: input model\n    qconfig_spec: Either a dictionary mapping submodule names/types to quantization\
+    \ configurations or a set of types/names for dynamic quantization\n    inplace: carry out model transformations\
+    \ in-place, mutating the original module\n    mapping: maps submodule types to dynamically quantized\
+    \ versions"
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- quantization
+- elementwise
+- reduction
+- convolution
+source:
+  channel: T
+  file: quantize_dynamic.py
+  name: torch.quantization.quantize_dynamic
+  difficulty: '3'
+  params_cnt: 4
+  torch_cnt: 1
+gold_kernel: data/TritonBench_T_v1/quantize_dynamic.py

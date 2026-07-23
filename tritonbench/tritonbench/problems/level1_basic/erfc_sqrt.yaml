@@ -1,0 +1,78 @@
+id: erfc_sqrt
+level: 1
+category: kernel_translation
+title: Erfc Sqrt
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `erfc_sqrt`.
+
+
+  Operator description:
+
+  Computes the complementary error function (erfc) and the square root of each element in the input tensor.
+
+
+  Target Python signature / call pattern:
+
+  def erfc_sqrt(input: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]: The input tensor for which
+  the erfc and square root are computed.
+
+
+  Mathematical definition:
+
+  \text{erfc}(x) = 1 - \frac{2}{\sqrt{\pi}} \int_{0}^{x} e^{-t^2} dt \text{out}_{i} = \sqrt{\text{input}_{i}}
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  erfc_result = torch.special.erfc(input) sqrt_result = torch.sqrt(input)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> a = torch.tensor([0, -1., 10., 0.25]) >>> erfc_result, sqrt_result = erfc_sqrt(a) >>> erfc_result
+  tensor([ 1.0000,  1.8427,  0.0000,  0.5205]) >>> sqrt_result tensor([0.0000,    nan, 3.1623, 0.5000])
+
+
+  Additional constraints:
+
+  Returns a tuple containing the erfc result and the square root result for each element in the input
+  tensor.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 1
+  torch_cnt: 2
+  func_inputs: 'def erfc_sqrt(input: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]: The input tensor
+    for which the erfc and square root are computed.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+source:
+  channel: T
+  file: erfc_sqrt.py
+  name: erfc_sqrt
+  difficulty: '2'
+  params_cnt: 1
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/erfc_sqrt.py

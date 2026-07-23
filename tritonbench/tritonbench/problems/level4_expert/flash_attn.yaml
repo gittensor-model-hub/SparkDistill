@@ -1,0 +1,54 @@
+id: flash_attn
+level: 4
+category: kernel_debugging
+title: Flash Attn
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `flash_attn.py` (repo: 66RING/tiny-flash-attention).\n\nTask description:\nThe `flash_attn_triton`\
+  \ function is designed to compute the flash attention mechanism efficiently using the Triton library.\
+  \ It accepts input tensors `q`, `k`, and `v` representing the query, key, and value matrices with shape\
+  \ `[batch_size, heads, sequence_length, dimensions]`. The function handles optional causal masking and\
+  \ scales the dot products by `sm_scale`. It calculates the output using the `_fwd_kernel`, a specialized\
+  \ Triton kernel.\n\n            The Triton kernel `_fwd_kernel` performs operations in block-sized chunks\
+  \ defined by `BLOCK_M` and `BLOCK_N`, iterating over the sequence length in these fixed-size blocks.\
+  \ For each block, it loads segments of `Q`, `K`, and `V`, computes the dot products `qk`, applies softmax\
+  \ scaling with corrections for numerical stability using exp2 and logarithmic transformations. If `IS_CAUSAL`\
+  \ is enabled, it applies causal masking ensuring future information is not used.\n\n            The\
+  \ maximum values are tracked for each block to maintain precision during the softmax computation, followed\
+  \ by accumulation of scaled values into an output buffer. Once all blocks are processed, the output\
+  \ is normalized and stored in tensor `o`. The intermediate maximum and denominator values are also stored\
+  \ for each query's position.\n\n            Stride parameters for each tensor define memory layout,\
+  \ facilitating batched operations. `num_warps` controls the number of Triton warps used, determined\
+  \ based on the `Lk` dimension size. The function is specialized for `Lk` sizes of 16, 32, 64, or 128,\
+  \ ensuring optimal performance with these typical transformer sizes. Each Triton kernel launch is controlled\
+  \ by a 3D grid where dimensions correspond to blocks in the sequence length, the batch and head dimensions,\
+  \ and a single block in depth, effectively parallelizing the attention computation over the input dimensions.\n\
+  \nRequirements (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell\
+  \ (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use\
+  \ @triton.jit kernels with correct boundary masking\n- Include @triton.autotune with at least 3 configs\
+  \ when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose correctness test\n\
+  - Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally skip autotune\
+  \ for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- mask
+tags:
+- attention
+- matmul
+- softmax
+- elementwise
+- reduction
+- debug
+source:
+  channel: G
+  file: flash_attn.py
+  repo: 66RING/tiny-flash-attention
+  difficulty: '4'
+  star: 216
+  simp_instru_len: 126
+  comp_instru_len: 416
+  output_triton_len: 1737
+gold_kernel: data/TritonBench_G_v1/flash_attn.py

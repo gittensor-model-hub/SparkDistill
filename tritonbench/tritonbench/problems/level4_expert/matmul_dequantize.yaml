@@ -1,0 +1,70 @@
+id: matmul_dequantize
+level: 4
+category: kernel_generation
+title: Matmul Dequantize
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `matmul_dequantize.py` (repo: S-LoRA/S-LoRA).\n\nTask description:\nThe provided Triton code\
+  \ includes multiple kernels and wrapper functions for handling 4-bit quantized matrix multiplications\
+  \ and their dequantization. The code is structured as follows:\n\n            1. **matmul4_kernel**:\
+  \ This Triton kernel handles the matrix multiplication `C = A x B` where `A` is a float16 matrix and\
+  \ `B` is a 4-bit quantized matrix stored in int32 format. The kernel dequantizes `B` using provided\
+  \ `scales` and `zeros`. The dequantization logic involves shifting and masking bitwise operations to\
+  \ extract the 4-bit values from `B`, applying scales, and subtracting zeros. The computations are done\
+  \ in blocks determined by `BLOCK_SIZE_M`, `BLOCK_SIZE_N`, and `BLOCK_SIZE_K`. The result is accumulated\
+  \ in float32 precision and then stored in float16 format.\n\n            2. **matmul_dequantize_int4_gptq**:\
+  \ This function serves as a wrapper for `matmul4_kernel`. It prepares the inputs and sets up the Triton\
+  \ grid based on the dimensions of matrices `x`, `qweight`, `scales`, and `qzeros`. The grid size is\
+  \ determined by dividing `M` and `N` by the corresponding block sizes. If no output tensor is provided,\
+  \ it initializes a new tensor for the result. The kernel is invoked with all necessary parameters, including\
+  \ strides for addressing the elements of input matrices.\n\n            3. **matmul_kernel**: This Triton\
+  \ kernel performs a similar operation as `matmul4_kernel` but with an added `SPLIT_K` parameter. This\
+  \ allows splitting the `K` dimension into multiple parts, which can be processed separately, making\
+  \ it suitable for handling larger matrices. The kernel ensures that the result is accumulated correctly\
+  \ even when `SPLIT_K` is greater than 1 using atomic addition operations.\n\n            4. **matmul_dequantize_int4_s2**:\
+  \ This function wraps around `matmul_kernel`, organizing the execution of matrix multiplication with\
+  \ dequantization. The grid configuration takes into account both the `M` and `N` dimensions and the\
+  \ `SPLIT_K` factor. The function initializes the output matrix and calls the kernel with parameters\
+  \ set up for efficient parallel computation.\n\n            5. **dequantize_kernel**: This kernel is\
+  \ focused on converting a 4-bit quantized matrix `b` into a full precision float16 matrix. It uses block\
+  \ sizes `BLOCK_SIZE_K` and `BLOCK_SIZE_N` to manage parallel processing. Dequantization is achieved\
+  \ by extracting 4-bit values, adjusting for scales, and zero points. The kernel writes the dequantized\
+  \ values to the output matrix.\n\n            6. **dequantize_int4**: This function uses `dequantize_kernel`\
+  \ to convert quantized matrices into full precision. It sets up the necessary grid parameters and computes\
+  \ the dequantized matrix by invoking the kernel with appropriate memory strides and dimensions.\n\n\
+  \            7. **matmul_dequantize_int4_s1**: This function dequantizes the weight matrix first and\
+  \ then performs a matrix multiplication using PyTorch's `torch.mm`. This approach is beneficial in scenarios\
+  \ where the dequantization overhead is compensated by the reuse of the dequantized weights over multiple\
+  \ computations.\n\n            Overall, the code is designed to efficiently handle matrix operations\
+  \ on quantized data with Triton's parallel computation capabilities, providing both flexibility and\
+  \ performance.\n\nRequirements (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1 on workstation\
+  \ Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n\
+  - Use @triton.jit kernels with correct boundary masking\n- Include @triton.autotune with at least 3\
+  \ configs when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose correctness\
+  \ test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally skip\
+  \ autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- matmul
+- quantization
+- elementwise
+- reduction
+- convolution
+source:
+  channel: G
+  file: matmul_dequantize.py
+  repo: S-LoRA/S-LoRA
+  difficulty: '4'
+  star: 1760
+  simp_instru_len: 572
+  comp_instru_len: 774
+  output_triton_len: 5550
+gold_kernel: data/TritonBench_G_v1/matmul_dequantize.py

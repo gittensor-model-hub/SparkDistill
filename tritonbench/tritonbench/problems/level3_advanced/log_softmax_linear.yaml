@@ -1,0 +1,109 @@
+id: log_softmax_linear
+level: 3
+category: kernel_translation
+title: Log Softmax Linear
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `log_softmax_linear`.
+
+
+  Operator description:
+
+  Applies a linear transformation to the input tensor followed by the log_softmax activation function.
+  This combined operation is optimized to be numerically stable and efficient, applying both a linear
+  transformation and log-softmax in one step.
+
+
+  Target Python signature / call pattern:
+
+  log_softmax_linear(input, weight, bias=None, dim=-1, dtype=None) -> Tensor: input (Tensor): The input
+  tensor of shape `(*, in_features)`, where `*` represents any number of additional dimensions. weight
+  (Tensor): The weight matrix of shape `(out_features, in_features)`. bias (Tensor, optional): The optional
+  bias tensor of shape `(out_features)`. Default: None. dim (int): The dimension along which log_softmax
+  will be computed. Default: -1. dtype (:class:`torch.dtype`, optional): The desired data type of the
+  returned tensor. If specified, the input tensor is cast to :attr:`dtype` before the operation. Default:
+  None.
+
+
+  Mathematical definition:
+
+  \text{out} = \log\left(\frac{\exp(\text{linear}(\text{input}))}{\sum_j \exp(\text{linear}(\text{input})_j)}\right)
+  y = xA^T + b
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  torch.nn.functional.linear(input, weight, bias)
+
+  torch.nn.functional.log_softmax(linear_result, dim=dim, dtype=dtype)
+
+  ```
+
+
+  Example / usage notes:
+
+  import torch
+
+  import torch.nn.functional as F
+
+  input = torch.randn(5, 10)
+
+  weight = torch.randn(6, 10)
+
+  bias = torch.randn(6)
+
+  result = log_softmax_linear(input, weight, bias, dim=-1)
+
+  result
+
+  result = log_softmax_linear(input, weight, dim=1)
+
+  result.shape
+
+
+  Additional constraints:
+
+  The values along the specified dimension represent log probabilities and sum to 1.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 5
+  torch_cnt: 2
+  func_inputs: 'log_softmax_linear(input, weight, bias=None, dim=-1, dtype=None) -> Tensor: input (Tensor):
+    The input tensor of shape `(*, in_features)`, where `*` represents any number of additional dimensions.
+    weight (Tensor): The weight matrix of shape `(out_features, in_features)`. bias (Tensor, optional):
+    The optional bias tensor of shape `(out_features)`. Default: None. dim (int): The dimension along
+    which log_softmax will be computed. Default: -1. dtype (:class:`torch.dtype`, optional): The desired
+    data '
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- softmax
+- elementwise
+- reduction
+source:
+  channel: T
+  file: log_softmax_linear.py
+  name: log_softmax_linear
+  difficulty: '3'
+  params_cnt: 5
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/log_softmax_linear.py

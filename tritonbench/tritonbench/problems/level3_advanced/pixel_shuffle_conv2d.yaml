@@ -1,0 +1,93 @@
+id: pixel_shuffle_conv2d
+level: 3
+category: kernel_translation
+title: Pixel Shuffle Conv2D
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `pixel_shuffle_conv2d`.
+
+
+  Operator description:
+
+  Applies a 2D convolution followed by pixel shuffle upscaling to rearrange the spatial dimensions. This
+  function sequentially applies a 2D convolution operation and then rearranges the elements of the convolution
+  output to increase the spatial resolution by the upscale_factor.
+
+
+  Target Python signature / call pattern:
+
+  def pixel_shuffle_conv2d(input: torch.Tensor, weight: torch.Tensor, bias=None, stride=1, padding=0,
+  dilation=1, groups=1, upscale_factor=2) -> torch.Tensor: Input tensor of shape (minibatch, in_channels,
+  iH, iW). Convolution filter tensor of shape (out_channels, in_channels/groups, kH, kW). Optional bias
+  tensor of shape (out_channels). Stride of the convolving kernel. Padding added to all four sides of
+  the input. Spacing between kernel elements. Number of blocked connections from input channels to output
+  channels. Factor by which to increase spatial resolution.
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  torch.nn.functional.conv2d(input, weight, bias=bias, stride=stride, padding=padding, dilation=dilation,
+  groups=groups); torch.nn.functional.pixel_shuffle(x, upscale_factor)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> input = torch.randn(1, 8, 16, 16)
+
+  >>> weight = torch.randn(16, 8, 3, 3)
+
+  >>> output = pixel_shuffle_conv2d(input, weight, stride=1, padding=1, upscale_factor=2)
+
+  >>> output.shape
+
+  torch.Size([1, 4, 32, 32])
+
+
+  Additional constraints:
+
+  The function first applies a 2D convolution and then uses pixel shuffle to upscale the spatial dimensions
+  by the given upscale_factor.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 8
+  torch_cnt: 2
+  func_inputs: 'def pixel_shuffle_conv2d(input: torch.Tensor, weight: torch.Tensor, bias=None, stride=1,
+    padding=0, dilation=1, groups=1, upscale_factor=2) -> torch.Tensor: Input tensor of shape (minibatch,
+    in_channels, iH, iW). Convolution filter tensor of shape (out_channels, in_channels/groups, kH, kW).
+    Optional bias tensor of shape (out_channels). Stride of the convolving kernel. Padding added to all
+    four sides of the input. Spacing between kernel elements. Number of blocked connections from input
+    channels '
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+- convolution
+source:
+  channel: T
+  file: pixel_shuffle_conv2d.py
+  name: pixel_shuffle_conv2d
+  difficulty: '4'
+  params_cnt: 8
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/pixel_shuffle_conv2d.py

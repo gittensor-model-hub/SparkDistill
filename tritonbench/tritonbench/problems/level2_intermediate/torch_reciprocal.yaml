@@ -1,0 +1,84 @@
+id: torch_reciprocal
+level: 2
+category: kernel_translation
+title: Torch Reciprocal
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.reciprocal`.
+
+
+  Operator description:
+
+  Returns a new tensor with the reciprocal of the elements of the input. Unlike NumPy''s reciprocal, this
+  function supports integral inputs by promoting them to the default scalar type.
+
+
+  Target Python signature / call pattern:
+
+  reciprocal(input, *, out=None) -> Tensor; input (Tensor): the input tensor.; out (Tensor, optional):
+  the output tensor.
+
+
+  Mathematical definition:
+
+  \text{out}_{i} = \frac{1}{\text{input}_{i}}
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  torch.reciprocal(a)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> a = torch.randn(4)
+
+  >>> a
+
+  tensor([-0.4595, -2.1219, -1.4314,  0.7298])
+
+  >>> torch.reciprocal(a)
+
+  tensor([-2.1763, -0.4713, -0.6986,  1.3702])
+
+
+  Additional constraints:
+
+  Integral inputs to reciprocal are automatically promoted to the default scalar type.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 2
+  torch_cnt: 1
+  func_inputs: 'reciprocal(input, *, out=None) -> Tensor; input (Tensor): the input tensor.; out (Tensor,
+    optional): the output tensor.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags: []
+source:
+  channel: T
+  file: reciprocal.py
+  name: torch.reciprocal
+  difficulty: '2'
+  params_cnt: 2
+  torch_cnt: 1
+gold_kernel: data/TritonBench_T_v1/reciprocal.py

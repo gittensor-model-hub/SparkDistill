@@ -1,0 +1,62 @@
+id: fused_mv_logsoftmax_dropout
+level: 1
+category: kernel_translation
+title: Fused Mv Logsoftmax Dropout
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `fused_mv_logsoftmax_dropout`.\n\
+  \nOperator description:\nPerforms a fused operation combining matrix-vector multiplication, log-softmax\
+  \ activation, and dropout. The function first performs matrix-vector multiplication on the input matrix\
+  \ and vector. The result is then passed through a log-softmax activation function along the specified\
+  \ dimension. Finally, dropout is applied to the output of the log-softmax operation.\n\nTarget Python\
+  \ signature / call pattern:\nfused_mv_logsoftmax_dropout(input, vec, p=0.5, training=True, inplace=False,\
+  \ dim=0, *, out=None) -> Tensor\n\nMathematical definition:\nGiven an input matrix A ∈ ℝ^(n × m) and\
+  \ a vector v ∈ ℝ^m, the function computes:\n\nz = A * v\ns = log(exp(z) / ∑_j exp(z_j))\ny = Dropout(s,\
+  \ p)\n\nwhere log(exp(z) / ∑_j exp(z_j)) is the log-softmax function applied along dimension `dim`,\
+  \ and Dropout(s, p) randomly zeroes elements of s with probability p.\n\nPyTorch reference snippet:\n\
+  ```python\nz = torch.mv(input, vec)\ns = torch.nn.functional.log_softmax(z, dim=dim)\ny = torch.nn.functional.dropout(s,\
+  \ p=p, training=training, inplace=inplace)\nif out is not None:\n    out.copy_(y)\n    return out\n\
+  return y\n```\n\nExample / usage notes:\n```python\nimport torch\nimport torch.nn.functional as F\n\n\
+  def fused_mv_logsoftmax_dropout(input, vec, p=0.5, training=True, inplace=False, dim=0, *, out=None):\n\
+  \    z = torch.mv(input, vec)\n    s = torch.nn.functional.log_softmax(z, dim=dim)\n    y = torch.nn.functional.dropout(s,\
+  \ p=p, training=training, inplace=inplace)\n    if out is not None:\n        out.copy_(y)\n        return\
+  \ out\n    return y\n\n# Example usage\ninput = torch.tensor([[1.0, 2.0, 3.0],\n                   \
+  \   [4.0, 5.0, 6.0],\n                      [7.0, 8.0, 9.0],\n                      [10.0, 11.0, 12.0],\n\
+  \                      [13.0, 14.0, 15.0]])\nvec = torch.tensor([0.1, 0.2, 0.3])\noutput = fused_mv_logsoftmax_dropout(input,\
+  \ vec, p=0.2, training=True, dim=0)\nprint(\"Output:\", output)\n# Output: tensor([-1.4076, -1.3030,\
+  \ -1.1985, -1.0939, -0.9893])\n```\n\nAdditional constraints:\n- The shapes of `input` and `vec` must\
+  \ be compatible for matrix-vector multiplication: the number of columns in `input` must match the size\
+  \ of `vec`.\n- The `dim` argument in `log_softmax` specifies the dimension along which the log-softmax\
+  \ is computed. Since `z` is a 1-D tensor of shape `(n,)`, `dim` should be `0` or `-1`.\n- The `dropout`\
+  \ is applied during training when `training=True`. Set `training=False` to disable dropout during evaluation.\n\
+  - This function supports autograd for gradient computation.\n- All operations are differentiable and\
+  \ support backpropagation.\n\nRequirements (SparkDistill / TritonBench harness):\n- Translate the PyTorch\
+  \ reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics: include torch.allclose\
+  \ vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor\
+  \ over tl.make_block_ptr\n- Add @triton.autotune when there are meaningful tile/block choices\n- Provide\
+  \ a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 7
+  torch_cnt: 3
+  func_inputs: fused_mv_logsoftmax_dropout(input, vec, p=0.5, training=True, inplace=False, dim=0, *,
+    out=None) -> Tensor
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- softmax
+- elementwise
+- reduction
+- dropout
+- fused
+source:
+  channel: T
+  file: fused_mv_logsoftmax_dropout.py
+  name: fused_mv_logsoftmax_dropout
+  difficulty: '2'
+  params_cnt: 7
+  torch_cnt: 3
+gold_kernel: data/TritonBench_T_v1/fused_mv_logsoftmax_dropout.py

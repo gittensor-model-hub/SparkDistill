@@ -1,0 +1,24 @@
+id: dropout_mask_reuse
+level: bugfix
+category: kernel_debugging
+title: Dropout Mask Not Regenerated Per Row
+prompt: Dropout applies the same mask to every row. Fix RNG offsets.
+input_code: "@triton.jit\ndef dropout_kernel(x_ptr, out_ptr, n_rows, n_cols, p, seed, BLOCK: tl.constexpr):\n\
+  \    row = tl.program_id(0)\n    cols = tl.arange(0, BLOCK)\n    mask = cols < n_cols\n    x = tl.load(x_ptr\
+  \ + row * n_cols + cols, mask=mask, other=0.0)\n    # BUG: seed ignores row, so every row shares the\
+  \ mask\n    random = tl.rand(seed, cols)\n    keep = random > p\n    tl.store(out_ptr + row * n_cols\
+  \ + cols, tl.where(keep, x / (1 - p), 0.0), mask=mask)\n"
+expected_fix: Seed / offset Philox per row (or per element) instead of broadcasting one mask
+required_patterns:
+- '@triton.jit'
+- mask
+tags:
+- debugging
+- dropout
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+source:
+  channel: synthetic
+  file: dropout_mask_reuse.py
+  difficulty: bugfix

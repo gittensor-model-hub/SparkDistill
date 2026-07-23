@@ -1,0 +1,55 @@
+id: sum_std
+level: 3
+category: kernel_translation
+title: Sum Std
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `sum_std`.\n\n\
+  Operator description:\nComputes the sum of elements in the input tensor along the specified dimension(s),\
+  \ followed by calculating the standard deviation of the summed values.\n\nTarget Python signature /\
+  \ call pattern:\ndef sum_std(input, dim=None, keepdim=False, dtype=None, correction=1, out=None) ->\
+  \ Tensor: input (Tensor): The input tensor. dim (int or tuple of ints, optional): The dimension(s) to\
+  \ reduce. If None, all dimensions are reduced. keepdim (bool, optional): Whether the output tensor has\
+  \ dim retained or not. Default is False. dtype (torch.dtype, optional): The desired data type of the\
+  \ returned tensor. If specified, the input tensor is cast to dtype before the operation. Default: None.\
+  \ correction (int, optional): Difference between the sample size and sample degrees of freedom. Default\
+  \ is 1 (Bessel's correction). out (Tensor, optional): The output tensor.\n\nMathematical definition:\n\
+  \\text{sum} = \\sum_{i=0}^{N-1} x_i\n\n\\sigma = \\sqrt{\\frac{1}{\\max(0,~N - \\delta N)}\\sum_{i=0}^{N-1}(x_i-\\\
+  bar{x})^2}\n\nPyTorch reference snippet:\n```python\nsum_result = torch.sum(input, dim=dim, keepdim=keepdim,\
+  \ dtype=dtype)\nreturn torch.std(sum_result, correction=correction, keepdim=keepdim, out=out)\n```\n\
+  \nExample / usage notes:\n>>> import torch\n>>> a = torch.tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])\n\
+  >>> # Compute the sum of all elements, then compute the std of this sum\n>>> result = sum_std(a)\n>>>\
+  \ result\ntensor(0.)\n\n>>> # Compute the sum along dimension 1, then compute the std of each row's\
+  \ sum\n>>> result = sum_std(a, dim=1)\n>>> result\ntensor(1.5000)\n\n>>> # Compute the sum along dimension\
+  \ 1 with keepdim=True, then compute std\n>>> result = sum_std(a, dim=1, keepdim=True)\n>>> result\n\
+  tensor([[1.5000],\n        [1.5000]])\n\nAdditional constraints:\nThe function uses Bessel's correction\
+  \ by default with a correction value of 1.\n\nRequirements (SparkDistill / TritonBench harness):\n-\
+  \ Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics:\
+  \ include torch.allclose vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary\
+  \ masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n- Add @triton.autotune when there\
+  \ are meaningful tile/block choices\n- Provide a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 6
+  torch_cnt: 2
+  func_inputs: 'def sum_std(input, dim=None, keepdim=False, dtype=None, correction=1, out=None) -> Tensor:
+    input (Tensor): The input tensor. dim (int or tuple of ints, optional): The dimension(s) to reduce.
+    If None, all dimensions are reduced. keepdim (bool, optional): Whether the output tensor has dim retained
+    or not. Default is False. dtype (torch.dtype, optional): The desired data type of the returned tensor.
+    If specified, the input tensor is cast to dtype before the operation. Default: None. correction (int'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: T
+  file: sum_std.py
+  name: sum_std
+  difficulty: '4'
+  params_cnt: 6
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/sum_std.py

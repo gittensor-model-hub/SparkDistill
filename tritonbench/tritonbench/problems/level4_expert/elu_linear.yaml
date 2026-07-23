@@ -1,0 +1,56 @@
+id: elu_linear
+level: 4
+category: kernel_translation
+title: Elu Linear
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `elu_linear`.\n\
+  \nOperator description:\nApplies a linear transformation to the input tensor, followed by the Exponential\
+  \ Linear Unit (ELU) activation function applied element-wise. This combined operation first performs\
+  \ a linear transformation and then introduces non-linearity with ELU.\n\nTarget Python signature / call\
+  \ pattern:\ndef elu_linear(input, weight, bias=None, alpha=1.0, inplace=False) -> Tensor: input (Tensor):\
+  \ The input tensor for the linear layer. weight (Tensor): The weight tensor for the linear transformation.\
+  \ bias (Tensor, optional): The bias tensor for the linear transformation. Default: None. alpha (float,\
+  \ optional): The \\(\\alpha\\) parameter for the ELU function. Default: 1.0. inplace (bool, optional):\
+  \ Whether to apply ELU in-place. Default: False.\n\nMathematical definition:\n\\text{out} = \\text{ELU}(\\\
+  text{Linear}(x))\n\n\\text{ELU}(x) = \\begin{cases}\n    x, & \\text{ if } x > 0\\\\\n    \\alpha *\
+  \ (\\exp(x) - 1), & \\text{ if } x \\leq 0\n\\end{cases}\n\nPyTorch reference snippet:\n```python\n\
+  linear_result = torch.nn.functional.linear(input, weight, bias)\nreturn torch.nn.functional.elu(linear_result,\
+  \ alpha=alpha, inplace=inplace)\n```\n\nExample / usage notes:\n>>> import torch\n>>> import torch.nn.functional\
+  \ as F\n>>> # Define input tensor, weights, and bias\n>>> input = torch.randn(2, 3)   # (batch_size,\
+  \ in_features)\n>>> weight = torch.randn(4, 3)  # (out_features, in_features)\n>>> bias = torch.randn(4)\
+  \       # (out_features)\n>>> # Apply elu_linear\n>>> result = elu_linear(input, weight, bias)\n>>>\
+  \ result.shape\ntorch.Size([2, 4])\n\n>>> # Apply elu_linear with custom alpha and inplace=True\n>>>\
+  \ result = elu_linear(input, weight, bias, alpha=2.0, inplace=True)\n>>> result.shape\ntorch.Size([2,\
+  \ 4])\n\nAdditional constraints:\nThe function integrates linear transformation and ELU activation.\
+  \ The ELU activation applies element-wise to incorporate non-linearity after linear mapping.\n\nRequirements\
+  \ (SparkDistill / TritonBench harness):\n- Translate the PyTorch reference into Triton 3.7.1 kernels\
+  \ for Blackwell SM120\n- Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate\
+  \ for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n\
+  - Add @triton.autotune when there are meaningful tile/block choices\n- Provide a launcher and a small\
+  \ self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 5
+  torch_cnt: 2
+  func_inputs: 'def elu_linear(input, weight, bias=None, alpha=1.0, inplace=False) -> Tensor: input (Tensor):
+    The input tensor for the linear layer. weight (Tensor): The weight tensor for the linear transformation.
+    bias (Tensor, optional): The bias tensor for the linear transformation. Default: None. alpha (float,
+    optional): The \(\alpha\) parameter for the ELU function. Default: 1.0. inplace (bool, optional):
+    Whether to apply ELU in-place. Default: False.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+source:
+  channel: T
+  file: elu_linear.py
+  name: elu_linear
+  difficulty: '4'
+  params_cnt: 5
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/elu_linear.py

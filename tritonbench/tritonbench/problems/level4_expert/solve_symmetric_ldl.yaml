@@ -1,0 +1,87 @@
+id: solve_symmetric_ldl
+level: 4
+category: kernel_translation
+title: Solve Symmetric Ldl
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `solve_symmetric_ldl`.
+
+
+  Operator description:
+
+  Solves a symmetric (or Hermitian) linear system A x = b using LDL decomposition. The function first
+  decomposes A into L and D through LDL decomposition, reconstructs matrix A, and then uses `torch.linalg.solve`
+  to solve the linear system.
+
+
+  Target Python signature / call pattern:
+
+  solve_symmetric_ldl(A, b, *, hermitian=False, out=None) -> Tensor A (Tensor): 形状为 (*, n, n) 的对称（或 Hermitian）矩阵，其中
+  * 是零个或多个批次维度。 b (Tensor): 形状为 (*, n) 或 (*, n, k) 的右端项张量。 hermitian (bool, 可选): 是否将 A 视为 Hermitian 矩阵。默认值：False。
+  out (Tensor, 可选): 输出张量。如果为 None，则忽略。默认值：None。
+
+
+  Mathematical definition:
+
+  Given a symmetric (or Hermitian) matrix A in \mathbb{K}^{n \times n} (where \mathbb{K} is the real field
+  \mathbb{R} or complex field \mathbb{C}), the LDL decomposition of A is represented as: A = L D L^{\mathrm{T}}
+  or A = L D L^{\mathrm{H}}.
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  L, D, _ = torch.linalg.ldl_factor(A, hermitian=hermitian); D_mat = torch.diag_embed(D); if hermitian:
+  A_reconstructed = L @ D_mat @ L.conj().transpose(-2, -1); else: A_reconstructed = L @ D_mat @ L.transpose(-2,
+  -1); x = torch.linalg.solve(A_reconstructed, b); if out is not None: out.copy_(x); return out; return
+  x
+
+  ```
+
+
+  Example / usage notes:
+
+  A = torch.tensor([[4., 1., 1.], [1., 3., 0.], [1., 0., 2.]]); b = torch.tensor([1., 2., 3.]); x = solve_symmetric_ldl(A,
+  b); print("Solution x:", x); residual = A @ x - b; print("Residual:", residual)
+
+
+  Additional constraints:
+
+  This function supports batch processing; all computations are performed across batch dimensions.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 4
+  torch_cnt: 4
+  func_inputs: 'solve_symmetric_ldl(A, b, *, hermitian=False, out=None) -> Tensor A (Tensor): 形状为 (*,
+    n, n) 的对称（或 Hermitian）矩阵，其中 * 是零个或多个批次维度。 b (Tensor): 形状为 (*, n) 或 (*, n, k) 的右端项张量。 hermitian (bool,
+    可选): 是否将 A 视为 Hermitian 矩阵。默认值：False。 out (Tensor, 可选): 输出张量。如果为 None，则忽略。默认值：None。'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- embedding
+source:
+  channel: T
+  file: solve_symmetric_ldl.py
+  name: solve_symmetric_ldl
+  difficulty: '4'
+  params_cnt: 4
+  torch_cnt: 4
+gold_kernel: data/TritonBench_T_v1/solve_symmetric_ldl.py

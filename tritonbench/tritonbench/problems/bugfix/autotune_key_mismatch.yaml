@@ -1,0 +1,23 @@
+id: autotune_key_mismatch
+level: bugfix
+category: kernel_debugging
+title: Autotune Key Not Matching Runtime Shape
+prompt: Autotune configs never match the runtime N used for masking. Fix the key list.
+input_code: "@triton.autotune(\n    configs=[triton.Config({\"BLOCK_SIZE\": 128}, num_warps=4),\n    \
+  \         triton.Config({\"BLOCK_SIZE\": 256}, num_warps=8)],\n    key=[\"M\"],  # BUG: kernel masks\
+  \ with N\n)\n@triton.jit\ndef row_kernel(x_ptr, out_ptr, M, N, BLOCK_SIZE: tl.constexpr):\n    row =\
+  \ tl.program_id(0)\n    cols = tl.arange(0, BLOCK_SIZE)\n    mask = cols < N\n    x = tl.load(x_ptr\
+  \ + row * N + cols, mask=mask, other=0.0)\n    tl.store(out_ptr + row * N + cols, x * 2, mask=mask)\n"
+expected_fix: Put the dynamic size used in masking into autotune key
+required_patterns:
+- '@triton.jit'
+tags:
+- debugging
+- autotune
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+source:
+  channel: synthetic
+  file: autotune_key_mismatch.py
+  difficulty: bugfix

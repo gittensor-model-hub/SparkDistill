@@ -1,0 +1,89 @@
+id: fused_avg_pool2d_cosine_similarity
+level: 3
+category: kernel_translation
+title: Fused Avg Pool2D Cosine Similarity
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `fused_avg_pool2d_cosine_similarity`.
+
+
+  Operator description:
+
+  Computes the cosine similarity between `x1` and `x2` along a specified dimension, adds a singleton dimension,
+  and applies 2D average pooling. It first computes cosine similarity along dim=1 using `cosine_similarity`,
+  then adds a singleton dimension using `unsqueeze`, and finally applies 2D average pooling using `avg_pool2d`.
+
+
+  Target Python signature / call pattern:
+
+  fused_avg_pool2d_cosine_similarity(x1: torch.Tensor, x2: torch.Tensor, kernel_size: int, stride: int
+  = None, padding: int = 0, eps: float = 1e-8) -> torch.Tensor
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  cosine_sim = torch.nn.functional.cosine_similarity(x1, x2, dim=1, eps=eps)
+
+  cosine_sim_expanded = cosine_sim.unsqueeze(1)
+
+  output = torch.nn.functional.avg_pool2d(cosine_sim_expanded, kernel_size=kernel_size, stride=stride,
+  padding=padding)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> x1 = torch.randn(10, 5, 32, 32)
+
+  >>> x2 = torch.randn(10, 5, 32, 32)
+
+  >>> output = fused_avg_pool2d_cosine_similarity(x1, x2, kernel_size=3, stride=2)
+
+  >>> print(output.shape)
+
+  torch.Size([10, 1, 16, 16])
+
+
+  Additional constraints:
+
+  The function provides an optional `stride` parameter which defaults to the value of `kernel_size` if
+  not provided. The `eps` parameter is used to prevent division by zero in cosine similarity.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 5
+  torch_cnt: 3
+  func_inputs: 'fused_avg_pool2d_cosine_similarity(x1: torch.Tensor, x2: torch.Tensor, kernel_size: int,
+    stride: int = None, padding: int = 0, eps: float = 1e-8) -> torch.Tensor'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+- convolution
+- fused
+source:
+  channel: T
+  file: fused_avg_pool2d_cosine_similarity.py
+  name: fused_avg_pool2d_cosine_similarity
+  difficulty: '3'
+  params_cnt: 5
+  torch_cnt: 3
+gold_kernel: data/TritonBench_T_v1/fused_avg_pool2d_cosine_similarity.py

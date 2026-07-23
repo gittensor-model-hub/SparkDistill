@@ -1,0 +1,63 @@
+id: rope_backward_transform
+level: 3
+category: kernel_generation
+title: Rope Backward Transform
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `rope_backward_transform.py` (repo: turbo-llm/turbo-alignment).
+
+
+  Task description:
+
+  The `_triton_rope` kernel is a Triton-annotated function (`@triton.jit`) designed to apply rotary position
+  embeddings to query (`q_ptr`) and key (`k_ptr`) matrices by using precomputed cosine and sine arrays
+  (`cos`, `sin`). The kernel uses a unique identifier `pid` for each program instance, indexing into matrices
+  for batch processing. The embeddings split the head dimensions into two halves, applying a rotation
+  formula to each. The `cos` and `sin` arrays determine the phase shift for the embedding. Two configurations
+  are supported: forward and backward, determined by `BACKWARD_PASS`. During the forward pass, the rotation
+  uses standard trigonometric relationships, while the backward pass applies the inverse rotation. The
+  `rope_backward` function is a wrapper that ensures gradients (`dq`, `dk`) are processed correctly by
+  transposing and configuring the kernel call. Inputs are padded to power-of-two dimensions to align with
+  efficient Triton memory access patterns. This function primarily sets up the operation and handles the
+  memory alignment, then triggers the kernel for execution.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- rope
+- elementwise
+- reduction
+- embedding
+source:
+  channel: G
+  file: rope_backward_transform.py
+  repo: turbo-llm/turbo-alignment
+  difficulty: '4'
+  star: 333
+  simp_instru_len: 155
+  comp_instru_len: 261
+  output_triton_len: 1825
+gold_kernel: data/TritonBench_G_v1/rope_backward_transform.py

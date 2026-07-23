@@ -1,0 +1,52 @@
+id: adam_update_triton
+level: 3
+category: kernel_generation
+title: Adam Update Triton
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `adam_update_triton.py` (repo: lucidrains/lion-pytorch).\n\nTask description:\nThe given Triton\
+  \ kernel named `update_fn_kernel` is designed to execute a parameter update using gradient and momentum\
+  \ for optimization purposes in a GPU environment. It operates over a 1D grid where each block handles\
+  \ a set of elements defined by `BLOCK_SIZE`. The kernel begins by computing the starting offset for\
+  \ each block using the program ID `pid` and `BLOCK_SIZE`. It masks the operation to ensure that only\
+  \ valid elements (within `n_elements`) are processed.\n\n            The kernel reads values from memory\
+  \ for parameters (`p_ptr`), gradients (`grad_ptr`), and the exponential moving average of past gradients\
+  \ (`exp_avg_ptr`). For each parameter, it applies step weight decay to scale down the parameter by `(1\
+  \ - lr * wd)`. It calculates the difference between the exponential average and the current gradient,\
+  \ and uses this to update the parameter with a momentum term determined by `beta1`. A sign-based adjustment\
+  \ is applied to the parameter only if there's a change, driven by a conditional mask, emulating a `torch.sign`\
+  \ operation.\n\n            After the parameter update, the exponential moving average is decayed using\
+  \ `beta2` and the new gradient. The results for the updated parameter and exponential average are stored\
+  \ back to global memory. The wrapper function `update_fn` ensures all tensors involved are CUDA tensors\
+  \ and calculates the execution grid using the total number of elements divided by `BLOCK_SIZE`. This\
+  \ wrapper also sets up the execution environment, invoking the kernel with these tensors and the relevant\
+  \ hyperparameters like learning rate (`lr`), weight decay (`wd`), and momentum terms (`beta1`, `beta2`).\n\
+  \nRequirements (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell\
+  \ (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use\
+  \ @triton.jit kernels with correct boundary masking\n- Include @triton.autotune with at least 3 configs\
+  \ when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose correctness test\n\
+  - Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally skip autotune\
+  \ for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+- optimizer
+source:
+  channel: G
+  file: adam_update_triton.py
+  repo: lucidrains/lion-pytorch
+  difficulty: '4'
+  star: 2049
+  simp_instru_len: 138
+  comp_instru_len: 369
+  output_triton_len: 739
+gold_kernel: data/TritonBench_G_v1/adam_update_triton.py

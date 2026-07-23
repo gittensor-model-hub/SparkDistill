@@ -1,0 +1,103 @@
+id: matrix_multiply_symmetric
+level: 4
+category: kernel_translation
+title: Matrix Multiply Symmetric
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `matrix_multiply_symmetric`.
+
+
+  Operator description:
+
+  Computes two operations on matrix `C`: first, it performs the matrix-matrix product `C = alpha * torch.mm(A,
+  B) + beta * C`, then updates `C` to be `C = alpha * torch.mm(C, C.T) + beta * C`. This function effectively
+  performs two sequential matrix operations: a weighted sum of a matrix product and itself, followed by
+  a weighted product of `C` and its transpose.
+
+
+  Target Python signature / call pattern:
+
+  matrix_multiply_symmetric(A: torch.Tensor, B: torch.Tensor, C: torch.Tensor, alpha: float, beta: float)
+  -> torch.Tensor; Args: A (Tensor): The first input matrix of shape `(n, m)`. B (Tensor): The second
+  input matrix of shape `(m, p)`. C (Tensor): The target matrix for the operations, shape `(n, p)`. alpha
+  (float): Scalar multiplier for matrix products. beta (float): Scalar multiplier for adding to `C`. Example:
+  A = torch.tensor([[1.0, 2.0], [3.0, 4.0]]), B = torch.tensor([[0.5, -1.0], [1.5, 2.0]]), C = torch.tensor([[1.0,
+  0.0], [0.0, 1.0]]), alpha, beta = 2.0, 0.5, result = matrix_multiply_symmetric(A, B, C, alpha, beta)
+
+
+  Mathematical definition:
+
+  C = alpha * torch.mm(A, B) + beta * C
+
+  C = alpha * torch.mm(C, C.T) + beta * C
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  C = alpha * torch.mm(A, B) + beta * C
+
+  C = alpha * torch.mm(C, C.T) + beta * C
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> A = torch.tensor([[1.0, 2.0], [3.0, 4.0]])
+
+  >>> B = torch.tensor([[0.5, -1.0], [1.5, 2.0]])
+
+  >>> C = torch.tensor([[1.0, 0.0], [0.0, 1.0]])
+
+  >>> alpha, beta = 2.0, 0.5
+
+  >>> result = matrix_multiply_symmetric(A, B, C, alpha, beta)
+
+  >>> print(result)
+
+
+  Additional constraints:
+
+  This function performs a fused operation of matrix multiplication and symmetric update.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 5
+  torch_cnt: 2
+  func_inputs: 'matrix_multiply_symmetric(A: torch.Tensor, B: torch.Tensor, C: torch.Tensor, alpha: float,
+    beta: float) -> torch.Tensor; Args: A (Tensor): The first input matrix of shape `(n, m)`. B (Tensor):
+    The second input matrix of shape `(m, p)`. C (Tensor): The target matrix for the operations, shape
+    `(n, p)`. alpha (float): Scalar multiplier for matrix products. beta (float): Scalar multiplier for
+    adding to `C`. Example: A = torch.tensor([[1.0, 2.0], [3.0, 4.0]]), B = torch.tensor([[0.5, -1.0],
+    [1.5, 2.0'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+- fused
+source:
+  channel: T
+  file: matrix_multiply_symmetric.py
+  name: matrix_multiply_symmetric
+  difficulty: '4'
+  params_cnt: 5
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/matrix_multiply_symmetric.py

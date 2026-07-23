@@ -1,0 +1,26 @@
+id: block_ptr_deprecated
+level: bugfix
+category: kernel_debugging
+title: Deprecated make_block_ptr Usage on Triton 3.7
+prompt: This kernel uses tl.make_block_ptr / tl.advance which are deprecated in Triton 3.7.1. Rewrite
+  using tensor descriptors while preserving numerics.
+input_code: "@triton.jit\ndef copy_block_ptr_kernel(src_ptr, dst_ptr, M, N, BLOCK_M: tl.constexpr, BLOCK_N:\
+  \ tl.constexpr):\n    pid_m = tl.program_id(0)\n    pid_n = tl.program_id(1)\n    src = tl.make_block_ptr(\n\
+  \        base=src_ptr, shape=(M, N), strides=(N, 1),\n        offsets=(pid_m * BLOCK_M, pid_n * BLOCK_N),\n\
+  \        block_shape=(BLOCK_M, BLOCK_N), order=(1, 0),\n    )\n    dst = tl.make_block_ptr(\n      \
+  \  base=dst_ptr, shape=(M, N), strides=(N, 1),\n        offsets=(pid_m * BLOCK_M, pid_n * BLOCK_N),\n\
+  \        block_shape=(BLOCK_M, BLOCK_N), order=(1, 0),\n    )\n    block = tl.load(src)\n    tl.store(dst,\
+  \ block)\n"
+expected_fix: Migrate to tl.make_tensor_descriptor load/store APIs
+required_patterns:
+- '@triton.jit'
+tags:
+- debugging
+- api_modernity
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+source:
+  channel: synthetic
+  file: block_ptr_deprecated.py
+  difficulty: bugfix

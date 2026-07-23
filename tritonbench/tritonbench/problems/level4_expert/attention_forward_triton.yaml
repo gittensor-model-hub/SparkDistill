@@ -1,0 +1,62 @@
+id: attention_forward_triton
+level: 4
+category: kernel_generation
+title: Attention Forward Triton
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `attention_forward_triton.py` (repo: thu-ml/SageAttention).\n\nTask description:\nThis Triton-based\
+  \ kernel performs a forward pass of the scaled dot-product attention mechanism, implemented through\
+  \ two main functions: `_attn_fwd` and `_attn_fwd_inner`. The kernel processes query (Q), key (K), value\
+  \ (V) matrices and corresponding scaling factors to compute attention scores in the output tensor `Out`.\
+  \ This is achieved by using a block-based approach, where computations are performed on blocks of size\
+  \ `BLOCK_M` (for queries) and `BLOCK_N` (for keys and values).\n\n            The `_attn_fwd` function\
+  \ orchestrates the overall computation by initializing pointers and offsets needed for matrix access.\
+  \ It handles the iteration over context size `N_CTX` and invokes the helper function `_attn_fwd_inner`\
+  \ for each block.\n\n            The `_attn_fwd_inner` function conducts the core computation by:\n\
+  \            - Loading blocks of K and V using pointer arithmetic, controlled via `K_ptrs`, `K_scale_ptr`,\
+  \ and `V_ptrs`.\n            - Computing the scaled dot-product `qk` between a block of Q and K, using\
+  \ scaling factors `q_scale` and `k_scale`.\n            - Applying the softmax operation over `qk` to\
+  \ obtain the probability matrix `p`.\n            - Accumulating the result of `p` weighted by V into\
+  \ `acc`.\n            - Updating normalization `l_i` and maximum score `m_i` for stability and normalization\
+  \ purposes.\n\n            Function Inputs:\n            - `Q`, `K`, `V`: 3D tensors representing the\
+  \ attention mechanism components.\n            - `Q_scale`, `K_scale`: Tensors representing scale factors\
+  \ for query and key matrices.\n            - `Out`: Output tensor to store the attention results.\n\
+  \            - `stride_qz`, `stride_qh`, `stride_qm`, `stride_qk`: Strides for navigating through the\
+  \ Q tensor.\n            - `stride_kz`, `stride_kh`, `stride_kn`, `stride_kk`: Strides for navigating\
+  \ through the K tensor.\n            - `stride_vz`, `stride_vh`, `stride_vk`, `stride_vn`: Strides for\
+  \ navigating through the V tensor.\n            - `stride_oz`, `stride_oh`, `stride_om`, `stride_on`:\
+  \ Strides for navigating through the output tensor.\n\n            Outputs:\n            - `Out`: The\
+  \ result tensor holding the attention scores, normalized over the softmax.\n\n            Key logic\
+  \ considerations:\n            - Block-wise processing allows for efficient memory access and parallel\
+  \ computation.\n            - Handling of numerical stability and normalization through `l_i` and `m_i`.\n\
+  \            - Triton's just-in-time (JIT) compilation is utilized to optimize performance across GPUs.\n\
+  \nRequirements (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell\
+  \ (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use\
+  \ @triton.jit kernels with correct boundary masking\n- Include @triton.autotune with at least 3 configs\
+  \ when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose correctness test\n\
+  - Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally skip autotune\
+  \ for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- attention
+- matmul
+- softmax
+- elementwise
+- reduction
+source:
+  channel: G
+  file: attention_forward_triton.py
+  repo: thu-ml/SageAttention
+  difficulty: '4'
+  star: 600
+  simp_instru_len: 310
+  comp_instru_len: 672
+  output_triton_len: 2013
+gold_kernel: data/TritonBench_G_v1/attention_forward_triton.py

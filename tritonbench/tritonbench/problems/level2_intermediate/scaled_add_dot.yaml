@@ -1,0 +1,94 @@
+id: scaled_add_dot
+level: 2
+category: kernel_translation
+title: Scaled Add Dot
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `scaled_add_dot`.
+
+
+  Operator description:
+
+  Computes `y += alpha * x` and returns the dot product of the modified `y` with itself. This fused function
+  performs two operations: 1. Scales `x` by a factor of `alpha` and adds the result to `y`. 2. Computes
+  the dot product of the modified `y` with itself.
+
+
+  Target Python signature / call pattern:
+
+  def scaled_add_dot(y: Tensor, x: Tensor, alpha: float) -> Tensor: y (Tensor): The target tensor to be
+  modified, of shape (n,). x (Tensor): The tensor to be scaled and added to y, of shape (n,). alpha (float):
+  The scalar multiplier for x.
+
+
+  Mathematical definition:
+
+  y += alpha * x
+
+  dot_product = torch.dot(y, y)
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  y += alpha * x
+
+  dot_product = torch.dot(y, y)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> y = torch.tensor([1.0, 2.0, 3.0])
+
+  >>> x = torch.tensor([0.5, -1.0, 2.0])
+
+  >>> alpha = 2.0
+
+  >>> result = scaled_add_dot(y, x, alpha)
+
+  >>> print(result)  # Outputs the dot product of `y + alpha * x` with itself
+
+
+  Additional constraints:
+
+  The function modifies the input tensor `y` in place.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 3
+  torch_cnt: 2
+  func_inputs: 'def scaled_add_dot(y: Tensor, x: Tensor, alpha: float) -> Tensor: y (Tensor): The target
+    tensor to be modified, of shape (n,). x (Tensor): The tensor to be scaled and added to y, of shape
+    (n,). alpha (float): The scalar multiplier for x.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- fused
+source:
+  channel: T
+  file: scaled_add_dot.py
+  name: scaled_add_dot
+  difficulty: '1'
+  params_cnt: 3
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/scaled_add_dot.py

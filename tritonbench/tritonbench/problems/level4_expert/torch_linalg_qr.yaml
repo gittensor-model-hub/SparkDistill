@@ -1,0 +1,62 @@
+id: torch_linalg_qr
+level: 4
+category: kernel_translation
+title: Torch Linalg Qr
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.linalg.qr`.\n\
+  \nOperator description:\nComputes the QR decomposition of a matrix. Supports input of float, double,\
+  \ cfloat and cdouble dtypes. Also supports batches of matrices, and if A is a batch of matrices then\
+  \ the output has the same batch dimensions. The parameter mode chooses between the full and reduced\
+  \ QR decomposition. It is always differentiable for 'reduced' mode, differentiable for 'complete' mode\
+  \ when m <= n, and never differentiable for 'r' mode.\n\nTarget Python signature / call pattern:\nqr(A,\
+  \ mode='reduced', *, out=None) -> (Tensor, Tensor) A (Tensor): tensor of shape `(*, m, n)` where `*`\
+  \ is zero or more batch dimensions. mode (str, optional): one of `'reduced'`, `'complete'`, `'r'`. Controls\
+  \ the shape of the returned tensors. Default: `'reduced'`. out (tuple, optional): output tuple of two\
+  \ tensors. Ignored if `None`. Default: `None`.\n\nMathematical definition:\nA = QR where Q is orthogonal\
+  \ in the real case and unitary in the complex case, and R is upper triangular with real diagonal. For\
+  \ tall matrices (m > n), the reduced QR decomposition is A = QR with Q in K^{m x n} and R in K^{n x\
+  \ n}.\n\nPyTorch reference snippet:\n```python\ntorch.linalg.qr(A)\ntorch.linalg.qr(A, mode='r')\ntorch.linalg.qr(A,\
+  \ mode='complete')\n```\n\nExample / usage notes:\nExamples::\n\n    >>> A = torch.tensor([[12., -51,\
+  \ 4], [6, 167, -68], [-4, 24, -41]])\n    >>> Q, R = torch.linalg.qr(A)\n    >>> Q\n    tensor([[-0.8571,\
+  \  0.3943,  0.3314],\n            [-0.4286, -0.9029, -0.0343],\n            [ 0.2857, -0.1714,  0.9429]])\n\
+  \    >>> R\n    tensor([[ -14.0000,  -21.0000,   14.0000],\n            [   0.0000, -175.0000,   70.0000],\n\
+  \            [   0.0000,    0.0000,  -35.0000]])\n    >>> (Q @ R).round()\n    tensor([[  12.,  -51.,\
+  \    4.],\n            [   6.,  167.,  -68.],\n            [  -4.,   24.,  -41.]])\n    >>> (Q.T @ Q).round()\n\
+  \    tensor([[ 1.,  0.,  0.],\n            [ 0.,  1., -0.],\n            [ 0., -0.,  1.]])\n    >>>\
+  \ Q2, R2 = torch.linalg.qr(A, mode='r')\n    >>> Q2\n    tensor([])\n    >>> torch.equal(R, R2)\n  \
+  \  True\n    >>> A = torch.randn(3, 4, 5)\n    >>> Q, R = torch.linalg.qr(A, mode='complete')\n    >>>\
+  \ torch.dist(Q @ R, A)\n    tensor(1.6099e-06)\n    >>> torch.dist(Q.mT @ Q, torch.eye(4))\n    tensor(6.2158e-07)\n\
+  \nAdditional constraints:\nDifferences with numpy.linalg.qr: mode='raw' is not implemented. Unlike numpy.linalg.qr,\
+  \ this function always returns a tuple of two tensors. When mode='r', the Q tensor is an empty tensor.\
+  \ The elements in the diagonal of R are not necessarily positive, making the QR decomposition unique\
+  \ only up to the sign of the diagonal of R. The QR decomposition is only well-defined if the first k\
+  \ = min(m, n) columns of every matrix in A are linearly independent.\n\nRequirements (SparkDistill /\
+  \ TritonBench harness):\n- Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120\n\
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)\n- Use\
+  \ @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n- Add @triton.autotune\
+  \ when there are meaningful tile/block choices\n- Provide a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 3
+  torch_cnt: 3
+  func_inputs: 'qr(A, mode=''reduced'', *, out=None) -> (Tensor, Tensor) A (Tensor): tensor of shape `(*,
+    m, n)` where `*` is zero or more batch dimensions. mode (str, optional): one of `''reduced''`, `''complete''`,
+    `''r''`. Controls the shape of the returned tensors. Default: `''reduced''`. out (tuple, optional):
+    output tuple of two tensors. Ignored if `None`. Default: `None`.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- reduction
+source:
+  channel: T
+  file: qr.py
+  name: torch.linalg.qr
+  difficulty: '5'
+  params_cnt: 3
+  torch_cnt: 3
+gold_kernel: data/TritonBench_T_v1/qr.py

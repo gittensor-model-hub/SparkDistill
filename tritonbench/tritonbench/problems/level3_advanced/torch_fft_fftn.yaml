@@ -1,0 +1,101 @@
+id: torch_fft_fftn
+level: 3
+category: kernel_translation
+title: Torch Fft Fftn
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.fft.fftn`.
+
+
+  Operator description:
+
+  Computes the N dimensional discrete Fourier transform of the input tensor. It returns all positive and
+  negative frequency terms, even though for real inputs, half of these values are redundant. Supports
+  torch.half and torch.chalf on CUDA with GPU Architecture SM53 or greater, but only for powers of 2 signal
+  length in every transformed dimension.
+
+
+  Target Python signature / call pattern:
+
+  fftn(input, s=None, dim=None, norm=None, *, out=None) -> Tensor; input (Tensor): the input tensor; s
+  (Tuple[int], optional): Signal size in the transformed dimensions. If given, each dimension dim[i] will
+  either be zero-padded or trimmed to the length s[i] before computing the FFT. If a length -1 is specified,
+  no padding is done in that dimension. Default: s = [input.size(d) for d in dim]; dim (Tuple[int], optional):
+  Dimensions to be transformed. Default: all dimensions, or the last len(s) dimensions if s is given.;
+  norm (str, optional): Normalization mode. For the forward transform (fftn), these correspond to: ''forward''
+  - normalize by 1/n; ''backward'' - no normalization; ''ortho'' - normalize by 1/sqrt(n) (making the
+  FFT orthonormal) Where n = prod(s) is the logical FFT size. Calling the backward transform (ifftn) with
+  the same normalization mode will apply an overall normalization of 1/n between the two transforms. This
+  is required to make ifftn the exact inverse. Default is ''backward'' (no normalization).; out (Tensor,
+  optional): the output tensor.
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  torch.fft.fftn(x)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> x = torch.rand(10, 10, dtype=torch.complex64)
+
+  >>> fftn = torch.fft.fftn(x)
+
+
+  The discrete Fourier transform is separable, so torch.fft.fftn here is equivalent to two one-dimensional
+  torch.fft.fft calls:
+
+
+  >>> two_ffts = torch.fft.fft(torch.fft.fft(x, dim=0), dim=1)
+
+  >>> torch.testing.assert_close(fftn, two_ffts, check_stride=False)
+
+
+  Additional constraints:
+
+  The Fourier domain representation of any real signal satisfies the Hermitian property. torch.fft.rfftn
+  returns the more compact one-sided representation where only the positive frequencies of the last dimension
+  are returned.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 5
+  torch_cnt: 4
+  func_inputs: 'fftn(input, s=None, dim=None, norm=None, *, out=None) -> Tensor; input (Tensor): the input
+    tensor; s (Tuple[int], optional): Signal size in the transformed dimensions. If given, each dimension
+    dim[i] will either be zero-padded or trimmed to the length s[i] before computing the FFT. If a length
+    -1 is specified, no padding is done in that dimension. Default: s = [input.size(d) for d in dim];
+    dim (Tuple[int], optional): Dimensions to be transformed. Default: all dimensions, or the last len(s)
+    dimen'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- rope
+- elementwise
+source:
+  channel: T
+  file: fftn.py
+  name: torch.fft.fftn
+  difficulty: '5'
+  params_cnt: 5
+  torch_cnt: 4
+gold_kernel: data/TritonBench_T_v1/fftn.py

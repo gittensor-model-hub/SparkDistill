@@ -1,0 +1,71 @@
+id: torch_special_logsumexp
+level: 2
+category: kernel_translation
+title: Torch Special Logsumexp
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.special.logsumexp`.
+
+
+  Operator description:
+
+  This function computes the logarithm of the sum of exponentials of input elements along the specified
+  dimension. It is useful for numerical stability when computing log probabilities.
+
+
+  Target Python signature / call pattern:
+
+  def logsumexp(input, dim, keepdim=False, *, out=None) -> Tensor
+
+
+  Mathematical definition:
+
+  logsumexp(x) = log(sum(exp(x)))
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  torch.logsumexp(input, dim, keepdim=False, out=None)
+
+  ```
+
+
+  Additional constraints:
+
+  Alias for torch.logsumexp.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 4
+  torch_cnt: 1
+  func_inputs: def logsumexp(input, dim, keepdim=False, *, out=None) -> Tensor
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: T
+  file: logsumexp.py
+  name: torch.special.logsumexp
+  difficulty: '3'
+  params_cnt: 4
+  torch_cnt: 1
+gold_kernel: data/TritonBench_T_v1/logsumexp.py

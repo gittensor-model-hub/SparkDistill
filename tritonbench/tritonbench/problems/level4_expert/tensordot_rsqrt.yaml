@@ -1,0 +1,52 @@
+id: tensordot_rsqrt
+level: 4
+category: kernel_translation
+title: Tensordot Rsqrt
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `tensordot_rsqrt`.\n\
+  \nOperator description:\nReturns the reciprocal of the square root of the tensordot product of two tensors\
+  \ `a` and `b`. This function performs a tensor contraction of `a` and `b` over the specified dimensions\
+  \ using `torch.tensordot`, and then applies the element-wise reciprocal square root to the resulting\
+  \ tensor. The operation involves computing the tensordot product first and then applying the reciprocal\
+  \ of the square root element-wise to the result.\n\nTarget Python signature / call pattern:\ndef tensordot_rsqrt(a:\
+  \ torch.Tensor, b: torch.Tensor, dims) -> torch.Tensor: a (Tensor): Left tensor to contract. b (Tensor):\
+  \ Right tensor to contract. dims (int, Tuple[List[int], List[int]], or List[List[int]]): Dimensions\
+  \ for contraction, as per `torch.tensordot`.\n\nMathematical definition:\n\\text{output} = \\frac{1}{\\\
+  sqrt{\\sum_{k_0,...,k_{d-1}} a_{i_0,...,i_{m-d},k_0,...,k_{d-1}} \\times b_{k_0,...,k_{d-1}, i_d,...,i_n}}}\n\
+  \nPyTorch reference snippet:\n```python\ntorch.tensordot(a, b, dims=dims)\ntorch.rsqrt(tensordot_result)\n\
+  ```\n\nExample / usage notes:\n>>> a = torch.arange(1, 13, dtype=torch.float32).reshape(3, 4)\n>>> b\
+  \ = torch.arange(1, 25, dtype=torch.float32).reshape(4, 6)\n>>> tensordot_rsqrt(a, b, dims=([1], [0]))\n\
+  tensor([[0.0141, 0.0126, 0.0115, 0.0108, 0.0102, 0.0097],\n        [0.0097, 0.0092, 0.0088, 0.0085,\
+  \ 0.0082, 0.0080],\n        [0.0085, 0.0082, 0.0080, 0.0077, 0.0075, 0.0073]])\n\nAdditional constraints:\n\
+  The function applies the `torch.tensordot` and `torch.rsqrt` operations. The `dims` argument specifies\
+  \ the dimensions over which the contraction happens, similar to the `torch.tensordot` function.\n\n\
+  Requirements (SparkDistill / TritonBench harness):\n- Translate the PyTorch reference into Triton 3.7.1\
+  \ kernels for Blackwell SM120\n- Preserve numerics: include torch.allclose vs the reference (atol/rtol\
+  \ appropriate for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over\
+  \ tl.make_block_ptr\n- Add @triton.autotune when there are meaningful tile/block choices\n- Provide\
+  \ a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 3
+  torch_cnt: 2
+  func_inputs: 'def tensordot_rsqrt(a: torch.Tensor, b: torch.Tensor, dims) -> torch.Tensor: a (Tensor):
+    Left tensor to contract. b (Tensor): Right tensor to contract. dims (int, Tuple[List[int], List[int]],
+    or List[List[int]]): Dimensions for contraction, as per `torch.tensordot`.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+source:
+  channel: T
+  file: tensordot_rsqrt.py
+  name: tensordot_rsqrt
+  difficulty: '4'
+  params_cnt: 3
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/tensordot_rsqrt.py

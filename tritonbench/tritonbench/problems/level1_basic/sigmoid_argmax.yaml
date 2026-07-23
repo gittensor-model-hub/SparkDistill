@@ -1,0 +1,103 @@
+id: sigmoid_argmax
+level: 1
+category: kernel_translation
+title: Sigmoid Argmax
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `sigmoid_argmax`.
+
+
+  Operator description:
+
+  Applies the sigmoid (logistic) function to each element in the input and then computes the indices of
+  the maximum values along the specified dimension or over all elements if no dimension is specified.
+  If dim is not specified, it returns the index of the maximum value in the flattened tensor.
+
+
+  Target Python signature / call pattern:
+
+  sigmoid_argmax(input, dim=None, keepdim=False) -> LongTensor: input (Tensor): The input tensor. dim
+  (int, optional): The dimension to reduce. Default is None, which computes the argmax over all elements.
+  keepdim (bool, optional): Whether the output tensor has :attr:`dim` retained or not. Default is False.
+
+
+  Mathematical definition:
+
+  sigmoid(x) = 1 / (1 + e^{-x})
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  torch.sigmoid(input)
+
+  torch.argmax(sigmoid_result, dim=dim, keepdim=keepdim)
+
+  ```
+
+
+  Example / usage notes:
+
+  import torch
+
+  a = torch.tensor([[0.8, -1.5, 2.5], [0.7, 3.1, -2.4]])
+
+  # Apply sigmoid and then find the index of the maximum value in the entire tensor
+
+  result = sigmoid_argmax(a)
+
+  result
+
+  tensor(4)
+
+
+  # Apply sigmoid and find the indices of the maximum values along dimension 1
+
+  result = sigmoid_argmax(a, dim=1)
+
+  result
+
+  tensor([2, 1])
+
+
+  Additional constraints:
+
+  The function uses PyTorch tensor operations and returns a LongTensor containing indices.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 3
+  torch_cnt: 2
+  func_inputs: 'sigmoid_argmax(input, dim=None, keepdim=False) -> LongTensor: input (Tensor): The input
+    tensor. dim (int, optional): The dimension to reduce. Default is None, which computes the argmax over
+    all elements. keepdim (bool, optional): Whether the output tensor has :attr:`dim` retained or not.
+    Default is False.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: T
+  file: sigmoid_argmax.py
+  name: sigmoid_argmax
+  difficulty: '1'
+  params_cnt: 3
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/sigmoid_argmax.py

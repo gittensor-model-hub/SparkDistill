@@ -1,0 +1,52 @@
+id: attention_kernel
+level: 4
+category: kernel_generation
+title: Attention Kernel
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `attention_kernel.py` (repo: pytorch-labs/segment-anything-fast).\n\nTask description:\nThe\
+  \ Triton kernel _fwd_kernel_aligned performs scaled dot-product attention using queries (Q), keys (K),\
+  \ values (V), and a bias matrix (B0) to compute the output (Out). The kernel operates using blocks of\
+  \ size defined by BLOCK_M, BLOCK_N, and BLOCK_DMODEL, enabling efficient memory usage and computation.\
+  \ The kernel processes data by dividing the input matrices Q, K, and V into smaller blocks, loading\
+  \ these into shared memory, and iteratively processing them using dot products and bias additions. The\
+  \ computation involves scaling the dot products by sm_scale, adding biases from B0, and applying a numerically\
+  \ stable softmax operation using tl.math.exp2. Accumulated results are normalized before being written\
+  \ back to the output matrix Out. The kernel is parallelized using Triton's grid, spreading tasks across\
+  \ the Q's head dimension and batch size.\n\n        The function _attention_rel_h_rel_w_kernel_aligned_device\
+  \ sets up and launches the Triton kernel. It first validates that input tensor shapes and types are\
+  \ consistent, particularly ensuring q, k, v, and rel_h_w are compatible and have expected dimensions.\
+  \ It configures a computation grid based on the third dimension of Q and its batch size. The function\
+  \ calculates necessary constants like OUT_DTYPE for the precision and BIAS_LAST_SIZE for bias processing.\
+  \ It then invokes the _fwd_kernel_aligned kernel with specified parameters such as tensor pointers,\
+  \ strides, block sizes, and tuning parameters (num_warps, num_stages) to optimize the execution.\n\n\
+  Requirements (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA\
+  \ SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use @triton.jit\
+  \ kernels with correct boundary masking\n- Include @triton.autotune with at least 3 configs when tile\
+  \ sizes matter\n- Provide a Python launcher + grid and a torch.allclose correctness test\n- Use fp32\
+  \ accumulators for tl.dot reductions\n- Print a short note if you intentionally skip autotune for a\
+  \ tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- attention
+- matmul
+- softmax
+- elementwise
+- reduction
+source:
+  channel: G
+  file: attention_kernel.py
+  repo: pytorch-labs/segment-anything-fast
+  difficulty: '4'
+  star: 1208
+  simp_instru_len: 291
+  comp_instru_len: 353
+  output_triton_len: 2375
+gold_kernel: data/TritonBench_G_v1/attention_kernel.py

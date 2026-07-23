@@ -1,0 +1,53 @@
+id: destindex_copy
+level: 1
+category: kernel_generation
+title: Destindex Copy
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `destindex_copy.py` (repo: ModelTC/lightllm).\n\nTask description:\nThe provided code defines\
+  \ a Triton kernel, `_fwd_kernel_destindex_copy_kv`, which is intended for copying elements from the\
+  \ source tensors `KV_nope` and `KV_rope` to the destination tensors `O_nope` and `O_rope` using indices\
+  \ specified in the tensor `DestLoc`. This kernel iterates over each index in the sequence, as specified\
+  \ by `DestLoc`, to load elements from the `KV_nope` and `KV_rope` tensors and subsequently store them\
+  \ in the corresponding position in the `O_nope` and `O_rope` tensors based on `DestLoc`. \n\n      \
+  \      The kernel uses Triton's parallel programming constructs, with `tl.load` and `tl.store` operations,\
+  \ ensuring efficient memory transactions. Specifically, `tl.arange` is used to compute offsets for batch\
+  \ processing of dimensions defined by `BLOCK_DMODEL_NOPE` and `BLOCK_DMODEL_ROPE`, which represent the\
+  \ aligned head dimensions (to the next power of two for optimal performance). The kernel is invoked\
+  \ via the `destindex_copy_kv` function, a no-gradient context wrapper that configures grid size and\
+  \ execution parameters such as `num_warps` and `num_stages` for optimal performance on the Triton platform.\
+  \ \n\n            The inputs to `destindex_copy_kv` include:\n            - `KV_nope`, `KV_rope`: Source\
+  \ tensors of shape `(batch_size, num_heads, head_dim)` which contain the data to be copied.\n      \
+  \      - `DestLoc`: A tensor indicating the destination indices in the output tensors.\n           \
+  \ - `O_nope`, `O_rope`: Output tensors which receive the copied data.\n\n            The function checks\
+  \ that the shapes of corresponding source and destination tensors match, prepares the aligned dimensions\
+  \ for kernel execution, calculates strides, and invokes the kernel with these parameters. This setup\
+  \ supports parallel data transfer leveraging Triton's capabilities for handling multi-dimensional tensor\
+  \ operations efficiently.\n\nRequirements (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1\
+  \ on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated\
+  \ tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include @triton.autotune\
+  \ with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose\
+  \ correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally\
+  \ skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- rope
+- elementwise
+- reduction
+source:
+  channel: G
+  file: destindex_copy.py
+  repo: ModelTC/lightllm
+  difficulty: '2'
+  star: 2647
+  simp_instru_len: 228
+  comp_instru_len: 472
+  output_triton_len: 1383
+gold_kernel: data/TritonBench_G_v1/destindex_copy.py

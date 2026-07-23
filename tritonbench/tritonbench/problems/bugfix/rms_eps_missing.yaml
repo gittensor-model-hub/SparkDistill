@@ -1,0 +1,23 @@
+id: rms_eps_missing
+level: bugfix
+category: kernel_debugging
+title: RMSNorm Missing Epsilon
+prompt: RMSNorm diverges / NaNs on near-zero rows because eps is omitted. Fix it.
+input_code: "@triton.jit\ndef rmsnorm_kernel(x_ptr, w_ptr, out_ptr, n_cols, eps, BLOCK: tl.constexpr):\n\
+  \    row = tl.program_id(0)\n    cols = tl.arange(0, BLOCK)\n    mask = cols < n_cols\n    x = tl.load(x_ptr\
+  \ + row * n_cols + cols, mask=mask, other=0.0).to(tl.float32)\n    var = tl.sum(x * x, axis=0) / n_cols\n\
+  \    rstd = tl.rsqrt(var)  # BUG: missing + eps\n    w = tl.load(w_ptr + cols, mask=mask, other=0.0).to(tl.float32)\n\
+  \    tl.store(out_ptr + row * n_cols + cols, (x * rstd * w).to(tl.float16), mask=mask)\n"
+expected_fix: Add eps inside the rsqrt denominator
+required_patterns:
+- '@triton.jit'
+tags:
+- debugging
+- normalization
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+source:
+  channel: synthetic
+  file: rms_eps_missing.py
+  difficulty: bugfix

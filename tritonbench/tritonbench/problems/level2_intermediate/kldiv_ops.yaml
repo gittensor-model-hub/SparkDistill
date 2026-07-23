@@ -1,0 +1,53 @@
+id: kldiv_ops
+level: 2
+category: kernel_generation
+title: Kldiv Ops
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `kldiv_ops.py` (repo: linkedin/Liger-Kernel).\n\nTask description:\nThis Triton implementation\
+  \ provides a specialized operator for computing the Kullback-Leibler divergence between predicted and\
+  \ target distributions, with support for various reduction modes and optimized gradient computation.\n\
+  \n    The `kldiv_forward_triton` function orchestrates the forward computation of the KL divergence.\
+  \ Inputs to this function include `y_pred` (a tensor of predicted log-probabilities with shape [BT,\
+  \ V]), `y_true` (ground truth tensor of the same shape), `log_target` (a boolean flag indicating whether\
+  \ `y_true` is in log-space), `reduction` (a string determining how the results are aggregated: \"none\"\
+  , \"sum\", \"mean\", or \"batchmean\"), and `eps` (a small value added for numerical stability in logarithmic\
+  \ operations).\n\n    The core computation is executed by the `_kldiv_kernel_forward` kernel. This kernel\
+  \ processes each batch independently. It calculates the KL divergence using the formula `KL(y_true ||\
+  \ y) = y_true * (log(y_true) - log(y))` when `log_target` is False, and uses `loss = exp(y_true) * (y_true\
+  \ - y)` otherwise. The kernel iterates over columns in blocks of size `BLOCK_SIZE`. If `reduction` is\
+  \ \"none\", the computed losses for each position are stored directly in `loss_ptr`. For other reduction\
+  \ modes, the losses are summed over the batch or entire tensor as specified.\n\n    In the backward\
+  \ pass, handled by `kldiv_backward_triton`, the gradients with respect to the inputs are calculated.\
+  \ The inputs are `target` (ground truth values), `grad_output` (incoming gradient from the network),\
+  \ `new_grads` (a tensor to hold the computed gradients), and `log_target`. The `_kldiv_kernel_backward`\
+  \ kernel performs the differentiation step, outputting gradients adjusted according to whether `log_target`\
+  \ is true (where the exponential form is used).\n\n    Parameters such as `BLOCK_SIZE` and `num_warps`\
+  \ are crucial for tuning the computation's performance, dictating the block of data processed per iteration\
+  \ and parallelism level, respectively.\n\nRequirements (SparkDistill / TritonBench harness):\n- Target\
+  \ Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over\
+  \ deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include @triton.autotune\
+  \ with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose\
+  \ correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally\
+  \ skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: G
+  file: kldiv_ops.py
+  repo: linkedin/Liger-Kernel
+  difficulty: '3'
+  star: 3606
+  simp_instru_len: 432
+  comp_instru_len: 497
+  output_triton_len: 1631
+gold_kernel: data/TritonBench_G_v1/kldiv_ops.py

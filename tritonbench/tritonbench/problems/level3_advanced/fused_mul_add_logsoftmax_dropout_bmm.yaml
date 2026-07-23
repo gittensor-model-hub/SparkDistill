@@ -1,0 +1,68 @@
+id: fused_mul_add_logsoftmax_dropout_bmm
+level: 3
+category: kernel_translation
+title: Fused Mul Add Logsoftmax Dropout Bmm
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `fused_mul_add_logsoftmax_dropout_bmm`.\n\
+  \nOperator description:\nPerforms a fused operation combining element-wise multiplication, addition,\
+  \ log-softmax activation, dropout, and batch matrix multiplication.\n\nTarget Python signature / call\
+  \ pattern:\nfused_mul_add_logsoftmax_dropout_bmm(input1, input2, other, mat2, p=0.5, training=True,\
+  \ inplace=False, dim=-1, *, out=None) -> Tensor\n\nMathematical definition:\nGiven input tensors X_1,\
+  \ X_2, O, and M, the function computes:\n\n\\[\n\\begin{align*}\nZ &= X_1 \\odot X_2 \\\\\nS &= Z +\
+  \ O \\\\\nL &= \\log\\left( \\frac{\\exp(S)}{\\sum_j \\exp(S_j)} \\right) \\\\\nD &= \\text{Dropout}(L,\
+  \ p) \\\\\nY &= \\text{bmm}(D, M)\n\\end{align*}\n\\]\n\nwhere:\n\n- X_1 and X_2 are input tensors for\
+  \ element-wise multiplication.\n- \\odot denotes element-wise multiplication.\n- O is a tensor or scalar\
+  \ to be added to Z, must be broadcastable to the shape of Z.\n- \\log\\left( \\frac{\\exp(S)}{\\sum_j\
+  \ \\exp(S_j)} \\right) is the log-softmax function applied along dimension `dim`.\n- \\text{Dropout}(L,\
+  \ p) randomly zeroes elements of L with probability p.\n- \\text{bmm}(D, M) performs batch matrix multiplication.\n\
+  \nPyTorch reference snippet:\n```python\nZ = torch.mul(input1, input2)\nS = torch.add(Z, other)\nL =\
+  \ torch.nn.functional.log_softmax(S, dim=dim)\nD = torch.nn.functional.dropout(L, p=p, training=training,\
+  \ inplace=inplace)\nY = torch.bmm(D, mat2)\nif out is not None:\n    out.copy_(Y)\n    return out\n\
+  return Y\n```\n\nExample / usage notes:\n```python\nimport torch\nimport torch.nn.functional as F\n\n\
+  def fused_mul_add_logsoftmax_dropout_bmm(input1, input2, other, mat2, p=0.5, training=True, inplace=False,\
+  \ dim=-1, *, out=None):\n    Z = torch.mul(input1, input2)\n    S = torch.add(Z, other)\n    L = torch.nn.functional.log_softmax(S,\
+  \ dim=dim)\n    D = torch.nn.functional.dropout(L, p=p, training=training, inplace=inplace)\n    Y =\
+  \ torch.bmm(D, mat2)\n    if out is not None:\n        out.copy_(Y)\n        return out\n    return\
+  \ Y\n\n# Example usage\nB, N, D_in, D_out = 2, 3, 4, 5  # Batch size, sequence length, input dimension,\
+  \ output dimension\ninput1 = torch.randn(B, N, D_in)\ninput2 = torch.randn(B, N, D_in)\nother = torch.randn(B,\
+  \ N, D_in)\nmat2 = torch.randn(B, D_in, D_out)\n\noutput = fused_mul_add_logsoftmax_dropout_bmm(input1,\
+  \ input2, other, mat2, p=0.2, training=True, dim=-1)\nprint(\"Output shape:\", output.shape)\n# Output\
+  \ shape: torch.Size([2, 3, 5])\n```\n\nAdditional constraints:\n- The shapes of `input1`, `input2`,\
+  \ and `other` must be broadcastable to each other.\n- The `mat2` tensor must have a shape compatible\
+  \ with the output of the dropout layer for batch matrix multiplication, i.e., `mat2` should have shape\
+  \ `(B, D_in, D_out)` if the dropout output has shape `(B, N, D_in)`.\n- The `log_softmax` function is\
+  \ applied along dimension `dim`, which should be the dimension of the features (typically `-1` for the\
+  \ last dimension).\n- The `dropout` is applied during training when `training=True`. Set `training=False`\
+  \ to disable dropout during evaluation.\n- All operations are differentiable and support autograd.\n\
+  \nRequirements (SparkDistill / TritonBench harness):\n- Translate the PyTorch reference into Triton\
+  \ 3.7.1 kernels for Blackwell SM120\n- Preserve numerics: include torch.allclose vs the reference (atol/rtol\
+  \ appropriate for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over\
+  \ tl.make_block_ptr\n- Add @triton.autotune when there are meaningful tile/block choices\n- Provide\
+  \ a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 8
+  torch_cnt: 5
+  func_inputs: fused_mul_add_logsoftmax_dropout_bmm(input1, input2, other, mat2, p=0.5, training=True,
+    inplace=False, dim=-1, *, out=None) -> Tensor
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- softmax
+- elementwise
+- reduction
+- dropout
+- fused
+source:
+  channel: T
+  file: fused_mul_add_logsoftmax_dropout_bmm.py
+  name: fused_mul_add_logsoftmax_dropout_bmm
+  difficulty: '3'
+  params_cnt: 8
+  torch_cnt: 5
+gold_kernel: data/TritonBench_T_v1/fused_mul_add_logsoftmax_dropout_bmm.py

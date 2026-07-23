@@ -1,0 +1,54 @@
+id: fused_hardshrink_dropout
+level: 3
+category: kernel_translation
+title: Fused Hardshrink Dropout
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `fused_hardshrink_dropout`.\n\
+  \nOperator description:\nApplies a fused operation consisting of dropout followed by hard shrinkage\
+  \ on the input tensor. The function first applies dropout to the input tensor, where each element is\
+  \ zeroed with a probability of p if training is True. The dropout can be applied in-place if specified.\
+  \ After dropout, a hard shrinkage operation is applied, which shrinks values towards zero based on the\
+  \ lambda parameter.\n\nTarget Python signature / call pattern:\ndef fused_hardshrink_dropout(input:\
+  \ torch.Tensor, p: float = 0.5, training: bool = True, inplace: bool = False, lambd: float = 0.5) ->\
+  \ torch.Tensor\nArgs:\n  input (Tensor): The input tensor.\n  p (float, optional): Probability of an\
+  \ element to be zeroed in dropout. Default is 0.5.\n  training (bool, optional): Apply dropout if True.\
+  \ Default is True.\n  inplace (bool, optional): If set to True, dropout will be applied in-place. Default\
+  \ is False.\n  lambd (float, optional): The lambda parameter for the hard shrinkage function. Default\
+  \ is 0.5.\nReturns:\n  Tensor: Result after applying dropout and then hard shrinkage on the input.\n\
+  \nPyTorch reference snippet:\n```python\ntorch.nn.functional.dropout(input, p=p, training=training,\
+  \ inplace=inplace)\ntorch.nn.functional.hardshrink(dropout_output, lambd=lambd)\n```\n\nExample / usage\
+  \ notes:\n>>> input = torch.randn(5, 5)  # Example input tensor\n>>> output = fused_hardshrink_dropout(input,\
+  \ p=0.5, lambd=0.5)\n>>> print(output)\n\nAdditional constraints:\nThe function combines dropout and\
+  \ hard shrinkage operations, which are typically used in neural network training to prevent overfitting\
+  \ and to enforce sparsity, respectively.\n\nRequirements (SparkDistill / TritonBench harness):\n- Translate\
+  \ the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics: include\
+  \ torch.allclose vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary masks;\
+  \ prefer tl.make_tensor_descriptor over tl.make_block_ptr\n- Add @triton.autotune when there are meaningful\
+  \ tile/block choices\n- Provide a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 5
+  torch_cnt: 2
+  func_inputs: "def fused_hardshrink_dropout(input: torch.Tensor, p: float = 0.5, training: bool = True,\
+    \ inplace: bool = False, lambd: float = 0.5) -> torch.Tensor\nArgs:\n  input (Tensor): The input tensor.\n\
+    \  p (float, optional): Probability of an element to be zeroed in dropout. Default is 0.5.\n  training\
+    \ (bool, optional): Apply dropout if True. Default is True.\n  inplace (bool, optional): If set to\
+    \ True, dropout will be applied in-place. Default is False.\n  lambd (float, optional): The lambda\
+    \ parameter for the"
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- dropout
+- fused
+source:
+  channel: T
+  file: fused_hardshrink_dropout.py
+  name: fused_hardshrink_dropout
+  difficulty: '3'
+  params_cnt: 5
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/fused_hardshrink_dropout.py

@@ -1,0 +1,61 @@
+id: matmul_leakyrelu
+level: 3
+category: kernel_generation
+title: Matmul Leakyrelu
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `matmul_leakyrelu.py` (repo: alexkranias/triton_vs_cuda).
+
+
+  Task description:
+
+  The code implements a Triton kernel `matmul_kernel` to perform matrix multiplication C = A x B, where
+  A has shape (M, K) and B has shape (K, N), resulting in matrix C with shape (M, N). The kernel processes
+  blocks of A and B defined by `BLOCK_SIZE_M`, `BLOCK_SIZE_N`, and `BLOCK_SIZE_K`, with parallel execution
+  managed using a grid of program IDs. The kernel computes a block of C by iteratively loading blocks
+  of A and B, performing dot products, and accumulating the results in the `accumulator`. Optionally,
+  a leaky ReLU activation is applied to the `accumulator`. The final block result is stored in C using
+  Triton''s memory operations, with handling for matrix boundaries via masks. The `matmul` function serves
+  as a high-level interface, ensuring input validity, preparing execution parameters, and invoking the
+  kernel. It accepts optional activation, setting `ACTIVATION` based on user input.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+source:
+  channel: G
+  file: matmul_leakyrelu.py
+  repo: alexkranias/triton_vs_cuda
+  difficulty: '3'
+  star: 0
+  simp_instru_len: 141
+  comp_instru_len: 223
+  output_triton_len: 1315
+gold_kernel: data/TritonBench_G_v1/matmul_leakyrelu.py

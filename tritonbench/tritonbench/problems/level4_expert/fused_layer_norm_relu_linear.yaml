@@ -1,0 +1,105 @@
+id: fused_layer_norm_relu_linear
+level: 4
+category: kernel_translation
+title: Fused Layer Norm Relu Linear
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `fused_layer_norm_relu_linear`.
+
+
+  Operator description:
+
+  Applies a fused operation consisting of a linear transformation followed by ReLU activation and layer
+  normalization on the input tensor.
+
+
+  Target Python signature / call pattern:
+
+  fused_layer_norm_relu_linear(input: Tensor, weight: Tensor, bias=None, normalized_shape=None, eps=1e-5,
+  elementwise_affine=True) -> Tensor: Input (Tensor): Input tensor with shape (*, in_features). Weight
+  (Tensor): Weights for the linear transformation, shape (out_features, in_features). Bias (Tensor, optional):
+  Bias for the linear transformation, shape (out_features). Normalized_shape (int or list or torch.Size,
+  optional): Shape of the dimensions to normalize. Eps (float, optional): A value added to the denominator
+  for numerical stability. Default is 1e-5. Elementwise_affine (bool, optional): If True, layer normalization
+  has learnable parameters. Default is True. Returns: Tensor: Result after applying the linear transformation,
+  ReLU, and layer normalization. Example: >>> input = torch.randn(4, 5) # Example input tensor >>> weight
+  = torch.randn(3, 5) # Linear transformation weights >>> bias = torch.randn(3) # Bias for linear layer
+  >>> normalized_shape = 3 >>> # Apply fused operation >>> output = fused_layer_norm_relu_linear(input,
+  weight, bias, normalized_shape) >>> print(output.shape) # Expected output shape: (4, 3)
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  torch.nn.functional.linear(input, weight, bias)
+
+  torch.nn.functional.relu(linear_output)
+
+  torch.nn.functional.layer_norm(relu_output, normalized_shape, eps=eps, elementwise_affine=elementwise_affine)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> input = torch.randn(4, 5)  # Example input tensor
+
+  >>> weight = torch.randn(3, 5)  # Linear transformation weights
+
+  >>> bias = torch.randn(3)  # Bias for linear layer
+
+  >>> normalized_shape = 3
+
+  >>> # Apply fused operation
+
+  >>> output = fused_layer_norm_relu_linear(input, weight, bias, normalized_shape)
+
+  >>> print(output.shape)  # Expected output shape: (4, 3)
+
+
+  Additional constraints:
+
+  The function performs a sequence of operations: linear transformation, ReLU activation, and layer normalization.
+  It supports optional bias and learnable parameters for layer normalization.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 6
+  torch_cnt: 3
+  func_inputs: 'fused_layer_norm_relu_linear(input: Tensor, weight: Tensor, bias=None, normalized_shape=None,
+    eps=1e-5, elementwise_affine=True) -> Tensor: Input (Tensor): Input tensor with shape (*, in_features).
+    Weight (Tensor): Weights for the linear transformation, shape (out_features, in_features). Bias (Tensor,
+    optional): Bias for the linear transformation, shape (out_features). Normalized_shape (int or list
+    or torch.Size, optional): Shape of the dimensions to normalize. Eps (float, optional): A value add'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- normalization
+- elementwise
+- reduction
+- fused
+source:
+  channel: T
+  file: fused_layer_norm_relu_linear.py
+  name: fused_layer_norm_relu_linear
+  difficulty: '4'
+  params_cnt: 6
+  torch_cnt: 3
+gold_kernel: data/TritonBench_T_v1/fused_layer_norm_relu_linear.py

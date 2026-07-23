@@ -1,0 +1,46 @@
+id: rmsnorm_triton
+level: 1
+category: kernel_debugging
+title: Rmsnorm Triton
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `rmsnorm_triton.py` (repo: ELS-RD/kernl).\n\nTask description:\nThe Triton kernel function `rmsnorm_triton`\
+  \ is designed to perform RMS normalization on a given 3D tensor `x`, which is stored in `x_ptr`. The\
+  \ normalization is applied over the last dimension of `x` with a specified size `N_SIZE`. The function\
+  \ takes pointers to the input tensor `x_ptr`, the RMS normalization weights `rms_w_ptr`, and the output\
+  \ tensor `output_ptr`. It also requires the strides for input tensor, weight, and output tensor, as\
+  \ well as the constants `N_SIZE`, `eps`, and `BLOCK_N_SIZE`.\n\n            Within the kernel, `pid_batch`\
+  \ and `pid_m` identify the current batch and row of the matrix being processed. The kernel calculates\
+  \ the variance by iterating over chunks of size `BLOCK_N_SIZE` and accumulating the sum of squares of\
+  \ the elements. This is divided by `N_SIZE` to get the variance, from which the reciprocal of the standard\
+  \ deviation `rstd` is derived using an epsilon `eps` for stability.\n\n            The function then\
+  \ proceeds to normalize the input, scale by the weights, and write the output back to `output_ptr`.\
+  \ The iteration over chunks ensures efficient memory access patterns. The wrapper function `rmsnorm_triton_wrapper`\
+  \ sets up the input data, initializes the output tensor, and launches the kernel with the appropriate\
+  \ grid dimensions based on batch size and the second dimension M of the input tensor.\n\nRequirements\
+  \ (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x\
+  \ / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use @triton.jit\
+  \ kernels with correct boundary masking\n- Include @triton.autotune with at least 3 configs when tile\
+  \ sizes matter\n- Provide a Python launcher + grid and a torch.allclose correctness test\n- Use fp32\
+  \ accumulators for tl.dot reductions\n- Print a short note if you intentionally skip autotune for a\
+  \ tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- mask
+tags:
+- normalization
+- elementwise
+- reduction
+source:
+  channel: G
+  file: rmsnorm_triton.py
+  repo: ELS-RD/kernl
+  difficulty: '2'
+  star: 1537
+  simp_instru_len: 119
+  comp_instru_len: 332
+  output_triton_len: 816
+gold_kernel: data/TritonBench_G_v1/rmsnorm_triton.py

@@ -1,0 +1,62 @@
+id: silu_batch_norm
+level: 3
+category: kernel_translation
+title: Silu Batch Norm
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `silu_batch_norm`.\n\
+  \nOperator description:\nApplies Batch Normalization over an input tensor across channels, followed\
+  \ by the Sigmoid Linear Unit (SiLU) activation function applied element-wise. This combined operation\
+  \ normalizes the input tensor and then applies a non-linear SiLU activation.\n\nTarget Python signature\
+  \ / call pattern:\nsilu_batch_norm(input, running_mean, running_var, weight=None, bias=None, training=False,\
+  \ momentum=0.1, eps=1e-5) -> Tensor; input (Tensor): The input tensor for Batch Normalization.; running_mean\
+  \ (Tensor): The running mean tensor (used during evaluation).; running_var (Tensor): The running variance\
+  \ tensor (used during evaluation).; weight (Tensor, optional): The weight tensor for Batch Normalization\
+  \ scaling. Default: None.; bias (Tensor, optional): The bias tensor for Batch Normalization. Default:\
+  \ None.; training (bool, optional): Whether the module is in training mode. Default: False.; momentum\
+  \ (float, optional): Value used for the running mean and variance computation. Default: 0.1.; eps (float,\
+  \ optional): A small value added to the denominator for numerical stability. Default: 1e-5.\n\nMathematical\
+  \ definition:\nThe combined operation is defined as: \\text{out} = \\text{silu}(\\text{BatchNorm}(x)),\
+  \ where the SiLU function is defined as: \\text{silu}(x) = x * \\sigma(x), \\text{where } \\sigma(x)\
+  \ = \\frac{1}{1 + \\exp(-x)}\n\nPyTorch reference snippet:\n```python\nbatch_norm_result = torch.nn.functional.batch_norm(input,\
+  \ running_mean, running_var, weight, bias, training, momentum, eps)\nreturn torch.nn.functional.silu(batch_norm_result)\n\
+  ```\n\nExample / usage notes:\nExample::\n\n    >>> import torch\n    >>> import torch.nn.functional\
+  \ as F\n    >>> # Define input tensor\n    >>> input = torch.randn(20, 10)  # (batch_size, num_features)\n\
+  \    >>> # Running mean and variance tensors\n    >>> running_mean = torch.zeros(10)\n    >>> running_var\
+  \ = torch.ones(10)\n    >>> # Apply silu_batch_norm in training mode\n    >>> output = silu_batch_norm(input,\
+  \ running_mean, running_var, training=True)\n    >>> output.shape\n    torch.Size([20, 10])\n\n    >>>\
+  \ # Apply silu_batch_norm with specific weight and bias\n    >>> weight = torch.ones(10)\n    >>> bias\
+  \ = torch.zeros(10)\n    >>> output = silu_batch_norm(input, running_mean, running_var, weight, bias,\
+  \ training=False)\n    >>> output.shape\n    torch.Size([20, 10])\n\nAdditional constraints:\nReturns:\
+  \ A tensor that has undergone batch normalization and SiLU activation.\n\nRequirements (SparkDistill\
+  \ / TritonBench harness):\n- Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell\
+  \ SM120\n- Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)\n\
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n- Add @triton.autotune\
+  \ when there are meaningful tile/block choices\n- Provide a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 8
+  torch_cnt: 2
+  func_inputs: 'silu_batch_norm(input, running_mean, running_var, weight=None, bias=None, training=False,
+    momentum=0.1, eps=1e-5) -> Tensor; input (Tensor): The input tensor for Batch Normalization.; running_mean
+    (Tensor): The running mean tensor (used during evaluation).; running_var (Tensor): The running variance
+    tensor (used during evaluation).; weight (Tensor, optional): The weight tensor for Batch Normalization
+    scaling. Default: None.; bias (Tensor, optional): The bias tensor for Batch Normalization. Defau'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- normalization
+- elementwise
+- reduction
+source:
+  channel: T
+  file: silu_batch_norm.py
+  name: silu_batch_norm
+  difficulty: '3'
+  params_cnt: 8
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/silu_batch_norm.py

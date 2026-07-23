@@ -1,0 +1,76 @@
+id: torch_special_chebyshev_polynomial_t
+level: 2
+category: kernel_translation
+title: Torch Special Chebyshev Polynomial T
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.special.chebyshev_polynomial_t`.
+
+
+  Operator description:
+
+  Computes the Chebyshev polynomial of the first kind T_n(input). If n = 0, returns 1. If n = 1, returns
+  input. For n < 6 or |input| > 1, uses a recursive formula. Otherwise, uses an explicit trigonometric
+  formula.
+
+
+  Target Python signature / call pattern:
+
+  chebyshev_polynomial_t(input, n, *, out=None) -> Tensor; Args: input (Tensor): the input tensor. n (Tensor):
+  Degree of the polynomial. Keyword args: out (Tensor, optional): the output tensor.
+
+
+  Mathematical definition:
+
+  T_{n + 1}(input) = 2 \times input \times T_{n}(input) - T_{n - 1}(input)
+
+  T_{n}(input) = \text{cos}(n \times \text{arccos}(x))
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  torch.special.chebyshev_polynomial_t(input, n, out=None)
+
+  ```
+
+
+  Additional constraints:
+
+  If n = 0, returns 1. If n = 1, returns input. Uses recursion for n < 6 or |input| > 1, otherwise uses
+  trigonometric formula.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 3
+  torch_cnt: 1
+  func_inputs: 'chebyshev_polynomial_t(input, n, *, out=None) -> Tensor; Args: input (Tensor): the input
+    tensor. n (Tensor): Degree of the polynomial. Keyword args: out (Tensor, optional): the output tensor.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+source:
+  channel: T
+  file: chebyshev_polynomial_t.py
+  name: torch.special.chebyshev_polynomial_t
+  difficulty: '3'
+  params_cnt: 3
+  torch_cnt: 1
+gold_kernel: data/TritonBench_T_v1/chebyshev_polynomial_t.py

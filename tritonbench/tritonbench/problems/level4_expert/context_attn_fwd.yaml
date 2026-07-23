@@ -1,0 +1,68 @@
+id: context_attn_fwd
+level: 4
+category: kernel_generation
+title: Context Attn Fwd
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `context_attn_fwd.py` (repo: ModelTC/lightllm).
+
+
+  Task description:
+
+  The Triton kernel function `_fwd_kernel_int8kv` is designed to perform a scaled dot-product attention
+  operation on inputs Q, K, and V, where Q represents the query tensor, K represents the key tensor, and
+  V represents the value tensor. The function computes attention scores by taking the dot product of Q
+  and K, scales them using a softmax scaling factor (derived from the inverse square root of the model
+  dimension and a logarithmic factor), and applies a causal mask to enforce autoregressive behavior. The
+  resulting probabilities are then used to weigh the values in V, producing the final attention output
+  stored in Out. The function uses constant expression parameters (`H`, `BLOCK_DMODEL`, `BLOCK_M`, `BLOCK_N`)
+  to define block sizes and tensor dimensions for efficient parallel execution. It accommodates prompt
+  caching and supports multiple head and batch sizes. The wrapper function `context_attention_fwd_ppl_int8kv`
+  configures the execution grid, sets parameters based on input tensor dimensions, and invokes the kernel.
+  The wrapper ensures the block size is adjusted based on the GPU architecture (e.g., Tesla GPUs). This
+  implementation is tailored for high-performance operations on compatible hardware, particularly optimized
+  for workloads requiring efficient memory and computational throughput.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- attention
+- matmul
+- softmax
+- quantization
+- elementwise
+- reduction
+source:
+  channel: G
+  file: context_attn_fwd.py
+  repo: ModelTC/lightllm
+  difficulty: '4'
+  star: 2647
+  simp_instru_len: 141
+  comp_instru_len: 286
+  output_triton_len: 2241
+gold_kernel: data/TritonBench_G_v1/context_attn_fwd.py

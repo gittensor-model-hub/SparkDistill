@@ -1,0 +1,66 @@
+id: kv_cache_filling
+level: 4
+category: kernel_generation
+title: Kv Cache Filling
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `kv_cache_filling.py` (repo: InternLM/lmdeploy).
+
+
+  Task description:
+
+  The provided Triton code is designed to efficiently fill key and value states into a cache for attention
+  mechanisms using two different kernels, based on whether quantization is applied. The primary function,
+  `fill_kv_cache`, handles this operation. It requires input tensors for keys and values (`k_states`,
+  `v_states`), the destination caches (`k_caches`, `v_caches`), and metadata about query start locations
+  and sequence lengths. Optional tensors `k_scales_zeros` and `v_scales_zeros` are used when quantization
+  is enabled, defining scale and zero-point adjustments for int4 or int8 representation. The logic branches
+  depending on `quant_policy`: if it is 0, the `_fill_kv_cache_kernel` is invoked, which directly copies
+  states to caches. Otherwise, `_fill_kv_cache_quant_kernel` quantizes inputs using helper functions `_quant_int4`
+  and `_quant_int8`, which compute quantization parameters and pack data accordingly. Each kernel is executed
+  over a multi-dimensional grid, determined by `batch_size` and `max_num_blocks`, using Triton''s grid-stride
+  loop pattern for parallelism. The code ensures that only valid data is processed and stored by computing
+  sequence lengths and using boolean masks for conditional memory operations. Additionally, the kernels
+  are optimized to handle different head and block dimensions by adjusting block sizes and grid configuration.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- attention
+- quantization
+- elementwise
+- reduction
+source:
+  channel: G
+  file: kv_cache_filling.py
+  repo: InternLM/lmdeploy
+  difficulty: '4'
+  star: 4740
+  simp_instru_len: 266
+  comp_instru_len: 317
+  output_triton_len: 5357
+gold_kernel: data/TritonBench_G_v1/kv_cache_filling.py

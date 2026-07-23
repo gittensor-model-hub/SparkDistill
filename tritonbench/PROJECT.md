@@ -85,9 +85,14 @@ python scripts/validate_reference_kernels.py --channel G --gpu 0
 | Exec pass | ~30% | >70% | >85% |
 | Composite | ~0.25 | >0.60 | >0.75 |
 
-## Next build steps
+## Harness status (v2)
 
-1. Expand `problems/` to full level1–4 + bugfix sets
-2. `distill/data_generator.py` wired to SparkDistill teachers + OpenRouter
-3. Quality filter sharing `TritonValidator` with SparkProof bundles
-4. Nsight Compute hooks in `metrics/performance.py` (optional)
+Completed in the TritonBench v2 harness work:
+
+1. **Problem corpus** — converters regenerate level1–4 + bugfix YAML from upstream G/T (`python -m tritonbench.cli generate-problems`)
+2. **`distill/`** — teacher prompt builder, `QualityFilter` (shared `TritonValidator`), SFT export, `DataGenerator`
+3. **Hardened metrics** — `core/numerical.py`, `core/performance.py`, `core/reference_oracle.py`; evaluator uses them via `score_detailed`
+4. **Repair agent** — multi-turn generate→fail→repair (`core/repair_agent.py`, `tritonbench eval --repair`)
+5. **Validation** — `python -m tritonbench.cli validate-problems` / `scripts/validate_all_problems.py`
+
+Optional follow-ups: live Nsight collection beyond the `format_nsight_command` stub; tighter SparkProof decontam ID sync CI.

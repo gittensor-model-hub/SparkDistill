@@ -1,0 +1,60 @@
+id: fp4_to_bf16
+level: 4
+category: kernel_generation
+title: Fp4 To Bf16
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `fp4_to_bf16.py` (repo: pytorch/ao).\n\nTask description:\nThe given Triton code provides an\
+  \ implementation to convert tensors containing packed FP4 (4-bit floating point) values into BF16 (bfloat16)\
+  \ values on a CUDA-capable GPU using Triton. The implementation is composed of two main functions: `_fp4_packed_to_bf16`\
+  \ and `triton_f4_to_bf16_kernel`.\n\n        1. Function: `_fp4_packed_to_bf16`\n        This function\
+  \ accepts packed FP4 values and produces BF16 values. The packed FP4 values consist of low and high\
+  \ bits, which are separated using bitwise operations and then interleaved. Each FP4 value consists of\
+  \ sign, exponent, and mantissa components that are extracted using provided bit masks and constants.\n\
+  \        \n        Key operations include:\n        - Separating sign, exponent, and mantissa.\n   \
+  \     - Handling special cases, such as zero and denormal (0.5) values.\n        - Adjusting exponents\
+  \ from FP4 to BF16, accounting for differences in exponent bias.\n        - Reconstructing the value\
+  \ in FP32 format first, then converting to BF16.\n        \n        2. Function: `triton_f4_to_bf16_kernel`\n\
+  \        This Triton kernel handles parallel processing of the input tensor. It processes data in blocks\
+  \ and employs `_fp4_packed_to_bf16` for conversion. Input includes pointers to packed FP4 data and the\
+  \ intended BF16 output location. The kernel uses a block size to iterate over chunks of data, efficiently\
+  \ converting each.\n\n        Essential constants and parameters involved in conversion include:\n \
+  \       - `SIGN_MASK_F4`, `MANTISSA_MASK_F4`: Used for extracting parts of FP4 numbers.\n        - `ZERO_BITS_F32`,\
+  \ `ZERO_POINT_FIVE_BITS_F32`: Bit patterns for special FP32 values (zero and 0.5).\n        - `EBITS_F4_E2M1`,\
+  \ `MBITS_F4_E2M1`, `EBITS_F32`, `MBITS_F32`: Exponent and mantissa specifications for FP4 and FP32.\n\
+  \        - Bias constants to correct exponent value differences between formats.\n\n        3. Wrapper:\
+  \ `triton_f4_to_bf16`\n        This Python function wraps around the kernel call, ensuring the input\
+  \ tensor is contiguous and CUDA-allocated. It calculates the grid dimensions for the kernel launch,\
+  \ corresponding to the number of elements and block size. The output tensor is allocated with the appropriate\
+  \ shape and type (bfloat16), and the kernel is executed.\n\n        In conclusion, this code demonstrates\
+  \ how to effectively convert FP4 encoded data into BF16 using Triton's CUDA parallelism to achieve high\
+  \ performance, with attention to numerical precision and edge-case handling.\n\nRequirements (SparkDistill\
+  \ / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer\
+  \ tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct\
+  \ boundary masking\n- Include @triton.autotune with at least 3 configs when tile sizes matter\n- Provide\
+  \ a Python launcher + grid and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot\
+  \ reductions\n- Print a short note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- attention
+- quantization
+- elementwise
+- convolution
+source:
+  channel: G
+  file: fp4_to_bf16.py
+  repo: pytorch/ao
+  difficulty: '3'
+  star: 1630
+  simp_instru_len: 535
+  comp_instru_len: 640
+  output_triton_len: 2205
+gold_kernel: data/TritonBench_G_v1/fp4_to_bf16.py

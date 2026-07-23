@@ -1,0 +1,58 @@
+id: spectral_norm_eig
+level: 3
+category: kernel_translation
+title: Spectral Norm Eig
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `spectral_norm_eig`.\n\
+  \nOperator description:\nComputes the spectral norm (operator norm induced by the Euclidean vector norm)\
+  \ of a square matrix using its eigenvalues. The spectral norm is the largest absolute value among the\
+  \ eigenvalues of a matrix. It supports inputs of float, double, cfloat, and cdouble dtypes and handles\
+  \ batches of matrices.\n\nTarget Python signature / call pattern:\nspectral_norm_eig(A, *, out=None)\
+  \ -> Tensor\nA (Tensor): Tensor of shape `(*, n, n)` where `*` is zero or more batch dimensions consisting\
+  \ of square matrices.\nout (Tensor, optional): Output tensor. Ignored if `None`. Default: `None`.\n\n\
+  Mathematical definition:\n\\|A\\|_2 = \\max \\{ |\\lambda| : \\lambda \\text{ is an eigenvalue of }\
+  \ A \\}\n\nPyTorch reference snippet:\n```python\neigenvalues, _ = torch.linalg.eig(A)\nabs_eigenvalues\
+  \ = torch.abs(eigenvalues)\nspectral_norm, _ = torch.max(abs_eigenvalues, dim=-1)\nif out is not None:\n\
+  \    out.copy_(spectral_norm)\n    return out\nreturn spectral_norm\n```\n\nExample / usage notes:\n\
+  >>> import torch\n>>> def spectral_norm_eig(A, *, out=None):\n...     eigenvalues, _ = torch.linalg.eig(A)\n\
+  ...     abs_eigenvalues = torch.abs(eigenvalues)\n...     spectral_norm, _ = torch.max(abs_eigenvalues,\
+  \ dim=-1)\n...     if out is not None:\n...         out.copy_(spectral_norm)\n...         return out\n\
+  ...     return spectral_norm\n>>> # Example with a symmetric matrix\n>>> A = torch.tensor([[1., 2.],\
+  \ [2., 1.]])\n>>> spectral_norm_eig(A)\ntensor(3.)\n>>> # Compare with torch.linalg.norm(A, 2)\n>>>\
+  \ torch.linalg.norm(A, 2)\ntensor(3.)\n>>> # Example with a general matrix\n>>> A = torch.tensor([[1.,\
+  \ 2.], [3., 4.]])\n>>> spectral_norm_eig(A)\ntensor(5.3723)\n>>> # Compare with torch.linalg.norm(A,\
+  \ 2)\n>>> torch.linalg.norm(A, 2)\ntensor(5.4649)\n>>> # Note the difference due to non-normality of\
+  \ A\n>>> # Example with a batch of matrices\n>>> A_batch = torch.randn(4, 3, 3)\n>>> norms = spectral_norm_eig(A_batch)\n\
+  >>> norms.shape\ntorch.Size([4])\n\nAdditional constraints:\nFor normal matrices (where A A^{H} = A^{H}\
+  \ A), the spectral norm equals the largest absolute eigenvalue.\n\nRequirements (SparkDistill / TritonBench\
+  \ harness):\n- Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve\
+  \ numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit\
+  \ + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n- Add @triton.autotune\
+  \ when there are meaningful tile/block choices\n- Provide a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 2
+  torch_cnt: 3
+  func_inputs: 'spectral_norm_eig(A, *, out=None) -> Tensor
+
+    A (Tensor): Tensor of shape `(*, n, n)` where `*` is zero or more batch dimensions consisting of square
+    matrices.
+
+    out (Tensor, optional): Output tensor. Ignored if `None`. Default: `None`.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: T
+  file: spectral_norm_eig.py
+  name: spectral_norm_eig
+  difficulty: '4'
+  params_cnt: 2
+  torch_cnt: 3
+gold_kernel: data/TritonBench_T_v1/spectral_norm_eig.py

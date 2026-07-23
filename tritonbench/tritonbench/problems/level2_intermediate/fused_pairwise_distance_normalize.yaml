@@ -1,0 +1,54 @@
+id: fused_pairwise_distance_normalize
+level: 2
+category: kernel_translation
+title: Fused Pairwise Distance Normalize
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `fused_pairwise_distance_normalize`.\n\
+  \nOperator description:\nComputes the pairwise distance between two input tensors `x1` and `x2` after\
+  \ normalizing both tensors. Normalization is performed along the specified dimension, followed by pairwise\
+  \ distance calculation.\n\nTarget Python signature / call pattern:\ndef fused_pairwise_distance_normalize(x1:\
+  \ torch.Tensor, x2: torch.Tensor, p_norm: float = 2.0, eps_norm: float = 1e-12, eps_distance: float\
+  \ = 1e-6, keepdim: bool = False) -> torch.Tensor\nArgs:\n    x1 (Tensor): First input tensor.\n    x2\
+  \ (Tensor): Second input tensor.\n    p_norm (float, optional): The exponent value in the norm for normalization.\
+  \ Default: 2.\n    eps_norm (float, optional): Small value to avoid division by zero during normalization.\
+  \ Default: 1e-12.\n    eps_distance (float, optional): Small value to avoid division by zero in distance\
+  \ calculation. Default: 1e-6.\n    keepdim (bool, optional): If `True`, retains the last dimension in\
+  \ the output. Default: `False`.\n\nPyTorch reference snippet:\n```python\nnorm_x1 = torch.nn.functional.normalize(x1,\
+  \ p=p_norm, dim=1, eps=eps_norm) norm_x2 = torch.nn.functional.normalize(x2, p=p_norm, dim=1, eps=eps_norm)\
+  \ distance = torch.nn.functional.pairwise_distance(norm_x1, norm_x2, p=p_norm, eps=eps_distance, keepdim=keepdim)\n\
+  ```\n\nExample / usage notes:\n>>> x1 = torch.tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]) >>> x2 = torch.tensor([[1.0,\
+  \ 0.5, 1.5], [4.0, 4.5, 5.5]]) >>> output = fused_pairwise_distance_normalize(x1, x2) >>> print(output)\n\
+  \nAdditional constraints:\nNormalization is performed along the specified dimension. Small values `eps_norm`\
+  \ and `eps_distance` are used to avoid division by zero during normalization and distance calculation,\
+  \ respectively.\n\nRequirements (SparkDistill / TritonBench harness):\n- Translate the PyTorch reference\
+  \ into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics: include torch.allclose vs the\
+  \ reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor\
+  \ over tl.make_block_ptr\n- Add @triton.autotune when there are meaningful tile/block choices\n- Provide\
+  \ a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 5
+  torch_cnt: 3
+  func_inputs: "def fused_pairwise_distance_normalize(x1: torch.Tensor, x2: torch.Tensor, p_norm: float\
+    \ = 2.0, eps_norm: float = 1e-12, eps_distance: float = 1e-6, keepdim: bool = False) -> torch.Tensor\n\
+    Args:\n    x1 (Tensor): First input tensor.\n    x2 (Tensor): Second input tensor.\n    p_norm (float,\
+    \ optional): The exponent value in the norm for normalization. Default: 2.\n    eps_norm (float, optional):\
+    \ Small value to avoid division by zero during normalization. Default: 1e-12.\n    eps_distance (float,\
+    \ optiona"
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+- fused
+source:
+  channel: T
+  file: fused_pairwise_distance_normalize.py
+  name: fused_pairwise_distance_normalize
+  difficulty: '2'
+  params_cnt: 5
+  torch_cnt: 3
+gold_kernel: data/TritonBench_T_v1/fused_pairwise_distance_normalize.py

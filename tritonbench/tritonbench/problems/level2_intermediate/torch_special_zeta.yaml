@@ -1,0 +1,97 @@
+id: torch_special_zeta
+level: 2
+category: kernel_translation
+title: Torch Special Zeta
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.special.zeta`.
+
+
+  Operator description:
+
+  Computes the Hurwitz zeta function, elementwise. The function calculates the sum of the series for each
+  element in the input tensors, which represent the parameters x and q of the Hurwitz zeta function. The
+  Riemann zeta function is a special case when q equals 1.
+
+
+  Target Python signature / call pattern:
+
+  zeta(input, other, *, out=None) -> Tensor; Args: input (Tensor): the input tensor corresponding to `x`.
+  other (Tensor): the input tensor corresponding to `q`. Keyword args: out (Tensor, optional): the output
+  tensor.
+
+
+  Mathematical definition:
+
+  \zeta(x, q) = \sum_{k=0}^{\infty} \frac{1}{(k + q)^x}
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  torch.special.zeta(x, 1)
+
+  torch.special.zeta(x, torch.tensor([1., 2.]))
+
+  torch.special.zeta(2, torch.tensor([1., 2.]))
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> x = torch.tensor([2., 4.])
+
+  >>> torch.special.zeta(x, 1)
+
+  tensor([1.6449, 1.0823])
+
+  >>> torch.special.zeta(x, torch.tensor([1., 2.]))
+
+  tensor([1.6449, 0.0823])
+
+  >>> torch.special.zeta(2, torch.tensor([1., 2.]))
+
+  tensor([1.6449, 0.6449])
+
+
+  Additional constraints:
+
+  The Riemann zeta function corresponds to the case when `q = 1`
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 3
+  torch_cnt: 3
+  func_inputs: 'zeta(input, other, *, out=None) -> Tensor; Args: input (Tensor): the input tensor corresponding
+    to `x`. other (Tensor): the input tensor corresponding to `q`. Keyword args: out (Tensor, optional):
+    the output tensor.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: T
+  file: zeta.py
+  name: torch.special.zeta
+  difficulty: '3'
+  params_cnt: 3
+  torch_cnt: 3
+gold_kernel: data/TritonBench_T_v1/zeta.py

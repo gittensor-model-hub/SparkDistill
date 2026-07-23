@@ -1,0 +1,64 @@
+id: fast_layernorm
+level: 4
+category: kernel_generation
+title: Fast Layernorm
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `fast_layernorm.py` (repo: unslothai/unsloth).
+
+
+  Task description:
+
+  This code defines a custom layer normalization operation using Triton, a library designed for writing
+  high-performance custom GPU kernels. The `calculate_settings` function computes the optimal block size
+  and number of warps for a given number of columns `n`. It ensures the block size does not exceed the
+  maximum allowed size (`MAX_FUSED_SIZE`). The `layernorm_forward` function is a JIT-compiled kernel for
+  computing the forward pass of layer normalization. It calculates the mean and variance of each row of
+  the input `X`, applies normalization using these statistics, and scales/shifts the result with learned
+  parameters `W` and `b`. The `layernorm_backward` function computes the gradients of the input with respect
+  to the output loss gradient `dY`, using stored intermediate results (`r`, `mu`) from the forward pass.
+  `Fast_Layernorm` class is a PyTorch `autograd.Function` implementing this custom layer normalization.
+  The `forward` method sets up the computation and calls `layernorm_forward`, while `backward` calls `layernorm_backward`
+  to compute the gradient of `X` with respect to `dY`. The `fast_layernorm` function applies this custom
+  layer normalization by interfacing with PyTorch''s `nn.LayerNorm` parameters, ensuring that the operation
+  is done with `W` and `b` derived from the PyTorch module.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- normalization
+- reduction
+- fused
+source:
+  channel: G
+  file: fast_layernorm.py
+  repo: unslothai/unsloth
+  difficulty: '3'
+  star: 18751
+  simp_instru_len: 149
+  comp_instru_len: 321
+  output_triton_len: 1826
+gold_kernel: data/TritonBench_G_v1/fast_layernorm.py

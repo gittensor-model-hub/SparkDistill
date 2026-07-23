@@ -1,0 +1,23 @@
+id: wrong_num_warps_hint
+level: bugfix
+category: kernel_debugging
+title: num_warps Inconsistent with BLOCK Size
+prompt: Config pairs BLOCK_SIZE=1024 with num_warps=1 and OOMs / underutilizes. Propose corrected autotune
+  configs.
+input_code: "@triton.autotune(\n    configs=[triton.Config({\"BLOCK_SIZE\": 1024}, num_warps=1)],\n  \
+  \  key=[\"n\"],\n)\n@triton.jit\ndef heavy_kernel(x_ptr, out_ptr, n, BLOCK_SIZE: tl.constexpr):\n  \
+  \  offs = tl.program_id(0) * BLOCK_SIZE + tl.arange(0, BLOCK_SIZE)\n    mask = offs < n\n    x = tl.load(x_ptr\
+  \ + offs, mask=mask, other=0.0)\n    tl.store(out_ptr + offs, x * x, mask=mask)\n"
+expected_fix: Choose num_warps consistent with tile footprint / occupancy
+required_patterns:
+- '@triton.jit'
+tags:
+- debugging
+- autotune
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+source:
+  channel: synthetic
+  file: wrong_num_warps_hint.py
+  difficulty: bugfix

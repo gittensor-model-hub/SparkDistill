@@ -1,0 +1,86 @@
+id: torch_linalg_det
+level: 3
+category: kernel_translation
+title: Torch Linalg Det
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.linalg.det`.
+
+
+  Operator description:
+
+  Computes the determinant of a square matrix. Supports input of float, double, cfloat and cdouble dtypes.
+  Also supports batches of matrices, and if A is a batch of matrices then the output has the same batch
+  dimensions.
+
+
+  Target Python signature / call pattern:
+
+  linalg.det(A, *, out=None) -> Tensor; A (Tensor): tensor of shape (*, n, n) where * is zero or more
+  batch dimensions; out (Tensor, optional): output tensor. Ignored if None. Default: None.
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  torch.linalg.det(A)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> A = torch.randn(3, 3)
+
+  >>> torch.linalg.det(A)
+
+  tensor(0.0934)
+
+
+  >>> A = torch.randn(3, 2, 2)
+
+  >>> torch.linalg.det(A)
+
+  tensor([1.1990, 0.4099, 0.7386])
+
+
+  Additional constraints:
+
+  :func:`torch.linalg.slogdet` computes the sign and natural logarithm of the absolute value of the determinant
+  of square matrices.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 2
+  torch_cnt: 1
+  func_inputs: 'linalg.det(A, *, out=None) -> Tensor; A (Tensor): tensor of shape (*, n, n) where * is
+    zero or more batch dimensions; out (Tensor, optional): output tensor. Ignored if None. Default: None.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: T
+  file: det.py
+  name: torch.linalg.det
+  difficulty: '4'
+  params_cnt: 2
+  torch_cnt: 1
+gold_kernel: data/TritonBench_T_v1/det.py

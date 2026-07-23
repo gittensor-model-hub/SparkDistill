@@ -1,0 +1,53 @@
+id: chunk_gated_attention
+level: 4
+category: kernel_generation
+title: Chunk Gated Attention
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `chunk_gated_attention.py` (repo: josStorer/RWKV-Runner).\n\nTask description:\nThe Triton kernel\
+  \ code defines two main functions: `chunk_gated_abc_fwd_kernel_cum` and `chunk_gated_abc_fwd_kernel_h`,\
+  \ \n    both leveraging parallel computing capabilities to perform operations on tensor data.\n\n  \
+  \  `chunk_gated_abc_fwd_kernel_cum` takes an input tensor `s` and computes a cumulative result stored\
+  \ in `o`. \n    It is parameterized by tensor strides and block sizes such as `T` (total number of rows),\
+  \ `S` (total number of columns), \n    `BT` (block row size), and `BS` (block column size). The kernel\
+  \ constructs a mask `m_s` to apply cumulative operations \n    only on relevant data points, ensuring\
+  \ efficient computation through block pointer manipulation and boundary checking.\n\n    `chunk_gated_abc_fwd_kernel_h`\
+  \ is tailored for applying a gated cumulative sum on input tensors: `k` (keys), \n    `v` (values),\
+  \ and `g` (gating factors). It considers initial and final state tensors `h0` and `ht` if needed. \n\
+  \    The kernel processes data in chunks defined by `BT` (block size for T), `BK` (block size for K),\
+  \ and `BV` (block size for V), \n    updating the output tensor `h` via iterative transformations of\
+  \ `b_h` based on `b_k` and `b_v`, influenced by gating variables `b_g`.\n\n    The `fwd_pre` function\
+  \ serves as a preparatory step, setting up the execution grid for `chunk_gated_abc_fwd_kernel_cum`.\
+  \ \n    It reshapes and processes the input tensor `g`, effectively mimicking a cumulative sum operation.\n\
+  \n    `fwd_inner` configures and invokes `chunk_gated_abc_fwd_kernel_h`. It defines the computational\
+  \ grid and parameters \n    for efficient execution, with capabilities for adjusting based on warp sizes\
+  \ and stages. This function realizes \n    a gated accumulation logic often used in attention mechanisms,\
+  \ adapting with or without state continuity.\n\nRequirements (SparkDistill / TritonBench harness):\n\
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor\
+  \ over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include\
+  \ @triton.autotune with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid\
+  \ and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short\
+  \ note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- attention
+- elementwise
+- reduction
+source:
+  channel: G
+  file: chunk_gated_attention.py
+  repo: josStorer/RWKV-Runner
+  difficulty: '4'
+  star: 5337
+  simp_instru_len: 408
+  comp_instru_len: 489
+  output_triton_len: 2658
+gold_kernel: data/TritonBench_G_v1/chunk_gated_attention.py

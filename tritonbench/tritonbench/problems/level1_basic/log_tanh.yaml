@@ -1,0 +1,97 @@
+id: log_tanh
+level: 1
+category: kernel_translation
+title: Log Tanh
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `log_tanh`.
+
+
+  Operator description:
+
+  Computes the natural logarithm of each element in the input tensor, then applies the hyperbolic tangent
+  (tanh) function to the result. This involves applying the logarithm first, which is only defined for
+  positive numbers, and then applying tanh to transform the result between -1 and 1.
+
+
+  Target Python signature / call pattern:
+
+  def log_tanh(input, out=None) -> Tensor: input (Tensor): The input tensor. All elements must be positive
+  for the log function. out (Tensor, optional): The output tensor.
+
+
+  Mathematical definition:
+
+  \text{out}_{i} = \tanh(\log(\text{input}_{i}))
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  torch.log(input)
+
+  torch.tanh(log_result, out=out)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> import torch
+
+  >>> a = torch.tensor([1.0, 2.0, 3.0, 4.0])
+
+  >>> result = log_tanh(a)
+
+  >>> result
+
+  tensor([0.0000, 0.5493, 0.6931, 0.7616])
+
+
+  >>> a = torch.tensor([0.5, 1.5, 2.5, 0.1])
+
+  >>> result = log_tanh(a)
+
+  >>> result
+
+  tensor([-0.2554,  0.4051,  0.6194, -2.3026])
+
+
+  Additional constraints:
+
+  All input elements must be positive for the logarithm function to be defined.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 2
+  torch_cnt: 2
+  func_inputs: 'def log_tanh(input, out=None) -> Tensor: input (Tensor): The input tensor. All elements
+    must be positive for the log function. out (Tensor, optional): The output tensor.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+source:
+  channel: T
+  file: log_tanh.py
+  name: log_tanh
+  difficulty: '1'
+  params_cnt: 2
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/log_tanh.py

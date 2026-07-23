@@ -1,0 +1,55 @@
+id: fused_rotary_embedding
+level: 4
+category: kernel_generation
+title: Fused Rotary Embedding
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `fused_rotary_embedding.py` (repo: hpcaitech/ColossalAI).\n\nTask description:\nThe Triton kernel\
+  \ function `decoding_fused_rotary_embedding_kernel` applies rotary embedding transformation to the input\
+  \ tensors `q`, `k`, and `v`. This is achieved by computing sine and cosine rotations separately for\
+  \ halves of the head dimension. The result is stored back into the original query tensor `q`. Additionally,\
+  \ it selectively updates `k_cache` and `v_cache` tensors, which store past key/value embeddings, based\
+  \ on the `KV_GROUP_NUM` and layout configurations.\n\n            The kernel uses tensor slicing based\
+  \ on current program IDs to target specific heads and tokens within the tensors. The core of the computation\
+  \ involves two halves of the head dimension where sine and cosine transformations are applied to achieve\
+  \ rotary embeddings, which rotates the input embedding vectors to incorporate positional information.\n\
+  \n            The function `decoding_fused_rotary_embedding` is responsible for setting up kernel execution,\
+  \ including determining the grid size which depends on the number of heads and tokens. It takes in additional\
+  \ parameters `block_tables` and `kv_lengths` for managing cache layouts. It supports flexible cache\
+  \ layouts controlled by `use_new_kcache_layout` and dynamically computes strides for tensor access.\
+  \ The function chooses the number of warps based on head dimension to balance performance and resource\
+  \ usage.\n\n            Parameters for the kernel include various strides and offsets, indicating how\
+  \ to traverse and manipulate the memory layout efficiently. The grid defined by `(q_head_num, q_total_tokens)`\
+  \ enables parallel processing of each head and token.\n\n            Together, these components facilitate\
+  \ efficient decoding in transformer models, enhancing operations like attention by embedding positional\
+  \ information directly in the input embeddings.\n\nRequirements (SparkDistill / TritonBench harness):\n\
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor\
+  \ over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include\
+  \ @triton.autotune with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid\
+  \ and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short\
+  \ note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- attention
+- rope
+- elementwise
+- reduction
+- embedding
+- fused
+source:
+  channel: G
+  file: fused_rotary_embedding.py
+  repo: hpcaitech/ColossalAI
+  difficulty: '4'
+  star: 38848
+  simp_instru_len: 246
+  comp_instru_len: 383
+  output_triton_len: 2481
+gold_kernel: data/TritonBench_G_v1/fused_rotary_embedding.py

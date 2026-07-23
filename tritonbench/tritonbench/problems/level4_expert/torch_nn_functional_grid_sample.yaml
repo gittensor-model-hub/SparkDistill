@@ -1,0 +1,72 @@
+id: torch_nn_functional_grid_sample
+level: 4
+category: kernel_translation
+title: Torch Nn Functional Grid Sample
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.nn.functional.grid_sample`.
+
+
+  Operator description:
+
+  Computes output using input values and pixel locations from grid, supporting spatial (4-D) and volumetric
+  (5-D) input. Interpolates output value at specified grid positions using nearest or bilinear interpolation.
+  Grid values are normalized within [-1, 1] range, and values outside are handled by padding_mode. Often
+  used with affine_grid to build Spatial Transformer Networks.
+
+
+  Target Python signature / call pattern:
+
+  def grid_sample(input, grid, mode=''bilinear'', padding_mode=''zeros'', align_corners=False) -> Tensor
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  torch.nn.functional.grid_sample(input, grid, mode=''bilinear'', padding_mode=''zeros'', align_corners=False)
+
+  ```
+
+
+  Additional constraints:
+
+  Note: NaN values in grid are interpreted as -1. align_corners=True changes sampled grid positions with
+  image resolution. Default for align_corners changed to False since version 1.2.0. bicubic mode implemented
+  using cubic convolution algorithm with alpha=-0.75; other packages might use different alpha values.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 5
+  torch_cnt: 1
+  func_inputs: def grid_sample(input, grid, mode='bilinear', padding_mode='zeros', align_corners=False)
+    -> Tensor
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- convolution
+source:
+  channel: T
+  file: grid_sample.py
+  name: torch.nn.functional.grid_sample
+  difficulty: '4'
+  params_cnt: 5
+  torch_cnt: 1
+gold_kernel: data/TritonBench_T_v1/grid_sample.py

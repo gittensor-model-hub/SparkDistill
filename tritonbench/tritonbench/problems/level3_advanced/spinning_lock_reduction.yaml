@@ -1,0 +1,47 @@
+id: spinning_lock_reduction
+level: 3
+category: kernel_generation
+title: Spinning Lock Reduction
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `spinning_lock_reduction.py` (repo: xiaohuguo2023/scripts).\n\nTask description:\nThe function\
+  \ `spinning_lock_kernel` is a Triton kernel that performs a reduction operation using a spinning lock\
+  \ \n    mechanism for synchronization. This kernel takes input pointers `P`, `C`, and `locks`, with\
+  \ integer parameters \n    `num_sms`, `k`, `M`, `N`, `stride_cm`, and `stride_cn`, and two compile-time\
+  \ constants `BLOCK_SIZE_M` and \n    `BLOCK_SIZE_N`. Each block is identified by a unique program id\
+  \ `pid`, which determines its position in a virtual \n    grid through `pid_m` and `pid_n`. The kernel\
+  \ initializes an accumulator `acc` to zeros. It then loops up to 9 times, \n    performing accumulation\
+  \ only for the first thread (when `pid % k == 0`) by iterating over other participating threads \n \
+  \   and accumulating their data if successful in acquiring the lock via `tl.atomic_cas`. Threads that\
+  \ don't participate \n    directly in reduction (i.e., where `pid % k != 0`) store the accumulated result\
+  \ in `P` and release the lock using \n    `tl.atomic_xchg`. Finally, the results are written to `C`\
+  \ using computed offsets, and a mask ensures that only valid \n    memory locations are accessed. The\
+  \ `spinning_lock` function orchestrates the kernel launch, preparing the execution \n    grid according\
+  \ to `num_sms` and invoking the kernel with the specified block sizes.\n\nRequirements (SparkDistill\
+  \ / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer\
+  \ tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct\
+  \ boundary masking\n- Include @triton.autotune with at least 3 configs when tile sizes matter\n- Provide\
+  \ a Python launcher + grid and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot\
+  \ reductions\n- Print a short note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: G
+  file: spinning_lock_reduction.py
+  repo: xiaohuguo2023/scripts
+  difficulty: '4'
+  star: 0
+  simp_instru_len: 146
+  comp_instru_len: 335
+  output_triton_len: 761
+gold_kernel: data/TritonBench_G_v1/spinning_lock_reduction.py

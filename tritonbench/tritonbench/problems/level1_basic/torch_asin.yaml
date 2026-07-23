@@ -1,0 +1,85 @@
+id: torch_asin
+level: 1
+category: kernel_translation
+title: Torch Asin
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.asin`.
+
+
+  Operator description:
+
+  Returns a new tensor with the arcsine of the elements of the input tensor. The function computes the
+  inverse sine (arcsine) for each element in the input tensor.
+
+
+  Target Python signature / call pattern:
+
+  asin(input, *, out=None) -> Tensor: input (Tensor): the input tensor. out (Tensor, optional): the output
+  tensor.
+
+
+  Mathematical definition:
+
+  \text{out}_{i} = \sin^{-1}(\text{input}_{i})
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  torch.asin(a)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> a = torch.randn(4)
+
+  >>> a
+
+  tensor([-0.5962,  1.4985, -0.4396,  1.4525])
+
+  >>> torch.asin(a)
+
+  tensor([-0.6387,     nan, -0.4552,     nan])
+
+
+  Additional constraints:
+
+  The function returns NaN for input values outside the range [-1, 1] as arcsine is not defined for those
+  values.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 2
+  torch_cnt: 1
+  func_inputs: 'asin(input, *, out=None) -> Tensor: input (Tensor): the input tensor. out (Tensor, optional):
+    the output tensor.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags: []
+source:
+  channel: T
+  file: asin.py
+  name: torch.asin
+  difficulty: '1'
+  params_cnt: 2
+  torch_cnt: 1
+gold_kernel: data/TritonBench_T_v1/asin.py

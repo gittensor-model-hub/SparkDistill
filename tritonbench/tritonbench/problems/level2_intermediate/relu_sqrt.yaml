@@ -1,0 +1,84 @@
+id: relu_sqrt
+level: 2
+category: kernel_translation
+title: Relu Sqrt
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `relu_sqrt`.
+
+
+  Operator description:
+
+  Applies the rectified linear unit (ReLU) function to each element in input, and then computes the square
+  root of the result. This function ensures all negative values in input are set to zero before applying
+  the square root.
+
+
+  Target Python signature / call pattern:
+
+  def relu_sqrt(input, inplace=False, out=None) -> Tensor: input (Tensor): The input tensor. inplace (bool,
+  optional): If True, modifies input in-place (if possible). Default is False. out (Tensor, optional):
+  The output tensor.
+
+
+  Mathematical definition:
+
+  \text{out}_i = \sqrt{\max(0, \text{input}_i)}
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  torch.nn.functional.relu(input, inplace=inplace) torch.sqrt(relu_result, out=out)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> import torch >>> a = torch.tensor([-1.0, 0.0, 4.0, 9.0]) >>> result = relu_sqrt(a) >>> result tensor([0.0000,
+  0.0000, 2.0000, 3.0000]) >>> result = relu_sqrt(a, inplace=True) >>> result tensor([0.0000, 0.0000,
+  2.0000, 3.0000])
+
+
+  Additional constraints:
+
+  The function modifies input in-place if inplace is set to True.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 3
+  torch_cnt: 2
+  func_inputs: 'def relu_sqrt(input, inplace=False, out=None) -> Tensor: input (Tensor): The input tensor.
+    inplace (bool, optional): If True, modifies input in-place (if possible). Default is False. out (Tensor,
+    optional): The output tensor.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+source:
+  channel: T
+  file: relu_sqrt.py
+  name: relu_sqrt
+  difficulty: '2'
+  params_cnt: 3
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/relu_sqrt.py

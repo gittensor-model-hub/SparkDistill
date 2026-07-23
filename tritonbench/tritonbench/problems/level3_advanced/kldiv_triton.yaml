@@ -1,0 +1,59 @@
+id: kldiv_triton
+level: 3
+category: kernel_generation
+title: Kldiv Triton
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `kldiv_triton.py` (repo: JunnYu/paddlenlp_gpu_ops).\n\nTask description:\nThe provided Triton\
+  \ operator computes the forward and backward passes of the Kullback-Leibler divergence (KL divergence).\
+  \ It includes the kernel definitions `_kldiv_kernel_forward` and `_kldiv_kernel_backward` and their\
+  \ corresponding wrapper functions `kldiv_forward_triton` and `kldiv_backward_triton`. Here is a detailed\
+  \ breakdown:\n\n1. Constants:\n   - `MAX_FUSED_SIZE`: Set to 65536 divided by 4, determining the maximum\
+  \ block size for tensor fusion.\n   - Reduction mode constants: `_REDUCTION_MODE_NONE`, `_REDUCTION_MODE_SUM`,\
+  \ `_REDUCTION_MODE_MEAN`, and `_REDUCTION_MODE_BATCHMEAN` are defined to manage different reduction\
+  \ strategies.\n   - `_str_to_reduction_mode`: A dictionary mapping string representations of reduction\
+  \ modes to their constant values.\n\n2. Function `get_num_warps(BLOCK_SIZE)`:\n   - Determines the optimal\
+  \ number of warps based on the provided `BLOCK_SIZE`. It returns 4 by default but increases for larger\
+  \ block sizes, up to 32 for `BLOCK_SIZE` >= 32768.\n\n3. `_kldiv_kernel_forward` function:\n   - Takes\
+  \ pointers to the prediction tensor `y_ptr`, ground truth tensor `gt_ptr`, and a loss tensor `loss_ptr`,\
+  \ along with their strides.\n   - Iterates over blocks of `BLOCK_SIZE` columns, computing the KL divergence\
+  \ using the formula `KL(y_true || y) = y_true * (log(y_true) - log(y))`.\n   - Supports different reduction\
+  \ modes, handling each mode within the loop and storing results accordingly.\n\n4. `_kldiv_kernel_backward`\
+  \ function:\n   - Similar in structure to its forward counterpart, this kernel computes gradients for\
+  \ the backward pass.\n   - For non-log targets, it computes the negative of the target. For log targets,\
+  \ it multiplies the negative of the exponential of the target by the target.\n\n5. `kldiv_forward_triton`\
+  \ function:\n   - Configures and launches the `_kldiv_kernel_forward` with appropriate grid, block size,\
+  \ and warp count based on the input tensor shape.\n   - Outputs a tensor reduced based on the specified\
+  \ `reduction` mode, returning summed or mean values if applicable.\n\n6. `kldiv_backward_triton` function:\n\
+  \   - Configures and launches the `_kldiv_kernel_backward` for computing gradients.\n   - If the `grad_output`\
+  \ is a scalar tensor equal to one, it returns the computed gradient directly; otherwise, it scales the\
+  \ gradient by `grad_output`.\n\nThe operations leverage Triton's capabilities for efficient parallel\
+  \ execution, particularly suited for large-scale tensor computations often found in deep learning tasks.\n\
+  \nRequirements (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell\
+  \ (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use\
+  \ @triton.jit kernels with correct boundary masking\n- Include @triton.autotune with at least 3 configs\
+  \ when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose correctness test\n\
+  - Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally skip autotune\
+  \ for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+- fused
+source:
+  channel: G
+  file: kldiv_triton.py
+  repo: JunnYu/paddlenlp_gpu_ops
+  difficulty: '3'
+  star: 1
+  simp_instru_len: 405
+  comp_instru_len: 682
+  output_triton_len: 1762
+gold_kernel: data/TritonBench_G_v1/kldiv_triton.py

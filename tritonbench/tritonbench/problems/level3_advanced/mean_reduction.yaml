@@ -1,0 +1,52 @@
+id: mean_reduction
+level: 3
+category: kernel_generation
+title: Mean Reduction
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `mean_reduction.py` (repo: linuxlonelyeagle/triton-exp).\n\nTask description:\nThis Triton kernel\
+  \ implementation calculates the mean of a tensor across specified dimensions. The kernel, `mean_dim_kernel`,\
+  \ receives tensor `X`, a tensor `Mean` to store the output, the dimensions `M` and `N` indicating the\
+  \ size, and `BLOCK_M` and `BLOCK_N` defining the block sizes for processing. The kernel uses a program\
+  \ ID `pid` to map each computation block to the correct row in `X`. It calculates a mask `row_mask`\
+  \ to ensure operations only occur within valid tensor bounds.\n\n            The kernel computes the\
+  \ mean across a specified dimension by iteratively loading elements from `X` in blocks and accumulating\
+  \ their sum in `_mean`. After summing, it divides by `N` to find the mean, storing the result in `Mean`.\n\
+  \n            The function `dim_compress` is used to rearrange the input tensor dimensions for efficient\
+  \ memory access patterns. This function takes a tensor `inp` and a list of dimensions `dims` to reduce,\
+  \ returning a permuted tensor with these dimensions at the end.\n\n            The `mean_dim` function\
+  \ is a wrapper that prepares the inputs for the kernel. It converts the input tensor `x` to a format\
+  \ compatible with the kernel by reducing dimensions specified in `dim`. It calculates `M` as the product\
+  \ of remaining dimensions after reduction and `N` as the product of reduction dimensions. It creates\
+  \ an empty output tensor `out` with the required shape. The kernel is then launched using a grid configuration\
+  \ determined by the `cdiv` function, dividing `M` by `BLOCK_M`. After execution, if `keepdim` is `False`,\
+  \ the output tensor's reduced dimensions are squeezed out. The function returns the resulting tensor.\n\
+  \nRequirements (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell\
+  \ (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use\
+  \ @triton.jit kernels with correct boundary masking\n- Include @triton.autotune with at least 3 configs\
+  \ when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose correctness test\n\
+  - Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally skip autotune\
+  \ for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+- convolution
+source:
+  channel: G
+  file: mean_reduction.py
+  repo: linuxlonelyeagle/triton-exp
+  difficulty: '4'
+  star: 0
+  simp_instru_len: 122
+  comp_instru_len: 384
+  output_triton_len: 705
+gold_kernel: data/TritonBench_G_v1/mean_reduction.py

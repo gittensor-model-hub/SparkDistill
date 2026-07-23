@@ -1,0 +1,49 @@
+id: square_matrix
+level: 1
+category: kernel_generation
+title: Square Matrix
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `square_matrix.py` (repo: gpu-mode/lectures).\n\nTask description:\nThis Triton kernel `square_kernel`\
+  \ computes the element-wise square of each element in a 2D input tensor. The kernel logic works as follows:\n\
+  \    - It launches one instance per row of the input, making rows independent for parallel execution.\
+  \ \n    - The function parameters include pointers to the input and output, the row strides for input\
+  \ and output, the number of columns, and the `BLOCK_SIZE` representing the power of two greater than\
+  \ the number of columns to manage the memory layout.\n    - For each row, it calculates starting pointers\
+  \ and loads the row into SRAM using `tl.load` with a masking operation to handle cases where `BLOCK_SIZE`\
+  \ exceeds the number of columns.\n    - The computation of squaring each element in the row is performed\
+  \ simply by multiplying the row with itself, stored in `square_output`.\n    - Finally, it stores the\
+  \ squared values back to global memory using `tl.store`.\n\n    The wrapper function `square`:\n   \
+  \ - Accepts a 2D tensor `x` and computes the number of rows and columns.\n    - Determines `BLOCK_SIZE`\
+  \ as the smallest power of two greater than `n_cols` and sets `num_warps` for parallel execution; it\
+  \ adjusts this based on `BLOCK_SIZE` to optimize performance.\n    - Allocates an output tensor `y`\
+  \ using PyTorch's `empty_like` to match the input tensor's shape.\n    - Launches the `square_kernel`\
+  \ with a 1D grid configuration corresponding to the number of rows, ensuring each row is processed by\
+  \ one kernel instance.\n    - Returns the squared tensor `y`.\n\nRequirements (SparkDistill / TritonBench\
+  \ harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor\
+  \ over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include\
+  \ @triton.autotune with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid\
+  \ and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short\
+  \ note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: G
+  file: square_matrix.py
+  repo: gpu-mode/lectures
+  difficulty: '2'
+  star: 3106
+  simp_instru_len: 141
+  comp_instru_len: 369
+  output_triton_len: 684
+gold_kernel: data/TritonBench_G_v1/square_matrix.py

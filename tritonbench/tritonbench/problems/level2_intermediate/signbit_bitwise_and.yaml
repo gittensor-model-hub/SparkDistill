@@ -1,0 +1,52 @@
+id: signbit_bitwise_and
+level: 2
+category: kernel_translation
+title: Signbit Bitwise And
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `signbit_bitwise_and`.\n\
+  \nOperator description:\nComputes the sign bit check and the bitwise AND operation on the input tensors.\
+  \ `signbit` checks if the sign bit of each element in `input` is set, returning True for negative values,\
+  \ including -0. `bitwise_and` computes the bitwise AND between `input` and `other`, with the tensors\
+  \ needing to be of integral or boolean types.\n\nTarget Python signature / call pattern:\ndef signbit_bitwise_and(input:\
+  \ torch.Tensor, other: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:\n    Args:\n        input\
+  \ (Tensor): The input tensor.\n        other (Tensor): The second tensor for bitwise AND, should be\
+  \ of integral or boolean types.\n    Example:\n        >>> a = torch.tensor([0.7, -1.2, 0., 2.3])\n\
+  \        >>> b = torch.tensor([1, 0, 1, 1], dtype=torch.int8)\n        >>> signbit_result, bitwise_and_result\
+  \ = signbit_bitwise_and(a, b)\n        >>> signbit_result\n        tensor([False, True, False, False])\n\
+  \        >>> bitwise_and_result\n        tensor([0, 0, 0, 0], dtype=torch.int8)\n\nPyTorch reference\
+  \ snippet:\n```python\ntorch.signbit(input); torch.bitwise_and(input.to(other.dtype), other)\n```\n\n\
+  Example / usage notes:\n>>> a = torch.tensor([0.7, -1.2, 0., 2.3]) >>> b = torch.tensor([1, 0, 1, 1],\
+  \ dtype=torch.int8) >>> signbit_result, bitwise_and_result = signbit_bitwise_and(a, b) >>> signbit_result\
+  \ tensor([False, True, False, False]) >>> bitwise_and_result tensor([0, 0, 0, 0], dtype=torch.int8)\n\
+  \nAdditional constraints:\nThe tensors need to be of integral or boolean types for the bitwise AND operation.\n\
+  \nRequirements (SparkDistill / TritonBench harness):\n- Translate the PyTorch reference into Triton\
+  \ 3.7.1 kernels for Blackwell SM120\n- Preserve numerics: include torch.allclose vs the reference (atol/rtol\
+  \ appropriate for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over\
+  \ tl.make_block_ptr\n- Add @triton.autotune when there are meaningful tile/block choices\n- Provide\
+  \ a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 2
+  torch_cnt: 2
+  func_inputs: "def signbit_bitwise_and(input: torch.Tensor, other: torch.Tensor) -> Tuple[torch.Tensor,\
+    \ torch.Tensor]:\n    Args:\n        input (Tensor): The input tensor.\n        other (Tensor): The\
+    \ second tensor for bitwise AND, should be of integral or boolean types.\n    Example:\n        >>>\
+    \ a = torch.tensor([0.7, -1.2, 0., 2.3])\n        >>> b = torch.tensor([1, 0, 1, 1], dtype=torch.int8)\n\
+    \        >>> signbit_result, bitwise_and_result = signbit_bitwise_and(a, b)\n        >>> signbit_result\n\
+    \        tensor([Fa"
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- quantization
+source:
+  channel: T
+  file: signbit_bitwise_and.py
+  name: signbit_bitwise_and
+  difficulty: '1'
+  params_cnt: 2
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/signbit_bitwise_and.py

@@ -1,0 +1,21 @@
+id: int_div_truncation
+level: bugfix
+category: kernel_debugging
+title: Integer Division Truncation in Grid
+prompt: Launcher uses n // BLOCK_SIZE for the grid and drops a partial block. Show the corrected launcher
+  + kernel.
+input_code: "def launch_add(x, y):\n    out = torch.empty_like(x)\n    n = x.numel()\n    BLOCK = 1024\n\
+  \    grid = (n // BLOCK,)  # BUG\n    add_kernel[grid](x, y, out, n, BLOCK_SIZE=BLOCK)\n    return out\n"
+expected_fix: Use triton.cdiv(n, BLOCK) for grid sizing
+required_patterns:
+- '@triton.jit'
+tags:
+- debugging
+- launch
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+source:
+  channel: synthetic
+  file: int_div_truncation.py
+  difficulty: bugfix

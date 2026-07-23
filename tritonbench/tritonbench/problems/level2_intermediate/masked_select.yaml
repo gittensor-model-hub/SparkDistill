@@ -1,0 +1,66 @@
+id: masked_select
+level: 2
+category: kernel_debugging
+title: Masked Select
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `masked_select.py` (repo: FlagOpen/FlagGems).
+
+
+  Task description:
+
+  This code snippet implements a masked select operation using Triton to enable high-performance parallel
+  computations on GPUs. The core logic is encapsulated in a Triton JIT-compiled kernel `masked_select_kernel`,
+  which processes data in parallel across many threads organized in blocks. The kernel takes pointers
+  to input data (`inp_ptr`), a selection mask (`select_mask_ptr`), a prefix sum array (`prefix_sum_ptr`),
+  and an output buffer (`out_ptr`). Each thread computes its global ID using `tl.program_id` and `tl.arange`,
+  checking if it''s within the bounds of `n_elements`. It loads the input and mask values, converts the
+  mask to a Boolean type `tl.int1`, and calculates output positions using a prefix sum. The selected input
+  values are stored in the output buffer where both the mask and bounds conditions are met. The `masked_select`
+  function wraps the kernel invocation, performing necessary pre-processing steps such as broadcasting
+  tensors to compatible shapes, flattening the mask, and computing prefix sums for determining output
+  positions. The kernel''s grid size is dynamically computed based on the number of elements and the block
+  size (`BLOCK_SIZE`). The `cfggen` function generates various Triton configurations to optimize execution
+  by testing different block sizes and warp numbers, enhancing performance through autotuning. This ensures
+  efficient parallel computation by exploring multiple execution configurations. The `broadcastable` function
+  provides a utility to ensure that two tensor shapes can be broadcasted, adhering to broadcasting rules
+  essential for element-wise operations in multi-dimensional arrays.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- mask
+tags:
+- elementwise
+- reduction
+- convolution
+- debug
+source:
+  channel: G
+  file: masked_select.py
+  repo: FlagOpen/FlagGems
+  difficulty: '3'
+  star: 347
+  simp_instru_len: 241
+  comp_instru_len: 352
+  output_triton_len: 847
+gold_kernel: data/TritonBench_G_v1/masked_select.py

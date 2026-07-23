@@ -1,0 +1,59 @@
+id: int8_matmul_quantization
+level: 4
+category: kernel_generation
+title: Int8 Matmul Quantization
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `int8_matmul_quantization.py` (repo: S-LoRA/S-LoRA).\n\nTask description:\nThis Triton implementation\
+  \ provides a specialized routine for performing matrix multiplication with quantized int8 matrices to\
+  \ leverage efficient GPU computation. \n\n            The `quantize_int8_perrow_kernel` is a Triton\
+  \ JIT-compiled kernel, decorated with multiple `triton.autotune` configurations to optimize execution\
+  \ parameters such as `num_stages` and `num_warps`. It is designed to quantize a floating-point matrix\
+  \ to int8 per row, by first calculating the maximum absolute value per row and using it to scale the\
+  \ values to fit within the int8 range [-127, 127]. The kernel operates on a matrix `fpa` of dimensions\
+  \ MxK, loading blocks of data to compute maximums and perform quantization, and stores the resulting\
+  \ int8 values in matrix `a` while outputting the scale per row to `as`.\n\n            The `quantize_int8_perrow`\
+  \ function serves as a Python wrapper for this kernel. It allocates output tensors for the quantized\
+  \ result and the scale factors, determines grid size based on input matrix dimensions, and launches\
+  \ the Triton kernel.\n\n            The `matmul_kernel` is another Triton JIT kernel that handles matrix\
+  \ multiplication C = A x B where A and B are quantized matrices, accompanied by scaling factors `as_ptr`\
+  \ and `bs_ptr`. The kernel iteratively loads sub-blocks of A and B, accumulates the results in `accumulator`,\
+  \ and applies scaling factors before storing the final result in matrix C. The kernel supports various\
+  \ configurations, including SPLIT_K for advanced memory management and optimization.\n\n           \
+  \ The `matmul_quantize_int8` function first applies row-wise quantization on a floating-point matrix\
+  \ `fpa` and then performs multiplication using `matmul_int8`.\n\n            The `matmul_int8` method\
+  \ calls `matmul_kernel` with appropriate parameters, allocating and preparing output storage if not\
+  \ provided. It calculates grid size using configurable meta-parameters `BLOCK_SIZE_M`, `BLOCK_SIZE_N`,\
+  \ and `SPLIT_K`.\n\n            Finally, the `quantize_int8` function handles the quantization of matrices,\
+  \ computing scale factors based on maximum absolute values along the specified axis, and transforming\
+  \ the weight matrix to int8, preparing it for efficient matrix operations. Outputs from these functions\
+  \ include the quantized matrix and corresponding scaling factors, essential for accurate result reconstruction\
+  \ after computation.\n\nRequirements (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1 on\
+  \ workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n\
+  - Use @triton.jit kernels with correct boundary masking\n- Include @triton.autotune with at least 3\
+  \ configs when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose correctness\
+  \ test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally skip\
+  \ autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- matmul
+- quantization
+- elementwise
+- reduction
+source:
+  channel: G
+  file: int8_matmul_quantization.py
+  repo: S-LoRA/S-LoRA
+  difficulty: '4'
+  star: 1760
+  simp_instru_len: 286
+  comp_instru_len: 534
+  output_triton_len: 5600
+gold_kernel: data/TritonBench_G_v1/int8_matmul_quantization.py

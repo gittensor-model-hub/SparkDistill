@@ -1,0 +1,22 @@
+id: reinterpret_pointer_bug
+level: bugfix
+category: kernel_debugging
+title: Incorrect Pointer Arithmetic on Strided View
+prompt: Kernel treats float32 pointers as byte addresses and skips elements. Fix pointer math.
+input_code: "@triton.jit\ndef copy_kernel(src_ptr, dst_ptr, n, BLOCK: tl.constexpr):\n    offs = tl.program_id(0)\
+  \ * BLOCK + tl.arange(0, BLOCK)\n    mask = offs < n\n    # BUG: * 4 as if byte addressing while ptr\
+  \ is element-typed\n    val = tl.load(src_ptr + offs * 4, mask=mask)\n    tl.store(dst_ptr + offs *\
+  \ 4, val, mask=mask)\n"
+expected_fix: Multiply offsets by element size only when using raw byte pointers
+required_patterns:
+- '@triton.jit'
+tags:
+- debugging
+- layout
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+source:
+  channel: synthetic
+  file: reinterpret_pointer_bug.py
+  difficulty: bugfix

@@ -1,0 +1,68 @@
+id: reversed_cumsum
+level: 4
+category: kernel_generation
+title: Reversed Cumsum
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `reversed_cumsum.py` (repo: sustcsonglin/flash-linear-attention).
+
+
+  Task description:
+
+  The `chunk_global_reversed_cumsum_vector` function performs a reversed cumulative sum on a 4D tensor
+  `s` using a custom Triton kernel, suitable for batched operations with attention-like structures. The
+  function begins by extracting the dimensions of the input tensor [B, H, T, S] and sets a spatial block
+  size `BS` of 32. The output tensor `z` is initialized with the same shape as `s`, but with the specified
+  `dtype`. The kernel `chunk_global_reversed_cumsum_vector_kernel` is configured to optimize over various
+  block sizes (`BT`) and numbers of warps to efficiently handle different input sizes. Within the kernel,
+  a loop iterates backwards over time blocks determined by `BT`, starting from the end (`tl.cdiv(T, BT)
+  - 1`) to the beginning. A block pointer is created for both the input and output tensors. The kernel
+  loads the input block `b_s`, computes a masked dot product with a lower triangular mask `m_s` to ensure
+  the cumulative sum is reversed, and stores the result in the corresponding block of the output tensor
+  `z`. This operation ensures only the elements at or after the current time step are included. The cumulative
+  sum `b_z` is updated after processing each block, adding the sum of the current block `b_s` along the
+  feature dimension. The kernel ensures boundary checks during load and store operations to manage out-of-bounds
+  memory accesses. The result is returned in `z` after the kernel execution, representing the reversed
+  cumulative sum across the specified dimension.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- attention
+- matmul
+- elementwise
+- reduction
+source:
+  channel: G
+  file: reversed_cumsum.py
+  repo: sustcsonglin/flash-linear-attention
+  difficulty: '4'
+  star: 1382
+  simp_instru_len: 241
+  comp_instru_len: 355
+  output_triton_len: 902
+gold_kernel: data/TritonBench_G_v1/reversed_cumsum.py

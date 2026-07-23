@@ -1,0 +1,90 @@
+id: fused_cross_entropy_softmax_layernorm
+level: 3
+category: kernel_translation
+title: Fused Cross Entropy Softmax Layernorm
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `fused_cross_entropy_softmax_layernorm`.\n\
+  \nOperator description:\nPerforms a fused operation combining cross-entropy loss computation, softmax\
+  \ activation, and layer normalization. It computes the cross-entropy loss for given logits and targets,\
+  \ applies softmax activation to the logits, and then applies layer normalization to the resulting probabilities.\n\
+  \nTarget Python signature / call pattern:\nfused_cross_entropy_softmax_layernorm(logits, targets, normalized_shape,\
+  \ weight=None, ignore_index=-100, reduction='mean', label_smoothing=0.0, eps=1e-5, *, out=None) -> Tuple[Tensor,\
+  \ Tensor] - logits (Tensor): Input logits of shape (N, C) or (N, C, *), where N is the batch size and\
+  \ C is the number of classes. - targets (Tensor): Ground truth class indices or class probabilities.\
+  \ If containing class indices: shape (N) or (N, *) with values 0 <= targets_i < C. If containing class\
+  \ probabilities: same shape as logits and values in [0, 1]. - normalized_shape (int or list or torch.Size):\
+  \ Input shape over which layer normalization is applied. - weight (Tensor, optional): A manual rescaling\
+  \ weight given to each class. If provided, must be of size C. - ignore_index (int, optional): Specifies\
+  \ a target value that is ignored and does not contribute to the input gradient. Default: -100. - reduction\
+  \ (str, optional): Specifies the reduction to apply to the output: 'none' | 'mean' | 'sum'. Default:\
+  \ 'mean'. - label_smoothing (float, optional): A float in [0.0, 1.0] specifying the amount of smoothing\
+  \ when computing the loss. Default: 0.0. - eps (float, optional): A value added to the denominator for\
+  \ numerical stability in layer normalization. Default: 1e-5. - out (Tensor, optional): Output tensor\
+  \ for the normalized probabilities. Ignored if None. Default: None.\n\nMathematical definition:\nGiven\
+  \ input logits \\mathbf{z} and target labels \\mathbf{y}, the function computes:\n\n1. **Cross-Entropy\
+  \ Loss:**\n\nFor target class indices:\n\n\\[\nL = -\\sum_{i=1}^N \\log\\left( \\frac{e^{z_{i, y_i}}}{\\\
+  sum_{j=1}^C e^{z_{i, j}}} \\right)\n\\]\n\nFor target class probabilities:\n\n\\[\nL = -\\sum_{i=1}^N\
+  \ \\sum_{j=1}^C y_{i, j} \\log\\left( \\frac{e^{z_{i, j}}}{\\sum_{k=1}^C e^{z_{i, k}}} \\right)\n\\\
+  ]\n\n2. **Softmax Activation:**\n\n\\[\n\\mathbf{p}_{i, j} = \\text{Softmax}(z_{i, j}) = \\frac{e^{z_{i,\
+  \ j}}}{\\sum_{k=1}^C e^{z_{i, k}}}\n\\]\n\n3. **Layer Normalization:**\n\n\\[\n\\mathbf{o}_i = \\frac{\\\
+  mathbf{p}_i - \\mu_i}{\\sqrt{\\sigma_i^2 + \\epsilon}} \\times \\gamma + \\beta\n\\]\n\nwhere:\n\n-\
+  \ \\mu_i and \\sigma_i^2 are the mean and variance of \\mathbf{p}_i over the dimensions specified by\
+  \ `normalized_shape`.\n- \\gamma and \\beta are learnable parameters (omitted if `elementwise_affine=False`).\n\
+  - \\epsilon is a small value added for numerical stability.\n\nPyTorch reference snippet:\n```python\n\
+  loss = torch.nn.functional.cross_entropy(\n    logits,\n    targets,\n    weight=weight,\n    ignore_index=ignore_index,\n\
+  \    reduction=reduction,\n    label_smoothing=label_smoothing\n)\nprobabilities = torch.nn.functional.softmax(logits,\
+  \ dim=-1)\noutput = torch.nn.functional.layer_norm(\n    probabilities,\n    normalized_shape=normalized_shape,\n\
+  \    weight=None,\n    bias=None,\n    eps=eps\n)\n```\n\nExample / usage notes:\n```python\nimport\
+  \ torch\nimport torch.nn.functional as F\n\ndef fused_cross_entropy_softmax_layernorm(logits, targets,\
+  \ normalized_shape, weight=None, ignore_index=-100, reduction='mean', label_smoothing=0.0, eps=1e-5,\
+  \ *, out=None):\n    # Compute cross-entropy loss\n    loss = torch.nn.functional.cross_entropy(\n \
+  \       logits,\n        targets,\n        weight=weight,\n        ignore_index=ignore_index,\n    \
+  \    reduction=reduction,\n        label_smoothing=label_smoothing\n    )\n    # Compute softmax probabilities\n\
+  \    probabilities = torch.nn.functional.softmax(logits, dim=-1)\n    # Apply layer normalization\n\
+  \    output = torch.nn.functional.layer_norm(\n        probabilities,\n        normalized_shape=normalized_shape,\n\
+  \        weight=None,\n        bias=None,\n        eps=eps\n    )\n    if out is not None:\n       \
+  \ out.copy_(output)\n        return loss, out\n    return loss, output\n\n# Example usage\nN, C = 4,\
+  \ 5  # Batch size and number of classes\nlogits = torch.randn(N, C, requires_grad=True)\ntargets = torch.tensor([1,\
+  \ 0, 3, 2])  # Class indices\nnormalized_shape = C  # Apply LayerNorm over the class dimension\n\nloss,\
+  \ output = fused_cross_entropy_softmax_layernorm(\n    logits,\n    targets,\n    normalized_shape=normalized_shape\n\
+  )\nprint(\"Loss:\", loss.item())\nprint(\"Output shape:\", output.shape)\n# Output shape: torch.Size([4,\
+  \ 5])\n```\n\nAdditional constraints:\n- The `logits` tensor should contain raw, unnormalized scores\
+  \ for each class.\n- The `targets` can be class indices or class probabilities matching the shape of\
+  \ `logits`.\n- The `normalized_shape` argument in `layer_norm` should correspond to the dimensions over\
+  \ which you want to apply normalization.\n- If `elementwise_affine` parameters (`weight` and `bias`)\
+  \ are needed in `layer_norm`, they can be defined and passed accordingly.\n- All operations support\
+  \ autograd for gradient computation.\n\nRequirements (SparkDistill / TritonBench harness):\n- Translate\
+  \ the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics: include\
+  \ torch.allclose vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary masks;\
+  \ prefer tl.make_tensor_descriptor over tl.make_block_ptr\n- Add @triton.autotune when there are meaningful\
+  \ tile/block choices\n- Provide a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 8
+  torch_cnt: 3
+  func_inputs: 'fused_cross_entropy_softmax_layernorm(logits, targets, normalized_shape, weight=None,
+    ignore_index=-100, reduction=''mean'', label_smoothing=0.0, eps=1e-5, *, out=None) -> Tuple[Tensor,
+    Tensor] - logits (Tensor): Input logits of shape (N, C) or (N, C, *), where N is the batch size and
+    C is the number of classes. - targets (Tensor): Ground truth class indices or class probabilities.
+    If containing class indices: shape (N) or (N, *) with values 0 <= targets_i < C. If containing class
+    probabilities: s'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- softmax
+- normalization
+- elementwise
+- reduction
+- fused
+source:
+  channel: T
+  file: fused_cross_entropy_softmax_layernorm.py
+  name: fused_cross_entropy_softmax_layernorm
+  difficulty: '3'
+  params_cnt: 8
+  torch_cnt: 3
+gold_kernel: data/TritonBench_T_v1/fused_cross_entropy_softmax_layernorm.py

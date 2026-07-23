@@ -1,0 +1,60 @@
+id: dropout_triton
+level: 1
+category: kernel_generation
+title: Dropout Triton
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `dropout_triton.py` (repo: triton-lang/triton).
+
+
+  Task description:
+
+  The `dropout` function is implemented using a Triton kernel named `_dropout`. The purpose is to apply
+  dropout to an input tensor `x`, controlled by a mask tensor `x_keep`, and store the result in `output`.
+  The kernel operates on blocks of elements (`BLOCK_SIZE=1024`) and for each block, calculates an offset
+  based on the program ID. The elements are loaded from `x_ptr` and `x_keep_ptr` using these offsets and
+  a mask to ensure within bounds. The core operation modifies the elements of `x` based on the mask `x_keep`,
+  using the formula `tl.where(x_keep, x / (1 - p), 0.0)` to scale retained elements and zero-out others.
+  Results are stored back to `output_ptr`. The host function `dropout` ensures input tensor `x` is contiguous,
+  computes the grid size for dispatching the Triton kernel, and calls `_dropout` with necessary pointers
+  and parameters, enabling parallel execution over the elements of `x`.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- elementwise
+- dropout
+source:
+  channel: G
+  file: dropout_triton.py
+  repo: triton-lang/triton
+  difficulty: '2'
+  star: 13556
+  simp_instru_len: 122
+  comp_instru_len: 236
+  output_triton_len: 411
+gold_kernel: data/TritonBench_G_v1/dropout_triton.py

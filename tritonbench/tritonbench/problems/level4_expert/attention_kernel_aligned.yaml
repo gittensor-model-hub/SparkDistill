@@ -1,0 +1,65 @@
+id: attention_kernel_aligned
+level: 4
+category: kernel_generation
+title: Attention Kernel Aligned
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `attention_kernel_aligned.py` (repo: yatengLG/ISAT_with_segment_anything).
+
+
+  Task description:
+
+  The `_fwd_kernel_aligned` function is a Triton JIT-compiled kernel designed to perform attention operations
+  incorporating relative positional embeddings between query (Q), key (K), and value (V) tensors. It uses
+  block-wise loading and processing for efficiency, leveraging blocks defined by dimensions `BLOCK_M`,
+  `BLOCK_N`, and `BLOCK_DMODEL`. The kernel applies a scaled dot-product mechanism with a temperature
+  scale `sm_scale`, accounting for additional bias from the B0 tensor. The forward pass of the attention
+  mechanism iterates over the sequence dimension (N_CTX + P_SEQ), calculating softmax scores and accumulating
+  weighted values into `acc`. The outer function `_attention_rel_h_rel_w_kernel_aligned_device` configures
+  the execution environment, specifying block dimensions, warps, and stages. It verifies shape and type
+  consistency of inputs and invokes the kernel using a 3D grid setup that parallels the batch, head, and
+  sequence dimensions. The resulting output is computed in `OUT_DTYPE` format, ensuring the data type
+  compatibility based on input precision (float16 or bfloat16).
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- attention
+- matmul
+- softmax
+- elementwise
+- reduction
+- embedding
+source:
+  channel: G
+  file: attention_kernel_aligned.py
+  repo: yatengLG/ISAT_with_segment_anything
+  difficulty: '4'
+  star: 1325
+  simp_instru_len: 148
+  comp_instru_len: 256
+  output_triton_len: 2066
+gold_kernel: data/TritonBench_G_v1/attention_kernel_aligned.py

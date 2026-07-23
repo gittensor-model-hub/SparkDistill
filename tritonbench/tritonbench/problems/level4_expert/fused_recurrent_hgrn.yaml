@@ -1,0 +1,51 @@
+id: fused_recurrent_hgrn
+level: 4
+category: kernel_generation
+title: Fused Recurrent Hgrn
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `fused_recurrent_hgrn.py` (repo: ridgerchu/matmulfreellm).\n\nTask description:\nThe code implements\
+  \ a fused recurrent hierarchical gated recurrent network (HGRN) using Triton, which provides efficient\
+  \ GPU kernels. It includes two main kernels: `fused_recurrent_hgrn_fwd_kernel` for the forward pass\
+  \ and `fused_recurrent_hgrn_bwd_kernel` for the backward pass.\n\n    The `fused_recurrent_hgrn_fwd_kernel`\
+  \ takes inputs `x` (input sequence), `g` (gates), `o` (output storage), `h0` (optional initial hidden\
+  \ state), `ht` (final state storage), and configuration constants `T`, `D`, `BD`, `USE_INITIAL_STATE`,\
+  \ `STORE_FINAL_STATE`. The kernel computes the output for each time step by iterating over the time\
+  \ dimension `T`, using the formula `b_h = b_g * b_h + b_x`, where `b_x` and `b_g` are loaded from `x`\
+  \ and `g`, respectively. The result is stored in `o`.\n\n    The `fused_recurrent_hgrn_bwd_kernel` computes\
+  \ gradients `dx` and `dg` for the inputs `x` and `g`, given the gradient of the output `do`. It backpropagates\
+  \ through time from `T-1` to `0`, updating the gradients using `b_dh = b_dh + b_do`, `b_dx = b_dh`,\
+  \ `b_dg = b_dh * b_o`, and `b_dh = b_dh * b_g`.\n\n    The `FusedRecurrentHGRNFunction` wraps these\
+  \ kernels in a PyTorch `autograd.Function` to allow for forward and backward passes during training.\
+  \ Its `forward` method sets up the necessary grid and calls the forward kernel. The `backward` method\
+  \ retrieves saved tensors and calls the backward kernel to compute gradients.\n\n    Finally, `fused_recurrent_hgrn`\
+  \ is a user-friendly function that initializes the operation, handling input detachment and configuring\
+  \ the kernels based on whether an initial state is provided and whether the final state should be output.\
+  \ It returns both the computed sequence and optionally the final state of the RNN.\n\nRequirements (SparkDistill\
+  \ / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer\
+  \ tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct\
+  \ boundary masking\n- Include @triton.autotune with at least 3 configs when tile sizes matter\n- Provide\
+  \ a Python launcher + grid and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot\
+  \ reductions\n- Print a short note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- fused
+source:
+  channel: G
+  file: fused_recurrent_hgrn.py
+  repo: ridgerchu/matmulfreellm
+  difficulty: '3'
+  star: 2927
+  simp_instru_len: 223
+  comp_instru_len: 506
+  output_triton_len: 2244
+gold_kernel: data/TritonBench_G_v1/fused_recurrent_hgrn.py

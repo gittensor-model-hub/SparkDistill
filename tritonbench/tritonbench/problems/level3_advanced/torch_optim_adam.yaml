@@ -1,0 +1,83 @@
+id: torch_optim_adam
+level: 3
+category: kernel_translation
+title: Torch Optim Adam
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.optim.Adam`.
+
+
+  Operator description:
+
+  Implements the Adam optimization algorithm, which is an adaptive learning rate optimization algorithm
+  designed for training deep neural networks. It computes individual adaptive learning rates for different
+  parameters from estimates of first and second moments of the gradients. The algorithm can optionally
+  use the AMSGrad variant, apply weight decay, and maximize the objective function. It supports various
+  implementation optimizations like foreach and fused implementations for performance improvements on
+  CUDA.
+
+
+  Target Python signature / call pattern:
+
+  def Adam(params, lr=1e-3, betas=(0.9, 0.999), eps=1e-8, weight_decay=0, amsgrad=False, foreach=None,
+  maximize=False, capturable=False, differentiable=False, fused=None) -> Optimizer
+
+
+  Mathematical definition:
+
+  m_t = \beta_1 m_{t-1} + (1 - \beta_1) g_t; v_t = \beta_2 v_{t-1} + (1-\beta_2) g^2_t; \widehat{m_t}
+  = m_t/(1-\beta_1^t); \widehat{v_t} = v_t/(1-\beta_2^t); \theta_t = \theta_{t-1} - \gamma \widehat{m_t}/(\sqrt{\widehat{v_t}}
+  + \epsilon)
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  torch.optim.Adam(params, lr=1e-3, betas=(0.9, 0.999), eps=1e-8, weight_decay=0, amsgrad=False, foreach=None,
+  maximize=False, capturable=False, differentiable=False, fused=None)
+
+  ```
+
+
+  Additional constraints:
+
+  The foreach and fused implementations are typically faster than the for-loop, single-tensor implementation.
+  The algorithm is based on the paper ''Adam: A Method for Stochastic Optimization''.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 11
+  torch_cnt: 1
+  func_inputs: def Adam(params, lr=1e-3, betas=(0.9, 0.999), eps=1e-8, weight_decay=0, amsgrad=False,
+    foreach=None, maximize=False, capturable=False, differentiable=False, fused=None) -> Optimizer
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+- optimizer
+- fused
+source:
+  channel: T
+  file: Adam.py
+  name: torch.optim.Adam
+  difficulty: '3'
+  params_cnt: 11
+  torch_cnt: 1
+gold_kernel: data/TritonBench_T_v1/Adam.py

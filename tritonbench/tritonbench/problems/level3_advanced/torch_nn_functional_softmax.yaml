@@ -1,0 +1,80 @@
+id: torch_nn_functional_softmax
+level: 3
+category: kernel_translation
+title: Torch Nn Functional Softmax
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.nn.functional.softmax`.
+
+
+  Operator description:
+
+  Apply a softmax function to all slices along the specified dimension, re-scaling them so that the elements
+  lie in the range [0, 1] and sum to 1.
+
+
+  Target Python signature / call pattern:
+
+  def softmax(input, dim, dtype=None) -> Tensor: input (Tensor): input; dim (int): A dimension along which
+  softmax will be computed.; dtype (torch.dtype, optional): the desired data type of returned tensor.
+  If specified, the input tensor is casted to dtype before the operation is performed. This is useful
+  for preventing data type overflows. Default: None.
+
+
+  Mathematical definition:
+
+  Softmax(x_i) = exp(x_i) / sum_j exp(x_j)
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  torch.nn.functional.softmax(input, dim, dtype=None)
+
+  ```
+
+
+  Additional constraints:
+
+  This function doesn''t work directly with NLLLoss, which expects the Log to be computed between the
+  Softmax and itself. Use log_softmax instead (it''s faster and has better numerical properties).
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 3
+  torch_cnt: 1
+  func_inputs: 'def softmax(input, dim, dtype=None) -> Tensor: input (Tensor): input; dim (int): A dimension
+    along which softmax will be computed.; dtype (torch.dtype, optional): the desired data type of returned
+    tensor. If specified, the input tensor is casted to dtype before the operation is performed. This
+    is useful for preventing data type overflows. Default: None.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- softmax
+- rope
+- elementwise
+- reduction
+source:
+  channel: T
+  file: softmax.py
+  name: torch.nn.functional.softmax
+  difficulty: '4'
+  params_cnt: 3
+  torch_cnt: 1
+gold_kernel: data/TritonBench_T_v1/softmax.py

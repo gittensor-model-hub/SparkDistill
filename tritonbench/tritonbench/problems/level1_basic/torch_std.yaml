@@ -1,0 +1,54 @@
+id: torch_std
+level: 1
+category: kernel_translation
+title: Torch Std
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.std`.\n\
+  \nOperator description:\nCalculates the standard deviation over the specified dimensions of the input\
+  \ tensor. The dim argument can specify a single dimension, a list of dimensions, or None to reduce over\
+  \ all dimensions. If keepdim is set to True, the output tensor retains the reduced dimensions as size\
+  \ 1; otherwise, these dimensions are removed. The correction parameter adjusts the calculation for the\
+  \ difference between sample size and degrees of freedom, defaulting to Bessel's correction with correction=1.\n\
+  \nTarget Python signature / call pattern:\ndef std(input, dim=None, *, correction=1, keepdim=False,\
+  \ out=None) -> Tensor: input (Tensor): the input tensor. dim (int or tuple of ints): the dimension or\
+  \ dimensions to reduce. correction (int): difference between the sample size and sample degrees of freedom.\
+  \ Defaults to `Bessel's correction`, correction=1. keepdim (bool): whether the output tensor has dim\
+  \ retained or not. out (Tensor, optional): the output tensor.\n\nMathematical definition:\n\\sigma =\
+  \ \\sqrt{\\frac{1}{\\max(0,~N - \\delta N)}\\sum_{i=0}^{N-1}(x_i-\\bar{x})^2}\n\nPyTorch reference snippet:\n\
+  ```python\ntorch.std(a, dim=1, keepdim=True)\n```\n\nExample / usage notes:\n>>> a = torch.tensor(\n\
+  ...     [[ 0.2035,  1.2959,  1.8101, -0.4644],\n...      [ 1.5027, -0.3270,  0.5905,  0.6538],\n...\
+  \      [-1.5745,  1.3330, -0.5596, -0.6548],\n...      [ 0.1264, -0.5080,  1.6420,  0.1992]])\n>>> torch.std(a,\
+  \ dim=1, keepdim=True)\ntensor([[1.0311],\n        [0.7477],\n        [1.2204],\n        [0.9087]])\n\
+  \nAdditional constraints:\nThe standard deviation function has undergone a change in version 2.0, where\
+  \ the argument previously called unbiased has been renamed to correction. Bessel's correction link:\
+  \ https://en.wikipedia.org/wiki/Bessel%27s_correction\n\nRequirements (SparkDistill / TritonBench harness):\n\
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics:\
+  \ include torch.allclose vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary\
+  \ masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n- Add @triton.autotune when there\
+  \ are meaningful tile/block choices\n- Provide a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 5
+  torch_cnt: 1
+  func_inputs: 'def std(input, dim=None, *, correction=1, keepdim=False, out=None) -> Tensor: input (Tensor):
+    the input tensor. dim (int or tuple of ints): the dimension or dimensions to reduce. correction (int):
+    difference between the sample size and sample degrees of freedom. Defaults to `Bessel''s correction`,
+    correction=1. keepdim (bool): whether the output tensor has dim retained or not. out (Tensor, optional):
+    the output tensor.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: T
+  file: std.py
+  name: torch.std
+  difficulty: '2'
+  params_cnt: 5
+  torch_cnt: 1
+gold_kernel: data/TritonBench_T_v1/std.py

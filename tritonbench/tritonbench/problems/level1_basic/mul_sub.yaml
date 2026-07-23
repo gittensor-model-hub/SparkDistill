@@ -1,0 +1,108 @@
+id: mul_sub
+level: 1
+category: kernel_translation
+title: Mul Sub
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `mul_sub`.
+
+
+  Operator description:
+
+  Multiplies the input tensor by another tensor or number, then subtracts another tensor or number from
+  the result, scaled by a given alpha. This operation is performed element-wise.
+
+
+  Target Python signature / call pattern:
+
+  def mul_sub(input, other_mul, other_sub, alpha=1, out=None) -> Tensor: input (Tensor): The input tensor
+  to be multiplied. other_mul (Tensor or Number): The tensor or number to multiply with `input`. other_sub
+  (Tensor or Number): The tensor or number to subtract from the multiplication result. alpha (Number,
+  optional): The multiplier for :attr:`other_sub`. Default is 1. out (Tensor, optional): The output tensor.
+
+
+  Mathematical definition:
+
+  \text{out}_i = (\text{input}_i \times \text{other\_mul}_i) - \text{alpha} \times \text{other\_sub}_i
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  mul_result = torch.mul(input, other_mul)
+
+  return torch.sub(mul_result, other_sub, alpha=alpha, out=out)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> import torch
+
+  >>> a = torch.tensor([2.0, 3.0, 4.0])
+
+  >>> b = torch.tensor([0.5, 1.5, 2.0])
+
+  >>> c = torch.tensor([1.0, 2.0, 3.0])
+
+  >>> # Multiply a and b, then subtract c scaled by alpha
+
+  >>> result = mul_sub(a, b, c, alpha=2)
+
+  >>> result
+
+  tensor([ 0.0000, -0.5000, -2.0000])
+
+
+  >>> # Using scalars for multiplication and subtraction
+
+  >>> result = mul_sub(a, 2, 1, alpha=1)
+
+  >>> result
+
+  tensor([3., 5., 7.])
+
+
+  Additional constraints:
+
+  The function allows for element-wise operations and supports both tensor and scalar inputs for multiplication
+  and subtraction. The output can be stored in a specified tensor.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 5
+  torch_cnt: 2
+  func_inputs: 'def mul_sub(input, other_mul, other_sub, alpha=1, out=None) -> Tensor: input (Tensor):
+    The input tensor to be multiplied. other_mul (Tensor or Number): The tensor or number to multiply
+    with `input`. other_sub (Tensor or Number): The tensor or number to subtract from the multiplication
+    result. alpha (Number, optional): The multiplier for :attr:`other_sub`. Default is 1. out (Tensor,
+    optional): The output tensor.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+source:
+  channel: T
+  file: mul_sub.py
+  name: mul_sub
+  difficulty: '2'
+  params_cnt: 5
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/mul_sub.py

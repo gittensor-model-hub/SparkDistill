@@ -1,0 +1,53 @@
+id: quantize_kv_copy
+level: 3
+category: kernel_generation
+title: Quantize Kv Copy
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `quantize_kv_copy.py` (repo: ModelTC/lightllm).\n\nTask description:\nThe Triton kernel `_fwd_kernel_destindex_copy_quantize_kv`\
+  \ is designed for quantizing and copying key-value (KV) tensor data using specified destination indices.\
+  \ It processes a tensor `K` where each element is accessed using calculated offsets and destination\
+  \ indices from `Dest_loc`. The main operations include:\n            1. Loading source data from tensor\
+  \ `K` for a specific group and dimension.\n            2. Computing the absolute maximum values within\
+  \ each group to determine scaling factors needed to normalize the data to fit into int8 format.\n  \
+  \          3. Quantizing the data by dividing each element by its group's scaling factor and casting\
+  \ it to int8.\n            4. Storing quantized data to the `Out` tensor at positions specified by `dest_index`\
+  \ derived from `Dest_loc`.\n            5. Saving the scaling factors into the `Out_scale` tensor for\
+  \ later dequantization.\n\n            The `destindex_copy_quantize_kv` function acts as a higher-level\
+  \ interface for this kernel, handling input reshaping and invoking the kernel. It sets up the grid size\
+  \ based on sequence length and head count, ensures that the head dimension is divisible by the quantization\
+  \ group dimension, and calls the kernel with the correct parameters. The head dimension is divided into\
+  \ groups for more efficient processing.\n\n            Key parameters and functions used:\n        \
+  \    - `K`: Source tensor of shape (batch, head, head_dim).\n            - `DestLoc`: Destination indices\
+  \ tensor indicating where each sequence element's output should be written.\n            - `Out`: Output\
+  \ tensor to store quantized data.\n            - `Out_scale`: Tensor to store scaling factors for each\
+  \ group.\n            - `group_size`, `BLOCK_GROUP_NUM`, `BLOCK_GROUP_DIM`: Parameters defining the\
+  \ size and dimensions of groups used in quantization.\n            - `tl.load`, `tl.store`: Triton operations\
+  \ to load from and store into GPU memory.\n\nRequirements (SparkDistill / TritonBench harness):\n- Target\
+  \ Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over\
+  \ deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include @triton.autotune\
+  \ with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose\
+  \ correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally\
+  \ skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- quantization
+- elementwise
+- reduction
+source:
+  channel: G
+  file: quantize_kv_copy.py
+  repo: ModelTC/lightllm
+  difficulty: '3'
+  star: 2647
+  simp_instru_len: 132
+  comp_instru_len: 447
+  output_triton_len: 1031
+gold_kernel: data/TritonBench_G_v1/quantize_kv_copy.py

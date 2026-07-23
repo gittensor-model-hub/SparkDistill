@@ -1,0 +1,63 @@
+id: index_select_cat
+level: 3
+category: kernel_generation
+title: Index Select Cat
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `index_select_cat.py` (repo: facebookresearch/xformers).
+
+
+  Task description:
+
+  The `index_select_cat_fwd` function is implemented using Triton to accelerate the process of selecting
+  and concatenating specific rows from a 2D source tensor based on a 1D index tensor, both residing on
+  the GPU. This function requires that `source` and `index` be CUDA tensors, with `source` being 2-dimensional
+  and `index` 1-dimensional. If the number of indices exceeds the number of rows in the source, a warning
+  is printed, and the indices are truncated. The function extracts strides for source tensor dimension
+  traversal. The `index_select_cat_fwd_kernel`, decorated with `@triton.jit`, uses a 2D grid to distribute
+  workload across blocks, where each block handles a block of indices (`BLOCK_SIZE_INDEX`) and a block
+  of columns (`BLOCK_SIZE_COL`). Within the kernel, program ids `pid0` and `pid1` determine the starting
+  indices and columns for the block. It computes offsets for source and output tensors, applying masks
+  to ensure bounds. `tl.load` is used to fetch data from the source, and `tl.store` writes the selected
+  data into the output tensor. The `grid` function computes the dimensions of the launch grid based on
+  the number of indices and columns, utilizing `triton.cdiv` for ceil division.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: G
+  file: index_select_cat.py
+  repo: facebookresearch/xformers
+  difficulty: '4'
+  star: 8708
+  simp_instru_len: 160
+  comp_instru_len: 300
+  output_triton_len: 838
+gold_kernel: data/TritonBench_G_v1/index_select_cat.py

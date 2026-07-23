@@ -1,0 +1,110 @@
+id: gelu_min
+level: 3
+category: kernel_translation
+title: Gelu Min
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `gelu_min`.
+
+
+  Operator description:
+
+  Applies the Gaussian Error Linear Units (GELU) activation function to each element in the input tensor,
+  followed by computing the minimum value along the specified dimension. If no dimension is specified,
+  it computes the minimum over all elements. The function supports two methods for computing GELU: exact
+  (''none'') and an approximation using ''tanh''.
+
+
+  Target Python signature / call pattern:
+
+  gelu_min(input, approximate=''none'', dim=None, keepdim=False, out=None) -> Tensor or (Tensor, LongTensor)
+
+
+  Mathematical definition:
+
+  When approximate is ''none'': GELU(x) = x * Φ(x), where Φ(x) is the Cumulative Distribution Function
+  for Gaussian Distribution.
+
+  When approximate is ''tanh'': GELU(x) = 0.5 * x * (1 + Tanh(√(2/π) * (x + 0.044715 * x^3)))
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  gelu_result = torch.nn.functional.gelu(input, approximate=approximate)
+
+  return torch.min(gelu_result, dim=dim, keepdim=keepdim, out=out)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> import torch
+
+  >>> import torch.nn.functional as F
+
+  >>> a = torch.tensor([[0.5, -1.2, 3.0], [1.5, -0.3, 2.1]])
+
+  >>> # Apply GELU and then compute the minimum of the entire tensor
+
+  >>> result = gelu_min(a)
+
+  >>> result
+
+  tensor(-0.1700)
+
+
+  >>> # Apply GELU and then compute the minimum along dimension 1
+
+  >>> result, indices = gelu_min(a, dim=1)
+
+  >>> result
+
+  tensor([-0.1700, -0.0708])
+
+  >>> indices
+
+  tensor([1, 1])
+
+
+  Additional constraints:
+
+  Returns a namedtuple (values, indices) if dim is specified, otherwise returns the minimum value tensor.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 5
+  torch_cnt: 2
+  func_inputs: gelu_min(input, approximate='none', dim=None, keepdim=False, out=None) -> Tensor or (Tensor,
+    LongTensor)
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+source:
+  channel: T
+  file: gelu_min.py
+  name: gelu_min
+  difficulty: '3'
+  params_cnt: 5
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/gelu_min.py

@@ -1,0 +1,51 @@
+id: matrix_vector_dot
+level: 2
+category: kernel_translation
+title: Matrix Vector Dot
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `matrix_vector_dot`.\n\
+  \nOperator description:\nComputes the matrix-vector product `y = alpha * torch.mv(A, x) + beta * y`\
+  \ and then returns the dot product `torch.dot(y, x)`. The function first computes a scaled matrix-vector\
+  \ product and updates `y`, then calculates the dot product of the updated `y` with `x`. It requires\
+  \ an input matrix `A` of shape `(n, m)`, an input vector `x` of shape `(m,)`, and a target vector `y`\
+  \ of shape `(n,)` that is modified in-place. The scalar `alpha` is a multiplier for `torch.mv(A, x)`,\
+  \ while `beta` is a multiplier for `y`.\n\nTarget Python signature / call pattern:\ndef matrix_vector_dot(A:\
+  \ Tensor, x: Tensor, y: Tensor, alpha: float, beta: float) -> Tensor: \nArgs:\n    A (Tensor): The input\
+  \ matrix of shape `(n, m)`.\n    x (Tensor): The input vector of shape `(m,)`.\n    y (Tensor): The\
+  \ target vector to be modified, of shape `(n,)`.\n    alpha (float): Scalar multiplier for `torch.mv(A,\
+  \ x)`.\n    beta (float): Scalar multiplier for `y`.\n\nMathematical definition:\ny = alpha * torch.mv(A,\
+  \ x) + beta * y; result = torch.dot(y, x)\n\nPyTorch reference snippet:\n```python\ny = alpha * torch.mv(A,\
+  \ x) + beta * y\nresult = torch.dot(y, x)\n```\n\nExample / usage notes:\n>>> A = torch.tensor([[1.0,\
+  \ 2.0], [3.0, 4.0]])\n>>> x = torch.tensor([0.5, -1.0])\n>>> y = torch.tensor([1.0, 2.0])\n>>> alpha,\
+  \ beta = 2.0, 0.5\n>>> result = matrix_vector_dot(A, x, y, alpha, beta)\n>>> print(result)  # Outputs\
+  \ the dot product of the modified y and x\n\nAdditional constraints:\nThe function modifies the `y`\
+  \ vector in-place and calculates a dot product after the update.\n\nRequirements (SparkDistill / TritonBench\
+  \ harness):\n- Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve\
+  \ numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit\
+  \ + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n- Add @triton.autotune\
+  \ when there are meaningful tile/block choices\n- Provide a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 5
+  torch_cnt: 2
+  func_inputs: "def matrix_vector_dot(A: Tensor, x: Tensor, y: Tensor, alpha: float, beta: float) -> Tensor:\
+    \ \nArgs:\n    A (Tensor): The input matrix of shape `(n, m)`.\n    x (Tensor): The input vector of\
+    \ shape `(m,)`.\n    y (Tensor): The target vector to be modified, of shape `(n,)`.\n    alpha (float):\
+    \ Scalar multiplier for `torch.mv(A, x)`.\n    beta (float): Scalar multiplier for `y`."
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+source:
+  channel: T
+  file: matrix_vector_dot.py
+  name: matrix_vector_dot
+  difficulty: '2'
+  params_cnt: 5
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/matrix_vector_dot.py

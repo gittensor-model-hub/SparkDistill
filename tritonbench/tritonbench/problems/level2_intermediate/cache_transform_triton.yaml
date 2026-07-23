@@ -1,0 +1,51 @@
+id: cache_transform_triton
+level: 2
+category: kernel_generation
+title: Cache Transform Triton
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `cache_transform_triton.py` (repo: hpcaitech/ColossalAI).\n\nTask description:\nThe Triton code\
+  \ defines two GPU kernels using Triton's JIT compilation to facilitate the manipulation of cosine and\
+  \ sine caches often employed in sequence-based models.\n\n            - `prefill_cache_kernel`: This\
+  \ kernel is optimized for pre-filling caches when given sequences (prompts) are involved. It receives\
+  \ parameters like `cos_cache` and `sin_cache`, which are the source caches, and target parameters like\
+  \ `cos_output` and `sin_output` for storing the processed cache sections. The kernel calculates the\
+  \ original sequence index for each target index using a cumulative sum of sequence lengths (`cumsum_lengths`)\
+  \ and extracts respective parts from the caches to fill `cos_output` and `sin_output`. It uses logical\
+  \ indexing based on the length of total sequences and caches specified by `HIDDEN_DIM`, `N_ELEMENTS`,\
+  \ and `BLOCK_SIZE`.\n\n            - `decoding_cache_kernel`: Targeted at decoding cache data based\
+  \ on sequence lengths, this kernel takes in parameters like `cos_cache`, `sin_cache`, and `lengths`,\
+  \ alongside output buffers `cos_output` and `sin_output`. It retrieves the previous cache entries for\
+  \ a given sequence using its length-1 value to index into the cache, ensuring data continuity. Important\
+  \ constants here include `HIDDEN_DIM`, `NUM_SEQS`, and `BLOCK_SIZE`.\n\n            The utility function\
+  \ `get_xine_cache` determines which kernel to execute based on the `is_prompts` flag, setting up computational\
+  \ grids and preparing tensors for output storage. For prompt processing, it aggregates sequence lengths\
+  \ to derive `total_length` and employs the `prefill_cache_kernel`. In non-prompt scenarios, it computes\
+  \ indices directly from `lengths` and engages the `decoding_cache_kernel`. This setup ensures flexible\
+  \ handling of cache operations across varied sequence lengths and types.\n\nRequirements (SparkDistill\
+  \ / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer\
+  \ tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct\
+  \ boundary masking\n- Include @triton.autotune with at least 3 configs when tile sizes matter\n- Provide\
+  \ a Python launcher + grid and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot\
+  \ reductions\n- Print a short note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: G
+  file: cache_transform_triton.py
+  repo: hpcaitech/ColossalAI
+  difficulty: '3'
+  star: 38848
+  simp_instru_len: 393
+  comp_instru_len: 425
+  output_triton_len: 1711
+gold_kernel: data/TritonBench_G_v1/cache_transform_triton.py

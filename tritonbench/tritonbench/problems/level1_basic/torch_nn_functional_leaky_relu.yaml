@@ -1,0 +1,72 @@
+id: torch_nn_functional_leaky_relu
+level: 1
+category: kernel_translation
+title: Torch Nn Functional Leaky Relu
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.nn.functional.leaky_relu`.
+
+
+  Operator description:
+
+  Applies the Leaky ReLU activation function element-wise to the input tensor. The function is defined
+  as LeakyReLU(x) = max(0, x) + negative_slope * min(0, x), where negative_slope is a small constant that
+  allows a small, non-zero gradient when the unit is not active.
+
+
+  Target Python signature / call pattern:
+
+  leaky_relu(input, negative_slope=0.01, inplace=False) -> Tensor
+
+
+  Mathematical definition:
+
+  LeakyReLU(x) = max(0, x) + negative_slope * min(0, x)
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  torch.nn.functional.leaky_relu(input, negative_slope=0.01, inplace=False)
+
+  ```
+
+
+  Additional constraints:
+
+  See torch.nn.LeakyReLU for more details.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 3
+  torch_cnt: 1
+  func_inputs: leaky_relu(input, negative_slope=0.01, inplace=False) -> Tensor
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: T
+  file: leaky_relu.py
+  name: torch.nn.functional.leaky_relu
+  difficulty: '2'
+  params_cnt: 3
+  torch_cnt: 1
+gold_kernel: data/TritonBench_T_v1/leaky_relu.py

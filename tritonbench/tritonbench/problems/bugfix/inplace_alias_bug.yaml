@@ -1,0 +1,21 @@
+id: inplace_alias_bug
+level: bugfix
+category: kernel_debugging
+title: In-Place Alias Corrupting Input Mid-Kernel
+prompt: Kernel reads and writes the same buffer with overlapping tiles. Fix aliasing.
+input_code: "@triton.jit\ndef prefix_kernel(x_ptr, n, BLOCK: tl.constexpr):\n    offs = tl.program_id(0)\
+  \ * BLOCK + tl.arange(0, BLOCK)\n    mask = offs < n\n    x = tl.load(x_ptr + offs, mask=mask, other=0.0)\n\
+  \    # BUG: store back before neighbors finish\n    tl.store(x_ptr + offs, x + 1.0, mask=mask)\n"
+expected_fix: Write to a distinct output buffer or stage in registers/SRAM
+required_patterns:
+- '@triton.jit'
+tags:
+- debugging
+- memory
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+source:
+  channel: synthetic
+  file: inplace_alias_bug.py
+  difficulty: bugfix

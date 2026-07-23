@@ -1,0 +1,53 @@
+id: matmul_triton_autotune
+level: 4
+category: kernel_generation
+title: Matmul Triton Autotune
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `matmul_triton_autotune.py` (repo: triton-lang/triton).\n\nTask description:\nThe Triton code\
+  \ outlines an implementation for matrix multiplication on GPU, enhanced by an autotuning mechanism which\
+  \ optimizes the kernel for various GPU configurations. The key computational routine is encapsulated\
+  \ in `matmul_kernel`, which multiplies matrices A (MxK) and B (KxN) to produce C (MxN). The kernel is\
+  \ decorated with `@triton.autotune` to select optimal parameters dynamically based on input dimensions\
+  \ (M, N, K).\n\n            The `matmul` function acts as a convenient interface, validating input tensor\
+  \ compatibility, ensuring contiguity, and calling the kernel with the right execution grid computed\
+  \ using the `grid` lambda function. The result is stored in a new tensor `c` of shape (M, N).\n\n  \
+  \          Core logic inside `matmul_kernel`:\n            - Computes grid and block indices to iterate\
+  \ over matrix chunks, using block size constants like `BLOCK_SIZE_M`, `BLOCK_SIZE_N`, and `BLOCK_SIZE_K`.\n\
+  \            - Pointers (`a_ptrs`, `b_ptrs`) are computed for accessing matrix blocks, leveraging input\
+  \ strides.\n            - An accumulator is initialized to zero and filled via dot-product operations\
+  \ across the K dimension.\n            - If specified, a leaky ReLU activation is applied, modifying\
+  \ the result where needed.\n            - The result matrix C is stored conditionally to handle edge\
+  \ cases on matrix boundaries.\n\n            The `leaky_relu` function is conditionally applied, performing\
+  \ element-wise operations to modify negative values in the accumulator. Triton's use of `tl.where` facilitates\
+  \ this transformation efficiently.\n\n            Overall, this implementation exemplifies efficient,\
+  \ configurable GPU-based matrix multiplication suitable for diverse GPU architectures.\n\nRequirements\
+  \ (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x\
+  \ / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use @triton.jit\
+  \ kernels with correct boundary masking\n- Include @triton.autotune with at least 3 configs when tile\
+  \ sizes matter\n- Provide a Python launcher + grid and a torch.allclose correctness test\n- Use fp32\
+  \ accumulators for tl.dot reductions\n- Print a short note if you intentionally skip autotune for a\
+  \ tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+- convolution
+source:
+  channel: G
+  file: matmul_triton_autotune.py
+  repo: triton-lang/triton
+  difficulty: '4'
+  star: 13556
+  simp_instru_len: 340
+  comp_instru_len: 391
+  output_triton_len: 1711
+gold_kernel: data/TritonBench_G_v1/matmul_triton_autotune.py

@@ -1,0 +1,92 @@
+id: scaled_add_norm
+level: 2
+category: kernel_translation
+title: Scaled Add Norm
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `scaled_add_norm`.
+
+
+  Operator description:
+
+  Computes `y += alpha * x` and returns the 2-norm of the modified `y`. The function takes a target tensor
+  `y`, a tensor `x` to be scaled by a scalar `alpha`, and adds the scaled `x` to `y`. It then calculates
+  and returns the 2-norm of the updated `y`.
+
+
+  Target Python signature / call pattern:
+
+  scaled_add_norm(y: Tensor, x: Tensor, alpha: float) -> Tensor: y (Tensor): The target tensor to be modified,
+  of shape `(n,)`. x (Tensor): The tensor to be scaled and added to `y`, of shape `(n,)`. alpha (float):
+  The scalar multiplier for `x`.
+
+
+  Mathematical definition:
+
+  y += alpha * x
+
+  norm = ||y||_2
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  y += alpha * x
+
+  norm = torch.norm(y)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> y = torch.tensor([1.0, 2.0, 3.0])
+
+  >>> x = torch.tensor([0.5, -1.0, 2.0])
+
+  >>> alpha = 2.0
+
+  >>> result = scaled_add_norm(y, x, alpha)
+
+  >>> print(result)  # Outputs the 2-norm of `y + alpha * x`
+
+
+  Additional constraints:
+
+  The function modifies the input tensor `y` in place and calculates the 2-norm using `torch.norm`.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 3
+  torch_cnt: 2
+  func_inputs: 'scaled_add_norm(y: Tensor, x: Tensor, alpha: float) -> Tensor: y (Tensor): The target
+    tensor to be modified, of shape `(n,)`. x (Tensor): The tensor to be scaled and added to `y`, of shape
+    `(n,)`. alpha (float): The scalar multiplier for `x`.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+source:
+  channel: T
+  file: scaled_add_norm.py
+  name: scaled_add_norm
+  difficulty: '3'
+  params_cnt: 3
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/scaled_add_norm.py

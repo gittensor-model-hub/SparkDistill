@@ -1,0 +1,53 @@
+id: layer_norm_triton
+level: 4
+category: kernel_generation
+title: Layer Norm Triton
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `layer_norm_triton.py` (repo: triton-lang/triton).\n\nTask description:\nThe Triton-based implementation\
+  \ provides a high-performance LayerNorm operation optimized for execution on GPUs. It involves three\
+  \ specialized kernels: \n            `_layer_norm_fwd_fused` performs the forward pass by normalizing\
+  \ input tensor `X` over its last dimension using batch statistics (mean and variance). It applies learned\
+  \ scale (`W`) and shift (`B`) parameters, storing the normalized result in output `Y`. The kernel uses\
+  \ block-wise reduction for efficient computation, storing per-row mean and inverse standard deviation\
+  \ (`Rstd`), which are later used for the backward pass.\n            `_layer_norm_bwd_dx_fused` computes\
+  \ the gradient of inputs (`DX`) using the output gradients (`DY`). It adjusts for learned parameters\
+  \ (`W`) and uses saved batch statistics (`Mean`, `Rstd`). The kernel handles partial reduction of gradients\
+  \ for weights (`DW`) and biases (`DB`) across a workgroup, ensuring synchronization via locks during\
+  \ accumulation.\n            `_layer_norm_bwd_dwdb` finalizes the backward pass by aggregating partial\
+  \ gradients for weights and biases collected across workgroups into final gradients (`FINAL_DW` and\
+  \ `FINAL_DB`). This kernel completes the distributed reduction using efficient memory operations.\n\
+  \            The `LayerNorm` class leverages these kernels, defining a custom PyTorch function. During\
+  \ the forward pass, it reshapes inputs and prepares necessary buffers, executing `_layer_norm_fwd_fused`.\
+  \ In the backward pass, `_layer_norm_bwd_dx_fused` and `_layer_norm_bwd_dwdb` are called sequentially,\
+  \ computing the necessary gradients with respect to inputs, weights, and biases. Parameters like `BLOCK_SIZE`,\
+  \ `GROUP_SIZE_M`, and kernel launch configurations (number of warps) are dynamically determined based\
+  \ on input dimensions to optimize performance.\n\nRequirements (SparkDistill / TritonBench harness):\n\
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor\
+  \ over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include\
+  \ @triton.autotune with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid\
+  \ and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short\
+  \ note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- normalization
+- elementwise
+- reduction
+- fused
+source:
+  channel: G
+  file: layer_norm_triton.py
+  repo: triton-lang/triton
+  difficulty: '4'
+  star: 13556
+  simp_instru_len: 292
+  comp_instru_len: 431
+  output_triton_len: 2736
+gold_kernel: data/TritonBench_G_v1/layer_norm_triton.py

@@ -1,0 +1,56 @@
+id: streamk_matmul
+level: 4
+category: kernel_generation
+title: Streamk Matmul
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `streamk_matmul.py` (repo: dmitrymailk/t5_optimization).\n\nTask description:\nThis Triton-based\
+  \ operator is a matrix multiplication kernel designed to optimize computational efficiency using techniques\
+  \ like memory hierarchy optimization and tile swizzling. It consists of several key functions:\n\n \
+  \           - `swizzle_tile(tile_id, M, N, K, BLOCK_M, BLOCK_N, BLOCK_K, GROUP_M)`: This function calculates\
+  \ 2D tile coordinates from a given linear tile ID using a swizzling pattern. It improves L2 cache performance\
+  \ by changing the order in which tiles are accessed.\n            - `linear_tile(tile_id, M, N, K, BLOCK_M,\
+  \ BLOCK_N, BLOCK_K, GROUP_M)`: Converts a linear tile ID into 2D tile coordinates without reordering.\n\
+  \            - `mac_loop(A, B, C, M, N, K, locks, stride_am, stride_ak, stride_bk, stride_bn, stride_cm,\
+  \ stride_cn, iters_per_tile, start_iter, end_iter, BLOCK_M, BLOCK_N, BLOCK_K, ACC_TYPE, GROUP_M)`: Computes\
+  \ a portion of the matrix multiplication for the given range of iterations (start_iter to end_iter).\
+  \ It accumulates results in a local accumulator and handles synchronization using locks.\n         \
+  \   - `first_wave(A, B, C, M, N, K, locks, stride_am, stride_ak, stride_bk, stride_bn, stride_cm, stride_cn,\
+  \ total_full_tiles_streamk, total_partial_tiles_streamk, iters_per_tile, BLOCK_M, BLOCK_N, BLOCK_K,\
+  \ ACC_TYPE, GROUP_M)`: Manages the first set of work-items executed on the hardware, handling a batch\
+  \ of tiles efficiently by leveraging Stream-K techniques.\n            - `full_tiles(A, B, C, M, N,\
+  \ K, stride_am, stride_ak, stride_bk, stride_bn, stride_cm, stride_cn, total_tiles_streamk, BLOCK_M,\
+  \ BLOCK_N, BLOCK_K, ACC_TYPE, GROUP_M)`: Computes tiles left after the initial \"first wave,\" managing\
+  \ the remaining work through classical blocking.\n\n            The `matmul` class orchestrates the\
+  \ execution, setting up parameters and calling the necessary functions. The `_call` method manages grid\
+  \ setup, memory allocation, and kernel execution, while `forward` exposes the operation as a PyTorch-compatible\
+  \ function. Key input parameters include the dimensions of matrices A and B (M, N, K), block sizes (BLK_M,\
+  \ BLK_N, BLK_K), and parallelization configuration (number of stages/warps). Output is the product matrix\
+  \ C, calculated from the input matrices A and B.\n\nRequirements (SparkDistill / TritonBench harness):\n\
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor\
+  \ over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include\
+  \ @triton.autotune with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid\
+  \ and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short\
+  \ note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- convolution
+source:
+  channel: G
+  file: streamk_matmul.py
+  repo: dmitrymailk/t5_optimization
+  difficulty: '4'
+  star: 0
+  simp_instru_len: 259
+  comp_instru_len: 641
+  output_triton_len: 3814
+gold_kernel: data/TritonBench_G_v1/streamk_matmul.py

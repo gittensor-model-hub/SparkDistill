@@ -1,0 +1,109 @@
+id: sub_gelu
+level: 3
+category: kernel_translation
+title: Sub Gelu
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `sub_gelu`.
+
+
+  Operator description:
+
+  Subtracts ''other'', scaled by ''alpha'', from ''input'', and then applies the Gaussian Error Linear
+  Units (GELU) activation function to the result. The function supports two modes for GELU: exact and
+  approximate using ''tanh''.
+
+
+  Target Python signature / call pattern:
+
+  def sub_gelu(input, other, alpha=1, approximate=''none'', out=None) -> Tensor: input (Tensor): The input
+  tensor. other (Tensor or Number): The tensor or number to subtract from input. alpha (Number, optional):
+  The multiplier for other. Default is 1. approximate (str, optional): The approximation method for GELU.
+  Default is ''none''. out (Tensor, optional): The output tensor.
+
+
+  Mathematical definition:
+
+  out_i = GELU(input_i - alpha * other_i)
+
+
+  GELU(x) = x * Φ(x) when approximate is ''none''
+
+  GELU(x) = 0.5 * x * (1 + Tanh(√(2/π) * (x + 0.044715 * x^3))) when approximate is ''tanh''
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  sub_result = torch.sub(input, other, alpha=alpha)
+
+  return torch.nn.functional.gelu(sub_result, approximate=approximate, out=out)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> import torch
+
+  >>> import torch.nn.functional as F
+
+  >>> a = torch.tensor([1.5, -2.0, 3.0])
+
+  >>> b = torch.tensor([0.5, 1.0, -1.5])
+
+  >>> result = sub_gelu(a, b, alpha=2)
+
+  >>> result
+
+  tensor([ 1.3998, -0.0000,  1.7744])
+
+
+  >>> result = sub_gelu(a, b, alpha=2, approximate=''tanh'')
+
+  >>> result
+
+  tensor([ 1.3998, -0.0000,  1.7744])
+
+
+  Additional constraints:
+
+  The function allows for an optional output tensor and supports both exact and approximate GELU calculations.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 5
+  torch_cnt: 2
+  func_inputs: 'def sub_gelu(input, other, alpha=1, approximate=''none'', out=None) -> Tensor: input (Tensor):
+    The input tensor. other (Tensor or Number): The tensor or number to subtract from input. alpha (Number,
+    optional): The multiplier for other. Default is 1. approximate (str, optional): The approximation
+    method for GELU. Default is ''none''. out (Tensor, optional): The output tensor.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+source:
+  channel: T
+  file: sub_gelu.py
+  name: sub_gelu
+  difficulty: '3'
+  params_cnt: 5
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/sub_gelu.py

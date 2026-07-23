@@ -1,0 +1,58 @@
+id: softmax_mul
+level: 3
+category: kernel_translation
+title: Softmax Mul
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `softmax_mul`.\n\
+  \nOperator description:\nApplies the softmax function to the input tensor along the specified dimension,\
+  \ and then multiplies the softmaxed values by another tensor or number. The softmax function re-scales\
+  \ the elements so that they lie in the range [0, 1] and sum to 1 along the specified dimension.\n\n\
+  Target Python signature / call pattern:\ndef softmax_mul(input, other, dim, dtype=None, out=None) ->\
+  \ Tensor: Applies the softmax function to the input tensor along the specified dimension, and then multiplies\
+  \ the softmaxed values by other. Args: input (Tensor): The input tensor to apply softmax on. other (Tensor\
+  \ or Number): The tensor or number to multiply with the softmaxed values. dim (int): The dimension along\
+  \ which softmax will be computed. dtype (torch.dtype, optional): The desired data type of returned tensor.\
+  \ If specified, the input tensor is cast to dtype before the operation. Default is None. out (Tensor,\
+  \ optional): The output tensor.\n\nMathematical definition:\n\\text{out}_i = \\text{Softmax}(\\text{input}_i)\
+  \ \\times \\text{other}_i\n    \\text{Softmax}(x_{i}) = \\frac{\\exp(x_i)}{\\sum_j \\exp(x_j)}\n\nPyTorch\
+  \ reference snippet:\n```python\nsoftmax_result = torch.nn.functional.softmax(input, dim=dim, dtype=dtype)\n\
+  \    return torch.mul(softmax_result, other, out=out)\n```\n\nExample / usage notes:\n>>> import torch\n\
+  >>> import torch.nn.functional as F\n>>> a = torch.tensor([[1.0, 2.0, 3.0], [1.0, 2.0, 3.0]])\n>>> b\
+  \ = torch.tensor([[0.5, 1.0, 1.5], [1.0, 0.5, 2.0]])\n>>> # Apply softmax along dim=1, then multiply\
+  \ by b\n>>> result = softmax_mul(a, b, dim=1)\n>>> result\ntensor([[0.0900, 0.2447, 0.6652],\n     \
+  \   [0.1966, 0.0892, 0.7142]])\n\n>>> # Using a scalar for multiplication\n>>> result = softmax_mul(a,\
+  \ 2, dim=1)\n>>> result\ntensor([[0.2689, 0.7311, 2.0000],\n        [0.2689, 0.7311, 2.0000]])\n\nAdditional\
+  \ constraints:\nSoftmax re-scales the elements so that they lie in the range [0, 1] and sum to 1 along\
+  \ the specified dimension.\n\nRequirements (SparkDistill / TritonBench harness):\n- Translate the PyTorch\
+  \ reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics: include torch.allclose\
+  \ vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor\
+  \ over tl.make_block_ptr\n- Add @triton.autotune when there are meaningful tile/block choices\n- Provide\
+  \ a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 5
+  torch_cnt: 2
+  func_inputs: 'def softmax_mul(input, other, dim, dtype=None, out=None) -> Tensor: Applies the softmax
+    function to the input tensor along the specified dimension, and then multiplies the softmaxed values
+    by other. Args: input (Tensor): The input tensor to apply softmax on. other (Tensor or Number): The
+    tensor or number to multiply with the softmaxed values. dim (int): The dimension along which softmax
+    will be computed. dtype (torch.dtype, optional): The desired data type of returned tensor. If specified,
+    the i'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- softmax
+- elementwise
+- reduction
+source:
+  channel: T
+  file: softmax_mul.py
+  name: softmax_mul
+  difficulty: '4'
+  params_cnt: 5
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/softmax_mul.py

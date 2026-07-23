@@ -1,0 +1,87 @@
+id: fused_cholesky_solve
+level: 4
+category: kernel_translation
+title: Fused Cholesky Solve
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `fused_cholesky_solve`.
+
+
+  Operator description:
+
+  Computes the solution `x` to the equation `Ax = b` using the Cholesky decomposition. It first performs
+  Cholesky decomposition on a symmetric positive-definite matrix `A` to obtain a lower triangular matrix
+  `L` such that `A = L * L.T`, then solves for `x` in `Ax = b` using the Cholesky factorization.
+
+
+  Target Python signature / call pattern:
+
+  def fused_cholesky_solve(A: Tensor, b: Tensor) -> Tensor: A: The symmetric positive-definite matrix
+  `A` of shape `(n, n)`. b: The right-hand side tensor `b` of shape `(n, k)`.
+
+
+  Mathematical definition:
+
+  Cholesky decomposition: A = L * L.T, Solve: Ax = b
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  L = torch.linalg.cholesky(A)
+
+  x = torch.cholesky_solve(b, L)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> A = torch.tensor([[4.0, 1.0], [1.0, 3.0]])
+
+  >>> b = torch.tensor([[1.0], [2.0]])
+
+  >>> x = fused_cholesky_solve(A, b)
+
+  >>> print(x)
+
+
+  Additional constraints:
+
+  The function assumes that the input matrix `A` is symmetric positive-definite.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 2
+  torch_cnt: 2
+  func_inputs: 'def fused_cholesky_solve(A: Tensor, b: Tensor) -> Tensor: A: The symmetric positive-definite
+    matrix `A` of shape `(n, n)`. b: The right-hand side tensor `b` of shape `(n, k)`.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- reduction
+- fused
+source:
+  channel: T
+  file: fused_cholesky_solve.py
+  name: fused_cholesky_solve
+  difficulty: '4'
+  params_cnt: 2
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/fused_cholesky_solve.py

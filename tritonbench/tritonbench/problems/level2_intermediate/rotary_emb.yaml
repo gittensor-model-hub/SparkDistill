@@ -1,0 +1,53 @@
+id: rotary_emb
+level: 2
+category: kernel_generation
+title: Rotary Emb
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `rotary_emb.py` (repo: ModelTC/lightllm).\n\nTask description:\nThe `_rotary_kernel` is a Triton\
+  \ JIT-compiled kernel aimed at applying a rotary positional encoding to tensors `Q` and `K`. This is\
+  \ achieved through the use of precomputed cosine and sine values contained in tensors `Cos` and `Sin`.\
+  \ The kernel operates on blocks of heads and sequences defined by compile-time constants `BLOCK_HEAD`,\
+  \ `BLOCK_SEQ`, and `BLOCK_DMODEL`.\n\n            The kernel leverages Triton's parallel processing\
+  \ model by executing on a 2D grid. Each block is tasked with processing specific portions of the input\
+  \ based on the current head and sequence indices, which are derived from the program's IDs (`tl.program_id(0)`\
+  \ and `tl.program_id(1)`). Strides and offsets are computed to efficiently access and manipulate the\
+  \ relevant sections of `Q`, `K`, `Cos`, and `Sin`.\n\n            The main computational steps involve:\n\
+  \            - Calculating offsets for `Q` and `K` based on their strides and the current block indices.\n\
+  \            - Loading segments of `Q` and `K` using these offsets and applying boundary masks to avoid\
+  \ out-of-bounds accesses.\n            - Applying the rotary transformation by combining the loaded\
+  \ values with `Cos` and `Sin` using the rotation formulas: `out0 = q0 * cos0 - q1 * sin0` and `out1\
+  \ = q0 * sin1 + q1 * cos1`.\n            - Storing the transformed segments back to the original locations\
+  \ in `Q` and `K`.\n\n            The `rotary_emb_fwd` function acts as a high-level interface for invoking\
+  \ the kernel. It validates input shapes, calculates execution grid dimensions (`grid`), and determines\
+  \ the number of warps to use based on the head dimension size. This function encapsulates all preparation\
+  \ logic required for the kernel execution, ensuring that `Q`, `K`, `Cos`, and `Sin` are correctly aligned\
+  \ with the expected input format of `_rotary_kernel`.\n\nRequirements (SparkDistill / TritonBench harness):\n\
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor\
+  \ over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include\
+  \ @triton.autotune with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid\
+  \ and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short\
+  \ note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- rope
+- elementwise
+- reduction
+source:
+  channel: G
+  file: rotary_emb.py
+  repo: ModelTC/lightllm
+  difficulty: '3'
+  star: 2647
+  simp_instru_len: 339
+  comp_instru_len: 449
+  output_triton_len: 2239
+gold_kernel: data/TritonBench_G_v1/rotary_emb.py

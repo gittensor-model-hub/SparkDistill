@@ -1,0 +1,43 @@
+id: f8_conversion_utils
+level: 3
+category: kernel_debugging
+title: F8 Conversion Utils
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `f8_conversion_utils.py` (repo: ELS-RD/kernl).\n\nTask description:\nThe code defines two conversion\
+  \ operations using Triton: one for converting float8 data stored as int8 to float16 (`kernel_f8_to_f16`\
+  \ and `f8_to_f16`), and another for converting float16 or float32 data to float8 stored as int8 (`kernel_f16_to_f8`\
+  \ and `f16_to_f8`). \n            The kernel `kernel_f8_to_f16` identifies a program ID `pid` and computes\
+  \ offsets `offs` based on `BLOCK_SIZE`. It loads data from input `X` with masking for valid indices,\
+  \ then writes the same data to output `Y`. The conversion is performed by interpreting the input int8\
+  \ tensor as float8.\n            The `f8_to_f16` function ensures the input tensor is of type `torch.int8`\
+  \ and resides on a CUDA device. It creates an output tensor of `torch.float16` type. It calculates the\
+  \ grid size based on the number of elements, and calls the Triton kernel.\n            The `kernel_f16_to_f8`\
+  \ operates similarly, processing float16 or float32 inputs and outputting int8 results, with appropriate\
+  \ reinterpretation of data types. The `f16_to_f8` function follows similar assertions and grid calculations.\n\
+  \            Both functions rely on Triton’s grid and masking functionalities for efficient computation.\n\
+  \nRequirements (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell\
+  \ (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use\
+  \ @triton.jit kernels with correct boundary masking\n- Include @triton.autotune with at least 3 configs\
+  \ when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose correctness test\n\
+  - Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally skip autotune\
+  \ for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- mask
+tags:
+- quantization
+- convolution
+source:
+  channel: G
+  file: f8_conversion_utils.py
+  repo: ELS-RD/kernl
+  difficulty: '2'
+  star: 1537
+  simp_instru_len: 130
+  comp_instru_len: 322
+  output_triton_len: 674
+gold_kernel: data/TritonBench_G_v1/f8_conversion_utils.py

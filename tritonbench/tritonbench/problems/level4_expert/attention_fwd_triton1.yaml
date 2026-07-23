@@ -1,0 +1,53 @@
+id: attention_fwd_triton1
+level: 4
+category: kernel_generation
+title: Attention Fwd Triton1
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `attention_fwd_triton1.py` (repo: sustcsonglin/flash-linear-attention).\n\nTask description:\n\
+  The provided Triton operator implements a forward-pass kernel for the attention mechanism, a central\
+  \ part of transformer models. The `attention_fwd_kernel` function is compiled using Triton’s `@triton.jit`,\
+  \ allowing the kernel to execute on the GPU. It computes the scaled dot-product attention, which involves\
+  \ taking queries (q), keys (k), and values (v) as inputs. The calculations are performed over batched\
+  \ multi-head inputs, where each batch and head are processed independently.\n\n            Inside the\
+  \ kernel, `b_h` is initialized as a zero matrix and is used to accumulate intermediate results. The\
+  \ loop iterates over divided blocks of the sequence length (`tl.cdiv(T, BT)`). In each iteration, memory\
+  \ pointers `p_q`, `p_k`, `p_v`, `p_h`, and `p_o` are set up to point to the corresponding slices of\
+  \ the q, k, v, h, and o tensors. The dimensions and strides are set to efficiently load and store tensor\
+  \ blocks.\n\n            The core computation begins with loading blocks of the query and key tensors,\
+  \ followed by a scaled dot-product to compute attention scores (`b_s`). The block of the value tensor\
+  \ is then weighted by these scores to produce the output block (`b_o`). Depending on the `IFCOND` condition,\
+  \ either a conditional update or standard update is applied to the intermediate `b_h` tensor, which\
+  \ may also be optionally stored when the `STORE` flag is set.\n\n            The class `AttentionFunction`\
+  \ provides a user interface for invoking the Triton kernel. It initializes the output tensor `o` and\
+  \ an intermediate storage tensor `h`. The forward method sets the kernel launch configurations, like\
+  \ grid size, number of warps, and stages, tailored for different input dimensions. The method also computes\
+  \ scaling based on the head dimension and calls the Triton kernel with these parameters. The function\
+  \ returns the computed output tensor.\n\nRequirements (SparkDistill / TritonBench harness):\n- Target\
+  \ Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over\
+  \ deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include @triton.autotune\
+  \ with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose\
+  \ correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally\
+  \ skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- attention
+- matmul
+- elementwise
+source:
+  channel: G
+  file: attention_fwd_triton1.py
+  repo: sustcsonglin/flash-linear-attention
+  difficulty: '4'
+  star: 1382
+  simp_instru_len: 324
+  comp_instru_len: 439
+  output_triton_len: 1210
+gold_kernel: data/TritonBench_G_v1/attention_fwd_triton1.py

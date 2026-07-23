@@ -1,0 +1,68 @@
+id: block_sparse_attn
+level: 4
+category: kernel_generation
+title: Block Sparse Attn
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `block_sparse_attn.py` (repo: microsoft/onnxruntime).
+
+
+  Task description:
+
+  The function `block_sparse_attention_kernel` is a Triton GPU kernel designed to perform block-sparse
+  attention for transformer models in the context of prompt processing. It assumes a past sequence length
+  of zero and right-padding only. The kernel takes as inputs the query tensor Q, key tensor K, value tensor
+  V, and layout data in CSR (Compressed Sparse Row) format, specifically `layout_csr_row_indices` and
+  `layout_csr_col_indices`. The kernel executes in a grid determined by the number of query blocks and
+  the product of batch size and number of heads. It utilizes offsets to correctly index into these tensors,
+  leveraging the block sizes BLOCK_M, BLOCK_N, and BLOCK_D. Each block''s indices in the query (Q), key
+  (K), and value (V) tensors are calculated, and memory is managed using these indices to perform the
+  necessary loads. The kernel performs key calculations including computing the dot product between query
+  and key blocks (qk), scaling by `softmax_scale`, and adjusting using softmax to prevent overflow. The
+  results are accumulated over the required dimensions to produce the final attention-weighted values
+  which are stored in the output tensor `out`. Support for multi-head attention is built-in, with special
+  handling for head grouping based on `num_heads` and `num_kv_heads`. If multiple data blocks are present
+  (NUM_D_BLOCKS > 1), additional accumulation is performed to account for the segmented data.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- attention
+- matmul
+- softmax
+- elementwise
+- reduction
+- sparse
+source:
+  channel: G
+  file: block_sparse_attn.py
+  repo: microsoft/onnxruntime
+  difficulty: '4'
+  star: 14860
+  simp_instru_len: 154
+  comp_instru_len: 334
+  output_triton_len: 3170
+gold_kernel: data/TritonBench_G_v1/block_sparse_attn.py

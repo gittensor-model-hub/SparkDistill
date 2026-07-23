@@ -1,0 +1,57 @@
+id: chunk_retention
+level: 4
+category: kernel_generation
+title: Chunk Retention
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `chunk_retention.py` (repo: josStorer/RWKV-Runner).\n\nTask description:\nThis code implements\
+  \ chunk retention operations using Triton, targeting high efficiency for transformer-like operations.\
+  \ It includes several kernels, each focused on specific computation aspects, along with a PyTorch autograd\
+  \ function to facilitate integration into neural network training pipelines.\n\n        - `chunk_retention_fwd_kernel_h`:\
+  \ This Triton kernel calculates an intermediate tensor 'h'. It accepts inputs 'k', 'v', and optional\
+  \ 'initial_state', manipulating a buffer 'b_h' initialized to zeros. If `USE_INITIAL_STATE` is true,\
+  \ it loads initial state data into 'b_h'. It performs several steps:\n            1. Computes decay\
+  \ factors 'd_b' and 'd_i' based on a custom decay function.\n            2. Iterates over time dimension\
+  \ 'NT', loading blocks of 'k' and 'v'.\n            3. Updates 'b_h' with a dot product computation,\
+  \ applying decay.\n            4. Optionally stores final state in 'final_state' if `STORE_FINAL_STATE`\
+  \ is set.\n\n        - `chunk_retention_fwd_kernel_o`: This kernel computes the output tensor 'o'. It\
+  \ integrates:\n            1. Loading blocks of 'q', 'k', 'v', and precomputed 'h'.\n            2.\
+  \ Uses decay factors 'd_i' and precomputed values to modulate contributions.\n            3. Aggregates\
+  \ contributions in 'b_o' and 'b_s' from interactions between 'q', 'k', and 'v'.\n            4. Final\
+  \ 'o' is calculated by scaling and storing the aggregated results.\n\n        - `chunk_retention_bwd_kernel_dh`:\
+  \ Part of the backward pass kernels, it calculates 'dh', accumulating gradient contributions while iterating\
+  \ backwards over time steps.\n\n        - `chunk_retention_bwd_kernel_dqkv`: This kernel computes the\
+  \ gradients with respect to 'q', 'k', and 'v' (denoted as 'dq', 'dk', 'dv'). It uses:\n            1.\
+  \ Loading blocks and calculating gradients using Triton's matrix operations.\n            2. Applying\
+  \ decay and scaling to modulate contributions.\n            3. Storing calculated gradients for 'q',\
+  \ 'k', 'v' efficiently.\n\n        - `ChunkRetentionFunction`: A custom PyTorch autograd function wrapping\
+  \ these kernels, providing an interface for forward and backward passes. It automatically handles device\
+  \ operations and manages kernel launch configuration.\n\n        The `chunk_retention` function acts\
+  \ as a user interface, preparing inputs, invoking the autograd function, and handling optional initial\
+  \ state and final state management.\n\nRequirements (SparkDistill / TritonBench harness):\n- Target\
+  \ Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over\
+  \ deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include @triton.autotune\
+  \ with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose\
+  \ correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally\
+  \ skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+source:
+  channel: G
+  file: chunk_retention.py
+  repo: josStorer/RWKV-Runner
+  difficulty: '4'
+  star: 5337
+  simp_instru_len: 275
+  comp_instru_len: 600
+  output_triton_len: 6611
+gold_kernel: data/TritonBench_G_v1/chunk_retention.py

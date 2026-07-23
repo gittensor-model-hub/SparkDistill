@@ -1,0 +1,53 @@
+id: torch_ones_like
+level: 1
+category: kernel_translation
+title: Torch Ones Like
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.ones_like`.\n\
+  \nOperator description:\nReturns a tensor filled with the scalar value 1, with the same size as the\
+  \ input tensor. It mirrors the properties of the input in terms of dtype, layout, device, and memory\
+  \ format unless specified otherwise. The function does not support the 'out' keyword as of version 0.4,\
+  \ and equivalent operation needs an alternative approach.\n\nTarget Python signature / call pattern:\n\
+  ones_like(input, *, dtype=None, layout=None, device=None, requires_grad=False, memory_format=torch.preserve_format)\
+  \ -> Tensor; input (Tensor): the size of :attr:`input` will determine size of the output tensor.; dtype\
+  \ (torch.dtype, optional): the desired data type of returned Tensor. Default: if None, defaults to the\
+  \ dtype of :attr:`input`.; layout (torch.layout, optional): the desired layout of returned tensor. Default:\
+  \ if None, defaults to the layout of :attr:`input`.; device (torch.device, optional): the desired device\
+  \ of returned tensor. Default: if None, defaults to the device of :attr:`input`.; requires_grad (bool,\
+  \ optional): If autograd should record operations on the returned tensor. Default: False.; memory_format\
+  \ (torch.memory_format, optional): the desired memory format of returned Tensor. Default: torch.preserve_format.\n\
+  \nPyTorch reference snippet:\n```python\ntorch.ones(input.size(), dtype=input.dtype, layout=input.layout,\
+  \ device=input.device)\n```\n\nExample / usage notes:\n>>> input = torch.empty(2, 3)\n>>> torch.ones_like(input)\n\
+  tensor([[ 1.,  1.,  1.],\n        [ 1.,  1.,  1.]])\n\nAdditional constraints:\nFunction does not support\
+  \ an 'out' keyword as of version 0.4. Use torch.ones for similar functionality if 'out' keyword is needed.\n\
+  \nRequirements (SparkDistill / TritonBench harness):\n- Translate the PyTorch reference into Triton\
+  \ 3.7.1 kernels for Blackwell SM120\n- Preserve numerics: include torch.allclose vs the reference (atol/rtol\
+  \ appropriate for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over\
+  \ tl.make_block_ptr\n- Add @triton.autotune when there are meaningful tile/block choices\n- Provide\
+  \ a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 6
+  torch_cnt: 1
+  func_inputs: 'ones_like(input, *, dtype=None, layout=None, device=None, requires_grad=False, memory_format=torch.preserve_format)
+    -> Tensor; input (Tensor): the size of :attr:`input` will determine size of the output tensor.; dtype
+    (torch.dtype, optional): the desired data type of returned Tensor. Default: if None, defaults to the
+    dtype of :attr:`input`.; layout (torch.layout, optional): the desired layout of returned tensor. Default:
+    if None, defaults to the layout of :attr:`input`.; device (torch.device, op'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- rope
+- reduction
+source:
+  channel: T
+  file: ones_like.py
+  name: torch.ones_like
+  difficulty: '1'
+  params_cnt: 6
+  torch_cnt: 1
+gold_kernel: data/TritonBench_T_v1/ones_like.py

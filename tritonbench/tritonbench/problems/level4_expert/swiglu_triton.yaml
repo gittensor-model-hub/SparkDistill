@@ -1,0 +1,51 @@
+id: swiglu_triton
+level: 4
+category: kernel_generation
+title: Swiglu Triton
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `swiglu_triton.py` (repo: linkedin/Liger-Kernel).\n\nTask description:\nThe Triton code defines\
+  \ custom forward and backward operations for the SWiGLU (SwiGLU: Swish-Gated Linear Units) function\
+  \ using Triton kernels. The main functions are `swiglu_forward` and `swiglu_backward`. \n          \
+  \  `swiglu_forward` takes input tensors `a` and `b`, reshapes them, and prepares an output tensor `c`.\
+  \ It computes the result using the `_swiglu_forward_kernel`, which calculates the element-wise product\
+  \ of `b` and the SiLU-activated `a`. The kernel uses `tl.load` to load data in blocks, applies the SiLU\
+  \ function defined by `silu`, and stores the result using `tl.store`. The kernel launches with a configurable\
+  \ grid size defined by the number of rows in the reshaped input tensor and a calculated block size,\
+  \ `BLOCK_SIZE`, which is a power of two based on the number of columns and limited by `MAX_FUSED_SIZE`.\n\
+  \            `swiglu_backward` computes gradients for `a` and `b` using the `_swiglu_backward_kernel`,\
+  \ which utilizes recomputation to save memory. It recalculates the SiLU activation and uses it to compute\
+  \ the gradients with respect to the input tensors. The backward kernel also uses `tl.load` and `tl.store`\
+  \ for handling data and follows a similar block configuration as the forward kernel.\n            The\
+  \ helper function `calculate_settings` assists in determining the optimal `BLOCK_SIZE` and `num_warps`\
+  \ based on the input size, with adjustments depending on the hardware being used (HIP or otherwise).\
+  \ The SiLU activation is implemented as a Triton JIT-compiled function, `silu`, using the Triton `tl.sigmoid`\
+  \ operation to define the SiLU function.\n\nRequirements (SparkDistill / TritonBench harness):\n- Target\
+  \ Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over\
+  \ deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include @triton.autotune\
+  \ with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose\
+  \ correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally\
+  \ skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+- fused
+source:
+  channel: G
+  file: swiglu_triton.py
+  repo: linkedin/Liger-Kernel
+  difficulty: '3'
+  star: 3606
+  simp_instru_len: 219
+  comp_instru_len: 417
+  output_triton_len: 1311
+gold_kernel: data/TritonBench_G_v1/swiglu_triton.py

@@ -1,0 +1,86 @@
+id: sub
+level: 1
+category: kernel_translation
+title: Sub
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `sub`.
+
+
+  Operator description:
+
+  Subtracts :attr:`other`, scaled by :attr:`alpha`, from :attr:`input`. The operation is defined as: out_i
+  = input_i - alpha * other_i. Supports broadcasting to a common shape, type promotion, and works with
+  integer, float, and complex inputs.
+
+
+  Target Python signature / call pattern:
+
+  sub(input, other, *, alpha=1, out=None) -> Tensor; input (Tensor): the input tensor.; other (Tensor
+  or Number): the tensor or number to subtract from input.; alpha (Number): the multiplier for other.;
+  out (Tensor, optional): the output tensor.
+
+
+  Mathematical definition:
+
+  out_i = input_i - alpha * other_i
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  torch.sub(a, b, alpha=2)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> a = torch.tensor((1, 2))
+
+  >>> b = torch.tensor((0, 1))
+
+  >>> torch.sub(a, b, alpha=2)
+
+  tensor([1, 0])
+
+
+  Additional constraints:
+
+  Supports broadcasting, type promotion, and works with integer, float, and complex inputs.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 4
+  torch_cnt: 1
+  func_inputs: 'sub(input, other, *, alpha=1, out=None) -> Tensor; input (Tensor): the input tensor.;
+    other (Tensor or Number): the tensor or number to subtract from input.; alpha (Number): the multiplier
+    for other.; out (Tensor, optional): the output tensor.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+source:
+  channel: T
+  file: sub.py
+  name: sub
+  difficulty: '2'
+  params_cnt: 4
+  torch_cnt: 1
+gold_kernel: data/TritonBench_T_v1/sub.py

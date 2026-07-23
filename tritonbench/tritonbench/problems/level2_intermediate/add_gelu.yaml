@@ -1,0 +1,101 @@
+id: add_gelu
+level: 2
+category: kernel_translation
+title: Add Gelu
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `add_gelu`.
+
+
+  Operator description:
+
+  Adds the tensor or number `other`, scaled by the multiplier `alpha`, to the input tensor `input`, and
+  then applies the Gaussian Error Linear Units (GELU) activation function to the result.
+
+
+  Target Python signature / call pattern:
+
+  def add_gelu(input, other, alpha=1, approximate=''none'', out=None) -> Tensor: input (Tensor): The input
+  tensor. other (Tensor or Number): The tensor or number to add to input. alpha (Number, optional): The
+  multiplier for other. Default is 1. approximate (str, optional): The approximation method for GELU.
+  Default is ''none''. out (Tensor, optional): The output tensor.
+
+
+  Mathematical definition:
+
+  \text{out}_i = \text{GELU}(\text{input}_i + \text{alpha} \times \text{other}_i) where GELU is defined
+  as: - \text{GELU}(x) = x * \Phi(x) when approximate is ''none'', - \text{GELU}(x) = 0.5 * x * (1 + \text{Tanh}(\sqrt{2
+  / \pi} * (x + 0.044715 * x^3))) when approximate is ''tanh''.
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  add_result = torch.add(input, other, alpha=alpha)
+
+  return torch.nn.functional.gelu(add_result, approximate=approximate, out=out)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> import torch
+
+  >>> import torch.nn.functional as F
+
+  >>> a = torch.tensor([1.0, -2.0, 3.0])
+
+  >>> b = torch.tensor([0.5, 1.5, -1.0])
+
+  >>> result = add_gelu(a, b, alpha=2)
+
+  >>> result
+
+  >>> result = add_gelu(a, b, alpha=2, approximate=''tanh'')
+
+  >>> result
+
+
+  Additional constraints:
+
+  The GELU function is defined with two methods: an exact method using the Cumulative Distribution Function
+  for Gaussian Distribution, and an approximate method using a tanh-based formula.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 5
+  torch_cnt: 2
+  func_inputs: 'def add_gelu(input, other, alpha=1, approximate=''none'', out=None) -> Tensor: input (Tensor):
+    The input tensor. other (Tensor or Number): The tensor or number to add to input. alpha (Number, optional):
+    The multiplier for other. Default is 1. approximate (str, optional): The approximation method for
+    GELU. Default is ''none''. out (Tensor, optional): The output tensor.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+source:
+  channel: T
+  file: add_gelu.py
+  name: add_gelu
+  difficulty: '2'
+  params_cnt: 5
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/add_gelu.py

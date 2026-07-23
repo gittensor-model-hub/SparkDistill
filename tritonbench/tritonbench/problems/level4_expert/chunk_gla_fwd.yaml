@@ -1,0 +1,62 @@
+id: chunk_gla_fwd
+level: 4
+category: kernel_generation
+title: Chunk Gla Fwd
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `chunk_gla_fwd.py` (repo: sustcsonglin/flash-linear-attention).\n\nTask description:\nThe Triton\
+  \ code is designed to handle complex matrix operations, primarily involving computation of attention\
+  \ matrices and outputs using block-based processing. Here's an intricate breakdown:\n\n            The\
+  \ code consists of multiple Triton kernels, each designed for different segments of the operation:\n\
+  \n            1. **chunk_gla_fwd_A_kernel_intra_sub_inter**:\n               - Input Parameters: `q`\
+  \ (query), `k` (key), `g` (gradient or gating), `A` (matrix for storing results), and several other\
+  \ configuration scalars.\n               - Functionality: This kernel computes a sub-block of the matrix\
+  \ `A` using input matrices `q`, `k`, and `g`. It ensures that computations are done only for valid blocks\
+  \ (`i_i <= i_j` is skipped to ensure upper triangle operations). It loads blocks, scales and modifies\
+  \ them using exponential transformations, and accumulates results in `b_A`. The computed block is then\
+  \ stored back.\n\n            2. **chunk_gla_fwd_A_kernel_intra_sub_intra**:\n               - Similar\
+  \ in setup to the first kernel but focuses on processing sub-blocks intra-thread to cover diagonal segments\
+  \ of `A`.\n               - Implements logic to sum over the product of matrix blocks while considering\
+  \ exponentials and scaling for attention-like computations.\n\n            3. **chunk_gla_fwd_A_kernel_intra_sub_intra_split**:\n\
+  \               - Introduces splitting of computation along the `K` dimension when `K` is large. This\
+  \ kernel writes intermediate results into `A_intra`, allowing for memory-efficient partial computation\
+  \ across the `K` dimension.\n\n            4. **chunk_gla_fwd_A_kernel_intra_sub_intra_merge**:\n  \
+  \             - Takes partially computed blocks from `A_intra` and merges them into the main matrix\
+  \ `A`. This step is necessary to consolidate the split results into a coherent output.\n\n         \
+  \   5. **chunk_gla_fwd_kernel_o**:\n               - Manages the construction of output `o`, crucial\
+  \ for attention mechanisms.\n               - It processes inputs using gated mechanisms and cumulative\
+  \ sums, combining them with the previous results to form the final output `o`.\n\n            Wrapper\
+  \ Functions:\n            - `chunk_fwd_intra_gated_gk_fn`: Executes the sequence of kernels responsible\
+  \ for calculating `A` based on the dimensions and splits specified.\n            - `chunk_fwd_o_gated_gk_fn`:\
+  \ Employs the previously computed `A` along with other inputs to determine the final result `o`.\n\n\
+  \            The kernels utilize Triton's efficient block operations, leveraging parallelism in GPU\
+  \ architectures. This includes advanced techniques like `tl.dot` for fast matrix multiplication and\
+  \ `tl.load`/`tl.store` for seamless data movement across the GPU.\n\nRequirements (SparkDistill / TritonBench\
+  \ harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor\
+  \ over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include\
+  \ @triton.autotune with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid\
+  \ and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short\
+  \ note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- attention
+- matmul
+- elementwise
+- reduction
+source:
+  channel: G
+  file: chunk_gla_fwd.py
+  repo: sustcsonglin/flash-linear-attention
+  difficulty: '4'
+  star: 1382
+  simp_instru_len: 532
+  comp_instru_len: 659
+  output_triton_len: 5345
+gold_kernel: data/TritonBench_G_v1/chunk_gla_fwd.py

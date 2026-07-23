@@ -1,0 +1,74 @@
+id: torch_nn_functional_gelu
+level: 4
+category: kernel_translation
+title: Torch Nn Functional Gelu
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.nn.functional.gelu`.
+
+
+  Operator description:
+
+  Applies the Gaussian Error Linear Unit (GELU) activation function element-wise to the input tensor.
+  The function can be computed exactly or approximately using a tanh-based formula depending on the ''approximate''
+  argument.
+
+
+  Target Python signature / call pattern:
+
+  gelu(input, approximate=''none'') -> Tensor
+
+
+  Mathematical definition:
+
+  When approximate is ''none'': GELU(x) = x * Φ(x), where Φ(x) is the Cumulative Distribution Function
+  for Gaussian Distribution. When approximate is ''tanh'': GELU(x) = 0.5 * x * (1 + Tanh(√(2/π) * (x +
+  0.044715 * x^3)))
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  torch.nn.functional.gelu(input, approximate=''none'')
+
+  ```
+
+
+  Additional constraints:
+
+  See Gaussian Error Linear Units (GELUs) https://arxiv.org/abs/1606.08415
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 2
+  torch_cnt: 1
+  func_inputs: gelu(input, approximate='none') -> Tensor
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+source:
+  channel: T
+  file: gelu.py
+  name: torch.nn.functional.gelu
+  difficulty: '4'
+  params_cnt: 2
+  torch_cnt: 1
+gold_kernel: data/TritonBench_T_v1/gelu.py

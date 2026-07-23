@@ -1,0 +1,50 @@
+id: torch_mean
+level: 1
+category: kernel_translation
+title: Torch Mean
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.mean`.\n\
+  \nOperator description:\nReturns the mean value of each row of the input tensor in the given dimension\
+  \ dim. If dim is a list of dimensions, reduce over all of them. If keepdim is True, the output tensor\
+  \ is of the same size as input except in the dimension(s) dim where it is of size 1. Otherwise, dim\
+  \ is squeezed, resulting in the output tensor having 1 (or len(dim)) fewer dimension(s).\n\nTarget Python\
+  \ signature / call pattern:\ninput (Tensor): the input tensor. dim (int or tuple of ints): the dimension\
+  \ or dimensions to reduce. keepdim (bool): whether the output tensor has dim retained or not. dtype\
+  \ (torch.dtype, optional): the desired data type of returned tensor. If specified, the input tensor\
+  \ is casted to dtype before the operation is performed. This is useful for preventing data type overflows.\
+  \ Default: None. out (Tensor, optional): the output tensor.\n\nPyTorch reference snippet:\n```python\n\
+  torch.mean(a, 1); torch.mean(a, 1, True)\n```\n\nExample / usage notes:\n>>> a = torch.randn(4, 4)\n\
+  >>> a\ntensor([[-0.3841,  0.6320,  0.4254, -0.7384],\n        [-0.9644,  1.0131, -0.6549, -1.4279],\n\
+  \        [-0.2951, -1.3350, -0.7694,  0.5600],\n        [ 1.0842, -0.9580,  0.3623,  0.2343]])\n>>>\
+  \ torch.mean(a, 1)\ntensor([-0.0163, -0.5085, -0.4599,  0.1807])\n>>> torch.mean(a, 1, True)\ntensor([[-0.0163],\n\
+  \        [-0.5085],\n        [-0.4599],\n        [ 0.1807]])\n\nAdditional constraints:\nSee also torch.nanmean\
+  \ which computes the mean value of non-NaN elements.\n\nRequirements (SparkDistill / TritonBench harness):\n\
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics:\
+  \ include torch.allclose vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary\
+  \ masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n- Add @triton.autotune when there\
+  \ are meaningful tile/block choices\n- Provide a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 5
+  torch_cnt: 2
+  func_inputs: 'input (Tensor): the input tensor. dim (int or tuple of ints): the dimension or dimensions
+    to reduce. keepdim (bool): whether the output tensor has dim retained or not. dtype (torch.dtype,
+    optional): the desired data type of returned tensor. If specified, the input tensor is casted to dtype
+    before the operation is performed. This is useful for preventing data type overflows. Default: None.
+    out (Tensor, optional): the output tensor.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- reduction
+source:
+  channel: T
+  file: mean.py
+  name: torch.mean
+  difficulty: '1'
+  params_cnt: 5
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/mean.py

@@ -1,0 +1,53 @@
+id: geglu_tanh_triton
+level: 2
+category: kernel_generation
+title: Geglu Tanh Triton
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `geglu_tanh_triton.py` (repo: linkedin/Liger-Kernel).\n\nTask description:\nThis implementation\
+  \ leverages Triton to perform a GEGLU activation function using a tanh-based approximation for efficient\
+  \ computation on GPUs. It includes two main kernels: `_geglu_tanh_forward_kernel` for the forward pass\
+  \ and `_geglu_tanh_backward_kernel` for the backward pass.\n\n            The `geglu_forward` function\
+  \ serves as the entry point for the forward computation. It takes two input tensors, `a` and `b`, representing\
+  \ linear transformations of some input data. These tensors are reshaped to a 2D format with the last\
+  \ dimension corresponding to the number of columns `n_cols`. The function then initializes an empty\
+  \ tensor `c` to store the output and calculates `BLOCK_SIZE` and `num_warps` using `calculate_settings`,\
+  \ assumed to be constant at 128 and 4 respectively. The `_geglu_tanh_forward_kernel` is launched across\
+  \ the number of rows (`n_rows`) to perform element-wise operations defined within the kernel: load `a`\
+  \ and `b`, compute the GEGLU activation using an approximation based on `tanh`, and store the result\
+  \ in `c`.\n\n            Similarly, the `geglu_backward` function calculates gradients with respect\
+  \ to inputs `a` and `b` from the upstream gradient `dc`. It invokes `_geglu_tanh_backward_kernel` with\
+  \ the appropriate parameters. The backward kernel recomputes necessary intermediates to avoid storing\
+  \ them, calculates gradients for `a` and `b` using the derivative of the GEGLU function, and stores\
+  \ them back to the respective tensors.\n\n            Common computations include a tanh approximation\
+  \ formula for GELU: `0.5 * a * (1 + tanh(sqrt(2/pi) * (a + 0.044715 * a^3)))`, and the corresponding\
+  \ backward pass calculations leveraging derivative rules for tanh and GELU. The code reflects efficient\
+  \ memory and computation usage, highlighting the suitability of Triton for such tasks.\n\nRequirements\
+  \ (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x\
+  \ / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use @triton.jit\
+  \ kernels with correct boundary masking\n- Include @triton.autotune with at least 3 configs when tile\
+  \ sizes matter\n- Provide a Python launcher + grid and a torch.allclose correctness test\n- Use fp32\
+  \ accumulators for tl.dot reductions\n- Print a short note if you intentionally skip autotune for a\
+  \ tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+source:
+  channel: G
+  file: geglu_tanh_triton.py
+  repo: linkedin/Liger-Kernel
+  difficulty: '2'
+  star: 3606
+  simp_instru_len: 184
+  comp_instru_len: 454
+  output_triton_len: 1564
+gold_kernel: data/TritonBench_G_v1/geglu_tanh_triton.py

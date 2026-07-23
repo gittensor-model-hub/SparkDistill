@@ -1,0 +1,48 @@
+id: kv_cache_copy
+level: 3
+category: kernel_generation
+title: Kv Cache Copy
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `kv_cache_copy.py` (repo: hpcaitech/ColossalAI).\n\nTask description:\nThe Triton kernel `_copy_to_kvcache_seqlen1_kernel`\
+  \ is defined to efficiently copy elements from the input tensors `K` (keys) and `V` (values) to the\
+  \ respective cache tensors `KCache` and `VCache`. It supports two types of cache layouts: one with a\
+  \ four-dimensional layout `[num_blocks, num_kv_heads, block_size, head_dim]`, and another with a five-dimensional\
+  \ layout `[num_blocks, num_kv_heads, head_dim // x, block_size, x]`.\n            The kernel is parameterized\
+  \ by the block size, head dimensions, and stride lengths for efficient memory indexing. It uses Triton's\
+  \ `program_id` to obtain the current sequence and head index, determining where to store the data in\
+  \ the cache. The `block_tables` tensor stores mapping information of blocks for each sequence, and `context_lengths`\
+  \ provides the lengths of past sequences.\n            The wrapper function `copy_kv_to_blocked_cache`\
+  \ orchestrates the setup for kernel invocation, asserting the compatibility of input shapes and deciding\
+  \ on the cache layout. It calculates strides and offsets based on whether the new cache layout is used,\
+  \ then launches the kernel with a calculated grid size based on batch size and number of heads.\n  \
+  \          This setup ensures that during model decoding, only necessary data is efficiently copied\
+  \ to cache for further operations, thereby optimizing the memory bandwidth and computation required\
+  \ in subsequent steps.\n\nRequirements (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1\
+  \ on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated\
+  \ tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include @triton.autotune\
+  \ with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose\
+  \ correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally\
+  \ skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- attention
+- elementwise
+- reduction
+source:
+  channel: G
+  file: kv_cache_copy.py
+  repo: hpcaitech/ColossalAI
+  difficulty: '3'
+  star: 38848
+  simp_instru_len: 226
+  comp_instru_len: 327
+  output_triton_len: 2141
+gold_kernel: data/TritonBench_G_v1/kv_cache_copy.py

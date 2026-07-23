@@ -1,0 +1,62 @@
+id: chunk_gla_simple
+level: 4
+category: kernel_generation
+title: Chunk Gla Simple
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `chunk_gla_simple.py` (repo: sustcsonglin/flash-linear-attention).
+
+
+  Task description:
+
+  The `chunk_simple_gla_fwd_kernel_o` function, decorated with `@triton.autotune`, implements a Triton
+  kernel for efficient computation of a forward pass in a chunked matrix-multiplication setting. It receives
+  tensors `q`, `k`, `v`, `h`, and `g`, alongside tensor strides (`s_k_h`, `s_k_t`, etc.), scaling factor
+  `scale`, and chunk dimensions (`BT`, `BK`, `BV`). The kernel operates using Triton''s parallel execution,
+  where indices are computed using `tl.program_id` for efficient matrix partitioning. Block pointers (e.g.,
+  `p_q`, `p_k`) load sub-blocks of `q`, `k`, `h` into registers. It computes partial outputs `b_o` and
+  `b_s` using dot products, adjusts them with exponentials, and conditions based on the mask `m_s`. The
+  result is stored in the output tensor `o` using `tl.store`. The `chunk_fwd_o_fn` function handles higher-level
+  orchestration, preparing grid dimensions, calculating chunk sizes (`BK`, `BV`), and calling the kernel
+  with the pre-computed grid and problem parameters.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- attention
+- matmul
+- elementwise
+source:
+  channel: G
+  file: chunk_gla_simple.py
+  repo: sustcsonglin/flash-linear-attention
+  difficulty: '4'
+  star: 1382
+  simp_instru_len: 155
+  comp_instru_len: 292
+  output_triton_len: 1392
+gold_kernel: data/TritonBench_G_v1/chunk_gla_simple.py

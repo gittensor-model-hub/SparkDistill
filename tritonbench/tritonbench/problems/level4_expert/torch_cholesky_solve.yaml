@@ -1,0 +1,57 @@
+id: torch_cholesky_solve
+level: 4
+category: kernel_translation
+title: Torch Cholesky Solve
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.cholesky_solve`.\n\
+  \nOperator description:\nComputes the solution of a system of linear equations with complex Hermitian\
+  \ or real symmetric positive-definite lhs given its Cholesky decomposition. Supports inputs of float,\
+  \ double, cfloat and cdouble dtypes. Also supports batches of matrices, and if :math:`A` or :math:`B`\
+  \ is a batch of matrices then the output has the same batch dimensions.\n\nTarget Python signature /\
+  \ call pattern:\ncholesky_solve(B, L, upper=False, *, out=None) -> Tensor; B (Tensor): right-hand side\
+  \ tensor of shape (*, n, k) where * is zero or more batch dimensions; L (Tensor): tensor of shape (*,\
+  \ n, n) where * is zero or more batch dimensions consisting of lower or upper triangular Cholesky decompositions\
+  \ of symmetric or Hermitian positive-definite matrices; upper (bool, optional): flag that indicates\
+  \ whether L is lower triangular or upper triangular. Default: False; out (Tensor, optional): output\
+  \ tensor. Ignored if None. Default: None\n\nMathematical definition:\nA = LL^{\\text{H}}; AX = B\n\n\
+  PyTorch reference snippet:\n```python\ntorch.cholesky_solve(B, L); torch.linalg.cholesky(A); A.inverse()\
+  \ @ B; torch.dist(X, A.inverse() @ B)\n```\n\nExample / usage notes:\n>>> A = torch.randn(3, 3)\n>>>\
+  \ A = A @ A.T + torch.eye(3) * 1e-3 # Creates a symmetric positive-definite matrix\n>>> L = torch.linalg.cholesky(A)\
+  \ # Extract Cholesky decomposition\n>>> B = torch.randn(3, 2)\n>>> torch.cholesky_solve(B, L)\ntensor([[\
+  \ -8.1625,  19.6097],\n        [ -5.8398,  14.2387],\n        [ -4.3771,  10.4173]])\n>>> A.inverse()\
+  \ @  B\ntensor([[ -8.1626,  19.6097],\n        [ -5.8398,  14.2387],\n        [ -4.3771,  10.4173]])\n\
+  \n>>> A = torch.randn(3, 2, 2, dtype=torch.complex64)\n>>> A = A @ A.mH + torch.eye(2) * 1e-3 # Batch\
+  \ of Hermitian positive-definite matrices\n>>> L = torch.linalg.cholesky(A)\n>>> B = torch.randn(2,\
+  \ 1, dtype=torch.complex64)\n>>> X = torch.cholesky_solve(B, L)\n>>> torch.dist(X, A.inverse() @ B)\n\
+  tensor(1.6881e-5)\n\nAdditional constraints:\nSupports float, double, cfloat, cdouble dtypes; Handles\
+  \ batches of matrices; Uses Cholesky decomposition\n\nRequirements (SparkDistill / TritonBench harness):\n\
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics:\
+  \ include torch.allclose vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary\
+  \ masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n- Add @triton.autotune when there\
+  \ are meaningful tile/block choices\n- Provide a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 4
+  torch_cnt: 4
+  func_inputs: 'cholesky_solve(B, L, upper=False, *, out=None) -> Tensor; B (Tensor): right-hand side
+    tensor of shape (*, n, k) where * is zero or more batch dimensions; L (Tensor): tensor of shape (*,
+    n, n) where * is zero or more batch dimensions consisting of lower or upper triangular Cholesky decompositions
+    of symmetric or Hermitian positive-definite matrices; upper (bool, optional): flag that indicates
+    whether L is lower triangular or upper triangular. Default: False; out (Tensor, optional): output
+    tensor.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+source:
+  channel: T
+  file: cholesky_solve.py
+  name: torch.cholesky_solve
+  difficulty: '4'
+  params_cnt: 4
+  torch_cnt: 4
+gold_kernel: data/TritonBench_T_v1/cholesky_solve.py

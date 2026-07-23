@@ -1,0 +1,55 @@
+id: fast_ce_loss
+level: 4
+category: kernel_generation
+title: Fast Ce Loss
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `fast_ce_loss.py` (repo: unslothai/unsloth).\n\nTask description:\nThe Triton-based implementation\
+  \ provides optimized GPU kernels for cross-entropy loss calculations. It comprises several key functions:\n\
+  \            \n            - `calculate_settings(n)`: Determines the optimal block size and number of\
+  \ warps for GPU execution based on the vocabulary size `n`. It ensures the block size does not exceed\
+  \ `MAX_FUSED_SIZE`.\n            \n            - `_cross_entropy_forward(...)`: This kernel calculates\
+  \ the cross-entropy loss for a single input row using a block of threads. It optionally applies softcapping\
+  \ and logit scaling to the logits. It performs the log-sum-exp calculation for numerical stability and\
+  \ stores the result. If the label is valid (not `-100`), it computes the loss by subtracting the logit\
+  \ corresponding to the true label from the log-sum-exp value.\n            \n            - `_chunked_cross_entropy_forward(...)`:\
+  \ This variant handles cases where the vocabulary size exceeds `MAX_FUSED_SIZE`. It breaks the computation\
+  \ into chunks. It uses similar logic as `_cross_entropy_forward` but accumulates partial log-sum-exp\
+  \ results across chunks.\n            \n            - `_cross_entropy_backward(...)`: Computes gradients\
+  \ with respect to logits. For each block of logits, it calculates the softmax derivative, applies optional\
+  \ transformations (softcapping, logit scaling), and stores the result multiplied by the incoming gradient\
+  \ `dlosses`.\n            \n            The `Fast_CrossEntropyLoss` class encapsulates these kernels.\
+  \ Its `forward` method checks if chunking is needed, sets up the data, and launches the appropriate\
+  \ kernel(s). The `backward` method launches `_cross_entropy_backward` to compute gradients.\n      \
+  \      \n            The `fast_cross_entropy_loss` function processes batched inputs and computes the\
+  \ mean loss, accounting for potentially masked labels (value `-100` indicates masking).\n\nRequirements\
+  \ (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x\
+  \ / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use @triton.jit\
+  \ kernels with correct boundary masking\n- Include @triton.autotune with at least 3 configs when tile\
+  \ sizes matter\n- Provide a Python launcher + grid and a torch.allclose correctness test\n- Use fp32\
+  \ accumulators for tl.dot reductions\n- Print a short note if you intentionally skip autotune for a\
+  \ tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- softmax
+- elementwise
+- reduction
+- fused
+source:
+  channel: G
+  file: fast_ce_loss.py
+  repo: unslothai/unsloth
+  difficulty: '4'
+  star: 18751
+  simp_instru_len: 229
+  comp_instru_len: 441
+  output_triton_len: 3441
+gold_kernel: data/TritonBench_G_v1/fast_ce_loss.py

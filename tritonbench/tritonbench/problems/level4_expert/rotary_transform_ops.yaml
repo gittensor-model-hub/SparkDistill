@@ -1,0 +1,63 @@
+id: rotary_transform_ops
+level: 4
+category: kernel_debugging
+title: Rotary Transform Ops
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `rotary_transform_ops.py` (repo: Dao-AILab/flash-attention).
+
+
+  Task description:
+
+  The Triton kernel ''rotary_kernel'' applies rotary positional encoding on the input tensor X using cosine
+  (COS) and sine (SIN) tensors. The kernel supports both variable and fixed sequence lengths, controlled
+  by IS_VARLEN. It processes data in blocks, with dimensions controlled by BLOCK_M and BLOCK_K, determining
+  the workload per thread. The kernel adjusts input and output pointers based on batch, head, and sequence
+  index calculations. The interleaved data layout is supported via INTERLEAVED, affecting how input data
+  is accessed and processed. The optional conjugate transformation is controlled by CONJUGATE, affecting
+  the sine component. The ''apply_rotary'' function is a high-level Python wrapper preparing the input
+  tensors and invoking the kernel with appropriate grid and block configurations. It handles data type
+  checks, ensures tensor contiguity, and manages inplace operations. It calculates grid sizes based on
+  sequence lengths, and sets up strides for various tensor dimensions (batch, sequence, heads, headdim).
+  The function ensures the kernel operates correctly, given the input tensor shapes and specified operation
+  parameters.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- mask
+tags:
+- attention
+- rope
+- elementwise
+- reduction
+- debug
+source:
+  channel: G
+  file: rotary_transform_ops.py
+  repo: Dao-AILab/flash-attention
+  difficulty: '4'
+  star: 14441
+  simp_instru_len: 113
+  comp_instru_len: 246
+  output_triton_len: 2855
+gold_kernel: data/TritonBench_G_v1/rotary_transform_ops.py

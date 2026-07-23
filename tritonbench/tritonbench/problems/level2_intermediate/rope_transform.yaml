@@ -1,0 +1,72 @@
+id: rope_transform
+level: 2
+category: kernel_generation
+title: Rope Transform
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `rope_transform.py` (repo: turbo-llm/turbo-alignment).
+
+
+  Task description:
+
+  The Triton kernel ''_triton_rope'' is a JIT-compiled function designed for efficient application of
+  rotary position embeddings to input matrices q (queries) and k (keys). The function takes pointers to
+  these matrices, their row strides, cosine and sine rotation vectors, and several configuration parameters
+  as inputs. Inside the kernel, program_id (pid) is used to distribute work across elements in a batch-sequence
+  space.
+
+
+  The kernel reads slices of the q and k matrices, applies rotary transformations using cosine and sine
+  components, and stores the transformed slices back. The transformation is effectively a 2D rotation
+  in each head''s dimensional space, achieved through vectorized operations. The choice of forward or
+  backward transformation is determined by the BACKWARD_PASS constant, allowing flexible operations depending
+  on the training phase.
+
+
+  The function ''rope_forward'' serves as a wrapper around ''_triton_rope''. It first transposes the query
+  and key matrices to the appropriate format, computes the necessary paddings using Triton''s utility
+  functions to ensure efficient processing, and calls the kernel on each batch-sequence pair. It configures
+  the execution grid based on the number of rows (batch_size * seq_len) and ensures the inputs are contiguous,
+  optimizing memory access patterns. Finally, it returns the matrices to their original shapes and provides
+  the updated q, k, cos, and sin matrices.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- rope
+- elementwise
+- reduction
+- embedding
+source:
+  channel: G
+  file: rope_transform.py
+  repo: turbo-llm/turbo-alignment
+  difficulty: '3'
+  star: 333
+  simp_instru_len: 120
+  comp_instru_len: 308
+  output_triton_len: 1827
+gold_kernel: data/TritonBench_G_v1/rope_transform.py

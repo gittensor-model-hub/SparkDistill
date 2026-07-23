@@ -1,0 +1,47 @@
+id: cosine_compute
+level: 1
+category: kernel_generation
+title: Cosine Compute
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `cosine_compute.py` (repo: linuxlonelyeagle/triton-exp).\n\nTask description:\nThis Triton kernel\
+  \ `cos_func` is designed to compute the cosine of each element in an input tensor `a` and write the\
+  \ results to an output tensor `b`. \n            It uses a configurable constant `BLOCK_SIZE` which\
+  \ dictates the number of elements each parallel thread block processes. The `offset` variable is calculated\
+  \ to give each block its starting point by considering the global program id and the thread's local\
+  \ position in the block using `tl.arange`. \n            The `mask` variable is created to ensure calculations\
+  \ are only performed on valid tensor elements within bounds. \n            The elements from `a` are\
+  \ loaded into `a_value` using `tl.load`, respecting the bounds defined by `mask`. \n            The\
+  \ cosine of each element is computed with `tl.cos` and stored in the `b_value` tensor. Finally, results\
+  \ are written to the output tensor `b` using `tl.store`, again with the `mask` ensuring correct boundaries.\
+  \ \n            The `cos` function in Python acts as a driver for the Triton kernel, preparing the input\
+  \ and output tensors, calculating the block size as the nearest power of 2 greater than the square root\
+  \ of the number of elements, and determining the grid size to cover all elements. It then executes the\
+  \ kernel with these parameters.\n\nRequirements (SparkDistill / TritonBench harness):\n- Target Triton\
+  \ 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated\
+  \ tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include @triton.autotune\
+  \ with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose\
+  \ correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally\
+  \ skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: G
+  file: cosine_compute.py
+  repo: linuxlonelyeagle/triton-exp
+  difficulty: '1'
+  star: 0
+  simp_instru_len: 171
+  comp_instru_len: 289
+  output_triton_len: 448
+gold_kernel: data/TritonBench_G_v1/cosine_compute.py

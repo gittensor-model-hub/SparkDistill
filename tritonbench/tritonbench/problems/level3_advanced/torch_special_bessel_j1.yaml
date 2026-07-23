@@ -1,0 +1,70 @@
+id: torch_special_bessel_j1
+level: 3
+category: kernel_translation
+title: Torch Special Bessel J1
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.special.bessel_j1`.
+
+
+  Operator description:
+
+  Computes the Bessel function of the first kind of order 1 for each element of the input tensor.
+
+
+  Target Python signature / call pattern:
+
+  bessel_j1(input, *, out=None) -> Tensor Args: input (Tensor): the input tensor. Keyword args: out (Tensor,
+  optional): the output tensor.
+
+
+  Mathematical definition:
+
+  Bessel function of the first kind of order :math:`1`.
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  torch.special.bessel_j1(input)
+
+  ```
+
+
+  Additional constraints:
+
+  The function supports an optional output tensor.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 2
+  torch_cnt: 1
+  func_inputs: 'bessel_j1(input, *, out=None) -> Tensor Args: input (Tensor): the input tensor. Keyword
+    args: out (Tensor, optional): the output tensor.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags: []
+source:
+  channel: T
+  file: bessel_j1.py
+  name: torch.special.bessel_j1
+  difficulty: '3'
+  params_cnt: 2
+  torch_cnt: 1
+gold_kernel: data/TritonBench_T_v1/bessel_j1.py

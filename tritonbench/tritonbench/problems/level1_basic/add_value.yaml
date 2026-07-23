@@ -1,0 +1,64 @@
+id: add_value
+level: 1
+category: kernel_generation
+title: Add Value
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `add_value.py` (repo: cosenza987/triton).
+
+
+  Task description:
+
+  The provided Triton code defines a kernel named ''puzzle1_kernel''. This kernel performs an element-wise
+  addition of a constant value to each element in the input tensor ''x''. The kernel expects the following
+  parameters: ''x_ptr'' (a pointer to the input tensor), ''output_ptr'' (a pointer to the output tensor),
+  ''N'' (the total number of elements), ''BLOCK_SIZE'' (a compile-time constant defining the block size),
+  and ''value'' (the constant to add). Within the kernel, ''pid'' identifies the program''s unique ID
+  along the specified axis (axis=0). Each block computes a starting index ''block_start'', and ''offsets''
+  determines the positions within this block. A ''mask'' ensures that computations only occur within valid
+  indices (offsets < N). The kernel loads data from ''x_ptr'', adds ''value'', and stores the result in
+  ''output_ptr''. The wrapper function ''puzzle1'' initializes an output tensor with the same shape and
+  type as ''x''. It verifies CUDA compatibility of input and output tensors, calculates the total number
+  of elements ''N'', defines the grid size using the function ''grid'', and invokes ''puzzle1_kernel''
+  with specified block size and constant value (10). It returns the output tensor that contains the modified
+  data.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: G
+  file: add_value.py
+  repo: cosenza987/triton
+  difficulty: '2'
+  star: 0
+  simp_instru_len: 137
+  comp_instru_len: 293
+  output_triton_len: 277
+gold_kernel: data/TritonBench_G_v1/add_value.py

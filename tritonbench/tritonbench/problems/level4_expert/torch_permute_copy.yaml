@@ -1,0 +1,66 @@
+id: torch_permute_copy
+level: 4
+category: kernel_translation
+title: Torch Permute Copy
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.permute_copy`.
+
+
+  Operator description:
+
+  Performs the same operation as torch.permute, which rearranges the dimensions of the input tensor according
+  to the specified dims, but all output tensors are freshly created instead of aliasing the input.
+
+
+  Target Python signature / call pattern:
+
+  torch.permute_copy(input, dims) -> Tensor
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  output = torch.permute_copy(input, dims)
+
+  ```
+
+
+  Additional constraints:
+
+  Freshly created output tensors mean that the function does not create views, so changes to the output
+  will not affect the input.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 2
+  torch_cnt: 1
+  func_inputs: torch.permute_copy(input, dims) -> Tensor
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- reduction
+source:
+  channel: T
+  file: permute_copy.py
+  name: torch.permute_copy
+  difficulty: '4'
+  params_cnt: 2
+  torch_cnt: 1
+gold_kernel: data/TritonBench_T_v1/permute_copy.py

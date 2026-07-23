@@ -1,0 +1,23 @@
+id: softmax_no_max_sub
+level: bugfix
+category: kernel_debugging
+title: Softmax Without Max Subtraction
+prompt: Softmax overflows to inf on large logits. Fix numerical stability.
+input_code: "@triton.jit\ndef softmax_unstable_kernel(out_ptr, in_ptr, stride, n_cols, BLOCK: tl.constexpr):\n\
+  \    row = tl.program_id(0)\n    cols = tl.arange(0, BLOCK)\n    mask = cols < n_cols\n    x = tl.load(in_ptr\
+  \ + row * stride + cols, mask=mask, other=float(\"-inf\"))\n    num = tl.exp(x)  # BUG: no max subtraction\n\
+  \    den = tl.sum(num, axis=0)\n    tl.store(out_ptr + row * stride + cols, num / den, mask=mask)\n"
+expected_fix: Subtract row max before exp for stability
+required_patterns:
+- '@triton.jit'
+tags:
+- debugging
+- softmax
+- precision
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+source:
+  channel: synthetic
+  file: softmax_no_max_sub.py
+  difficulty: bugfix

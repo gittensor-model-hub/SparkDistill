@@ -1,0 +1,65 @@
+id: fused_hstack_div
+level: 4
+category: kernel_translation
+title: Fused Hstack Div
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `fused_hstack_div`.\n\
+  \nOperator description:\nPerforms a fused operation combining horizontal stacking (hstack) and element-wise\
+  \ division. The function first horizontally stacks a sequence of tensors and then divides each element\
+  \ of the resulting tensor by the corresponding element of a divisor tensor, with optional rounding modes.\n\
+  \nTarget Python signature / call pattern:\nfused_hstack_div(tensors, divisor, *, rounding_mode=None,\
+  \ out=None) -> Tensor\n\n- **tensors** (sequence of Tensors): Sequence of tensors to be horizontally\
+  \ stacked. The tensors must have compatible shapes for stacking.\n- **divisor** (Tensor or Number):\
+  \ The tensor or number to divide the stacked tensor by. Must be broadcastable to the shape of the stacked\
+  \ tensor.\n- **rounding_mode** (str, optional): Type of rounding applied to the result:\n  - `None`:\
+  \ Default behavior. Performs no rounding and, if both `input` and `divisor` are integer types, promotes\
+  \ the inputs to the default scalar type. Equivalent to true division in Python (`/` operator).\n  -\
+  \ `'trunc'`: Rounds the results of the division towards zero.\n  - `'floor'`: Rounds the results of\
+  \ the division down.\n\n  Default: `None`.\n\n- **out** (Tensor, optional): Output tensor. Ignored if\
+  \ `None`. Default: `None`.\n\nMathematical definition:\nGiven a sequence of tensors [X_1, X_2, \\dots,\
+  \ X_n] and a divisor tensor D, the function computes:\n\n1. **Horizontal Stacking:**\n\n\\[\nX = \\\
+  text{hstack}(X_1, X_2, \\dots, X_n)\n\\]\n\n2. **Element-wise Division:**\n\n\\[\nY = \\frac{X}{D}\n\
+  \\]\n\nPyTorch reference snippet:\n```python\nX = torch.hstack(tensors)\nY = torch.div(X, divisor, rounding_mode=rounding_mode)\n\
+  ```\n\nExample / usage notes:\nimport torch\n\ndef fused_hstack_div(tensors, divisor, *, rounding_mode=None,\
+  \ out=None):\n    X = torch.hstack(tensors)\n    Y = torch.div(X, divisor, rounding_mode=rounding_mode)\n\
+  \    if out is not None:\n        out.copy_(Y)\n        return out\n    return Y\n\n# Example usage\n\
+  a = torch.tensor([[1, 2, 3], [4, 5, 6]])\nb = torch.tensor([[7, 8, 9], [10, 11, 12]])\ndivisor = torch.tensor([[2,\
+  \ 2, 2, 2, 2, 2]])\n\noutput = fused_hstack_div([a, b], divisor)\nprint(\"Output:\")\nprint(output)\n\
+  # Output:\n# tensor([[0.5000, 1.0000, 1.5000, 3.5000, 4.0000, 4.5000],\n#         [2.0000, 2.5000, 3.0000,\
+  \ 5.0000, 5.5000, 6.0000]])\n\nAdditional constraints:\n- The tensors in `tensors` must have shapes\
+  \ that are compatible for horizontal stacking, i.e., the dimensions except for the stacking dimension\
+  \ must be the same.\n- The `divisor` tensor must be broadcastable to the shape of the stacked tensor.\n\
+  - The function supports autograd for gradient computation.\n- All operations are differentiable and\
+  \ support backpropagation.\n\nRequirements (SparkDistill / TritonBench harness):\n- Translate the PyTorch\
+  \ reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics: include torch.allclose\
+  \ vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor\
+  \ over tl.make_block_ptr\n- Add @triton.autotune when there are meaningful tile/block choices\n- Provide\
+  \ a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 4
+  torch_cnt: 2
+  func_inputs: "fused_hstack_div(tensors, divisor, *, rounding_mode=None, out=None) -> Tensor\n\n- **tensors**\
+    \ (sequence of Tensors): Sequence of tensors to be horizontally stacked. The tensors must have compatible\
+    \ shapes for stacking.\n- **divisor** (Tensor or Number): The tensor or number to divide the stacked\
+    \ tensor by. Must be broadcastable to the shape of the stacked tensor.\n- **rounding_mode** (str,\
+    \ optional): Type of rounding applied to the result:\n  - `None`: Default behavior. Performs no rounding\
+    \ and, if "
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- fused
+source:
+  channel: T
+  file: fused_hstack_div.py
+  name: fused_hstack_div
+  difficulty: '3'
+  params_cnt: 4
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/fused_hstack_div.py

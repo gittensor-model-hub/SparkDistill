@@ -1,0 +1,51 @@
+id: token_softmax_llama
+level: 3
+category: kernel_generation
+title: Token Softmax Llama
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `token_softmax_llama.py` (repo: ModelTC/lightllm).\n\nTask description:\nThe provided code implements\
+  \ a custom Triton kernel for calculating softmax probabilities from logits in token sequences. The kernel\
+  \ function '_fwd_kernel_token_softmax' is designed to process each batch and head independently, leveraging\
+  \ Triton's just-in-time (JIT) compilation capabilities. Inputs include 'Logics', a tensor representing\
+  \ the logits; 'B_Start_Loc', indicating the starting indices of each sequence in the batch; 'B_Seqlen',\
+  \ giving the length of each sequence; and 'Prob_Out', an output tensor where the computed probabilities\
+  \ are stored.\n\n            The kernel works by first determining the current batch and head using\
+  \ 'tl.program_id', then loading the relevant portion of the logits using these indices. It uses the\
+  \ 'BLOCK_SIZE' to handle data in chunks, ensuring it respects sequence boundaries with a mask based\
+  \ on 'B_Seqlen'. Softmax computation is done in a numerically stable way by subtracting the max value\
+  \ from each element in the row before exponentiation, followed by a normalization step with the sum\
+  \ of the exponentials.\n\n            The wrapper function 'token_softmax_fwd' is responsible for setting\
+  \ up the kernel launch. It calculates an appropriate 'BLOCK_SIZE' based on 'max_input_len', adapts the\
+  \ number of warps used based on 'BLOCK_SIZE' to optimize performance, and orchestrates the batch and\
+  \ head dimension handling by launching the Triton kernel with these parameters. This function does not\
+  \ compute gradients, indicated by '@torch.no_grad()', making it suitable for inference tasks where gradients\
+  \ are not needed.\n\nRequirements (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1 on workstation\
+  \ Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n\
+  - Use @triton.jit kernels with correct boundary masking\n- Include @triton.autotune with at least 3\
+  \ configs when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose correctness\
+  \ test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally skip\
+  \ autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- softmax
+- elementwise
+- reduction
+source:
+  channel: G
+  file: token_softmax_llama.py
+  repo: ModelTC/lightllm
+  difficulty: '4'
+  star: 2647
+  simp_instru_len: 144
+  comp_instru_len: 356
+  output_triton_len: 705
+gold_kernel: data/TritonBench_G_v1/token_softmax_llama.py

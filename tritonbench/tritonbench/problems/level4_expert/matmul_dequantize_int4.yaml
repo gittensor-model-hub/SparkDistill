@@ -1,0 +1,65 @@
+id: matmul_dequantize_int4
+level: 4
+category: kernel_generation
+title: Matmul Dequantize Int4
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `matmul_dequantize_int4.py` (repo: ModelTC/lightllm).\n\nTask description:\nThe Triton code\
+  \ snippet provides a custom operator tailored for performing matrix multiplications where the matrix\
+  \ B is stored in a quantized int4 format, utilizing GPTQ (General-Purpose Tensor Quantization). This\
+  \ efficient format reduces memory usage and increases computational speed for neural network operations.\n\
+  \n        The main computational function, `matmul4_kernel`, is decorated with `@triton.jit`, allowing\
+  \ it to be compiled just-in-time for the specific hardware it runs on. It is also wrapped with `@triton.autotune`,\
+  \ providing different configurations to optimize performance based on the input matrix sizes and other\
+  \ parameters. This function handles the matrix multiplication C = A x B, where A is a float16 matrix,\
+  \ B is a quantized int4 matrix represented as int32, and the result C is a float16 matrix. Key inputs\
+  \ include pointers to the data arrays, stride information to navigate these arrays, and dimensional\
+  \ sizes (M, N, K). The kernel processes blocks of the matrices determined by BLOCK_SIZE_M, BLOCK_SIZE_N,\
+  \ and BLOCK_SIZE_K.\n\n        The kernel ensures proper dequantization of B using stored scale and\
+  \ zero-point values to transform B back to float format during operations. It leverages Triton's ability\
+  \ to manage thread and warp execution, relying on identifiers like `program_id` for handling parallel\
+  \ processing across different blocks. The computations involve transforming B's packed int32 representation\
+  \ back to float values through bit manipulation (`>>` for shifting, `&` for masking) and scaling adjustments.\
+  \ Accumulation results in a float32 temporary matrix that is later converted to the desired dtype before\
+  \ storage.\n\n        The wrapper function `matmul_dequantize_int4_gptq` orchestrates kernel execution.\
+  \ It validates input conditions, defines the execution grid size based on input dimensions, and calls\
+  \ the kernel with necessary parameters. Optionally, it allows in-place updates of the output matrix.\n\
+  \n        The auxiliary function `quantize_int4` is essential for preparing the B matrix in its int4\
+  \ format. The function quantizes matrix weights, computes appropriate scales and zero points for reconstruction,\
+  \ and efficiently packs these quantized values into the int32 format expected by the kernel. It processes\
+  \ input matrices by transposing, slicing into groups, and calculating min-max ranges to determine scale\
+  \ factors and zero points, ensuring that each group is accurately represented in its reduced bit-depth\
+  \ format.\n\n        Together, these components facilitate high-performance computations on modern GPU\
+  \ architectures, enabling efficient processing for deep learning models, particularly in contexts where\
+  \ memory and bandwidth constraints are significant.\n\nRequirements (SparkDistill / TritonBench harness):\n\
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor\
+  \ over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include\
+  \ @triton.autotune with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid\
+  \ and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short\
+  \ note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- matmul
+- rope
+- quantization
+- elementwise
+- reduction
+- convolution
+source:
+  channel: G
+  file: matmul_dequantize_int4.py
+  repo: ModelTC/lightllm
+  difficulty: '4'
+  star: 2647
+  simp_instru_len: 307
+  comp_instru_len: 559
+  output_triton_len: 4707
+gold_kernel: data/TritonBench_G_v1/matmul_dequantize_int4.py

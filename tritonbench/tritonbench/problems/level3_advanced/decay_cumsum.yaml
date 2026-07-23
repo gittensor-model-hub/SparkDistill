@@ -1,0 +1,58 @@
+id: decay_cumsum
+level: 3
+category: kernel_generation
+title: Decay Cumsum
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `decay_cumsum.py` (repo: josStorer/RWKV-Runner).\n\nTask description:\nThe code comprises three\
+  \ main Triton kernels for specific tensor operations, often utilized in transformer-like architectures:\n\
+  \n        1. **fwd_decay_cumsum**:\n           - **Function**: This kernel performs a cumulative sum\
+  \ with decay for each element in a tensor `g`, writing the results to `g_o`. It iterates over a defined\
+  \ number of block rows (`BT`).\n           - **Inputs**: Includes the input tensor `g`, output tensor\
+  \ `g_o`, and a decay constant, with parameters defining block and grid sizes.\n           - **Logic**:\
+  \ It initializes a zero vector `cum_decay`, iteratively loads segments from `g`, scales them by `inv_ln2`,\
+  \ accumulates into `cum_decay`, and stores results in `g_o`. The kernel uses a mask to handle boundary\
+  \ conditions where the iteration range exceeds tensor dimensions.\n\n        2. **prepare_qg_kg**:\n\
+  \           - **Function**: Prepares new tensors `qg` and `kg` from input tensors `q`, `k`, and `g`.\
+  \ The preparation involves applying exponential decay and scaling transformations.\n           - **Inputs**:\
+  \ Tensors `q`, `k`, and `g` with outputs `qg`, `kg`, and block/grid size parameters.\n           - **Logic**:\
+  \ For each block row (`BT`), it retrieves values from `q`, `k`, and `g`, computes exponential transformations\
+  \ based on cumulative decay from `g`, and applies a scaling factor. Transformed values are stored into\
+  \ `qg` and `kg`, leveraging mask operations to handle dimension bounds.\n\n        3. **bwd_decay_global_cumsum**:\n\
+  \           - **Function**: Implements the backward operation to compute gradients for the cumulative\
+  \ decay operation, updating `dg` based on provided input gradients.\n           - **Inputs**: Includes\
+  \ `dq_inner`, `dq_inter`, `dk_inner`, `dk_inter`, `q`, `k`, `g`, and the gradient tensor `dg`, along\
+  \ with configuration parameters.\n           - **Logic**: Backtracks through each block row (`BT`),\
+  \ loads input gradients and tensors, computes the gradient of the decay operation by differentiating\
+  \ through the sum and product operations of `q` and `k`, and accumulates results into `dg`. Employs\
+  \ exponential decay based on the gradient load position and handles edge cases with a mask.\n\n    \
+  \    **Launch Functions**: For each kernel, a corresponding launch function computes the necessary strides\
+  \ based on tensor dimensions, prepares grid dimensions (`DK // BK`, `T // BT`, `B * H`), and invokes\
+  \ the respective kernel with computed parameters.\n\nRequirements (SparkDistill / TritonBench harness):\n\
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor\
+  \ over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include\
+  \ @triton.autotune with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid\
+  \ and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short\
+  \ note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: G
+  file: decay_cumsum.py
+  repo: josStorer/RWKV-Runner
+  difficulty: '4'
+  star: 5337
+  simp_instru_len: 433
+  comp_instru_len: 609
+  output_triton_len: 2825
+gold_kernel: data/TritonBench_G_v1/decay_cumsum.py

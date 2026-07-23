@@ -1,0 +1,44 @@
+id: layernorm_fwd_triton
+level: 3
+category: kernel_generation
+title: Layernorm Fwd Triton
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `layernorm_fwd_triton.py` (repo: ModelTC/lightllm).\n\nTask description:\nThe `_layer_norm_fwd_kernel`\
+  \ function in Triton computes the forward pass of a layer normalization operation on a 3D input tensor\
+  \ `X`. The kernel normalizes the elements of `X` along the last dimension for each 2D slice, using a\
+  \ specified weight matrix `W` for scaling. \n\n    The kernel operates with blocks of size `BLOCK_SIZE`\
+  \ and uses loop iterations to handle each segment along the normalization axis. The mean and variance\
+  \ are computed first, using floating point precision for stability, and then applied to obtain the normalized\
+  \ output `Y`.\n\n    Input `X` is a pointer to a 3D tensor with shape `(D1, D2, N)`, and `W` is a pointer\
+  \ to weights with shape `(D2, N)`. `Y` is the output tensor of the same shape as `X`. The kernel uses\
+  \ provided strides to traverse the input tensor efficiently.\n\n    The function `layernorm_forward`\
+  \ prepares the grid dimensions for kernel execution, computes the memory strides, and ensures the dimensions\
+  \ are compatible between `X` and `W`. It then invokes the Triton kernel `_layer_norm_fwd_kernel` with\
+  \ computed parameters such as grid size, and block size.\n\nRequirements (SparkDistill / TritonBench\
+  \ harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor\
+  \ over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include\
+  \ @triton.autotune with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid\
+  \ and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short\
+  \ note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- normalization
+- reduction
+source:
+  channel: G
+  file: layernorm_fwd_triton.py
+  repo: ModelTC/lightllm
+  difficulty: '3'
+  star: 2647
+  simp_instru_len: 107
+  comp_instru_len: 276
+  output_triton_len: 1072
+gold_kernel: data/TritonBench_G_v1/layernorm_fwd_triton.py

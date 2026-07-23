@@ -1,0 +1,55 @@
+id: softmax_flaggems
+level: 3
+category: kernel_generation
+title: Softmax Flaggems
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `softmax_flaggems.py` (repo: FlagOpen/FlagGems).\n\nTask description:\nThis Triton script provides\
+  \ a specialized implementation of the softmax function, optimized for GPU computation. It includes both\
+  \ forward and backward passes for inner and non-inner dimensions, using Triton's kernel execution framework\
+  \ with tunable parameters to achieve optimal performance.\n\n### Key Components:\n\n- **Kernel Functions**:\n\
+  \  - `softmax_kernel_non_inner`: This function computes softmax over non-inner dimensions of a tensor.\
+  \ It uses the `TILE_K` and `TILE_N` parameters to define tile sizes, with `ONE_TILE_PER_CTA` indicating\
+  \ if a single tile is processed per CTA.\n  - `softmax_kernel_inner`: Similar to the non-inner version,\
+  \ but optimized for inner dimension processing, focusing on maximizing the efficient use of shared memory.\n\
+  \  - `softmax_backward_kernel_non_inner` & `softmax_backward_kernel_inner`: These handle the backpropagation\
+  \ phase, computing the gradient based on the forward pass results. \n\n- **Heuristic Functions**:\n\
+  \  - `heur_tile_k`, `heur_tile_n_non_inner`, etc., determine optimal tile sizes (`TILE_K`, `TILE_N`)\
+  \ based on input dimensions M, N, K. These heuristics help balance the workload across available SMs\
+  \ (Streaming Multiprocessors) on the GPU.\n\n- **Softmax Class**:\n  - Provides an autograd function\
+  \ with a custom forward and backward pass for PyTorch integration. The forward method executes the softmax\
+  \ operation using a Triton kernel, and the backward method computes the gradient.\n\n### Execution:\n\
+  - For forward pass, `softmax_kernel_non_inner` is invoked when K > 1, otherwise `softmax_kernel_inner`\
+  \ is used. Similar logic applies to the backward pass with the respective backward kernels.\n- Grid\
+  \ execution parameters are dynamically configured using the `grid` lambda functions.\n\n### Inputs/Outputs:\n\
+  - **Inputs**: `output_ptr`, `input_ptr`, and dimensions M, N, K. \n- **Outputs**: Computed softmax or\
+  \ gradient stored in `output_ptr` or `in_grad_ptr` respectively.\n\nBy splitting the softmax calculation\
+  \ into tiles and using Triton's parallel execution capabilities, this implementation leverages GPU resources\
+  \ effectively to provide scalable and high-performance softmax operations.\n\nRequirements (SparkDistill\
+  \ / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer\
+  \ tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct\
+  \ boundary masking\n- Include @triton.autotune with at least 3 configs when tile sizes matter\n- Provide\
+  \ a Python launcher + grid and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot\
+  \ reductions\n- Print a short note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- softmax
+- elementwise
+- reduction
+source:
+  channel: G
+  file: softmax_flaggems.py
+  repo: FlagOpen/FlagGems
+  difficulty: '5'
+  star: 347
+  simp_instru_len: 402
+  comp_instru_len: 544
+  output_triton_len: 5335
+gold_kernel: data/TritonBench_G_v1/softmax_flaggems.py

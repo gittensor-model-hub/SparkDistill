@@ -1,0 +1,62 @@
+id: embedding_triton_kernel
+level: 2
+category: kernel_generation
+title: Embedding Triton Kernel
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `embedding_triton_kernel.py` (repo: ModelTC/lightllm).
+
+
+  Task description:
+
+  The Triton-accelerated function embedding_kernel is specialized for extracting and storing embedding
+  vectors from a weight matrix for a sequence of token IDs. It uses program IDs to determine processing
+  offsets and handles iteration over sequences with BLOCK_N and BLOCK_NN stride sizes. For each sequence,
+  it computes token IDs and uses masks to ensure only valid data is loaded and processed. The weight matrix
+  is addressed using a combination of token IDs and dimension offsets, facilitated by the stride of the
+  weight tensor. The processed vectors are then stored into the ''out'' tensor using calculated strides
+  and masks, ensuring each output sequence position receives the correct embedding vector. The wrapping
+  function, embedding, configures and invokes the kernel with appropriate grid settings, aligning BLOCK_DMODEL
+  to the next power of two based on weight dimensions and leveraging constant memory settings to optimize
+  the embedding extraction process.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+- embedding
+source:
+  channel: G
+  file: embedding_triton_kernel.py
+  repo: ModelTC/lightllm
+  difficulty: '3'
+  star: 2647
+  simp_instru_len: 133
+  comp_instru_len: 191
+  output_triton_len: 789
+gold_kernel: data/TritonBench_G_v1/embedding_triton_kernel.py

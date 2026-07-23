@@ -1,0 +1,47 @@
+id: bmm_chunk_bwd
+level: 4
+category: kernel_generation
+title: Bmm Chunk Bwd
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `bmm_chunk_bwd.py` (repo: MzeroMiko/VMamba).\n\nTask description:\nThe Triton kernel _bmm_chunk_bwd_kernel\
+  \ is designed to compute the backward pass for a batched matrix multiplication operation, particularly\
+  \ in scenarios involving chunking of one of the matrices. The kernel is decorated with several configurations\
+  \ for autotuning, each specifying the number of stages, warps, and block sizes (BLOCK_SIZE_M, BLOCK_SIZE_N,\
+  \ BLOCK_SIZE_CS) for optimal execution.\n\n            Inputs include pointers to matrices (a_ptr, dout_ptr)\
+  \ and their respective strides and dimensions, such as stride_a_batch, stride_dout_csize_m, etc. The\
+  \ kernel calculates the partial dot product accumulation using tl.dot and can add a residual from res_ptr\
+  \ if HAS_RESIDUAL is set to True. The result is stored in db_ptr.\n\n            The auxiliary function\
+  \ _bmm_chunk_bwd prepares tensors, ensuring they are contiguous and appropriately shaped, while determining\
+  \ the computation grid size based on the meta-parameters. It invokes the Triton kernel using triton.jit\
+  \ for execution on the CUDA device associated with the input tensor. This function ensures alignment\
+  \ of tensor dimensions, strides, and types, converting them as necessary for the underlying Triton operations.\n\
+  \nRequirements (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell\
+  \ (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use\
+  \ @triton.jit kernels with correct boundary masking\n- Include @triton.autotune with at least 3 configs\
+  \ when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose correctness test\n\
+  - Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally skip autotune\
+  \ for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+- convolution
+source:
+  channel: G
+  file: bmm_chunk_bwd.py
+  repo: MzeroMiko/VMamba
+  difficulty: '4'
+  star: 2235
+  simp_instru_len: 215
+  comp_instru_len: 280
+  output_triton_len: 2552
+gold_kernel: data/TritonBench_G_v1/bmm_chunk_bwd.py

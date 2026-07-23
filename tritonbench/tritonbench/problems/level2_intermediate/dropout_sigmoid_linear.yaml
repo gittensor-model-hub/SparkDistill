@@ -1,0 +1,94 @@
+id: dropout_sigmoid_linear
+level: 2
+category: kernel_translation
+title: Dropout Sigmoid Linear
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `dropout_sigmoid_linear`.
+
+
+  Operator description:
+
+  Applies a linear transformation followed by a sigmoid activation and dropout. This function sequentially
+  applies a linear transformation to the input tensor, a sigmoid activation to scale the values between
+  0 and 1, and randomly zeroes some elements of the tensor with a specified probability during dropout.
+
+
+  Target Python signature / call pattern:
+
+  def dropout_sigmoid_linear(input: torch.Tensor, weight: torch.Tensor, bias=None, p=0.5, training=True,
+  inplace=False) -> torch.Tensor: Input tensor of shape :math:`(*, \text{in\_features})`. Weight tensor
+  of shape :math:`(\text{out\_features}, \text{in\_features})`. Bias tensor of shape :math:`(\text{out\_features})`.
+  Default is `None`. Probability of an element to be zeroed in dropout. Default: 0.5 If `True`, applies
+  dropout during training. Default: `True` If `True`, performs the operation in-place. Default: `False`
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  x = torch.nn.functional.linear(input, weight, bias)
+
+  x = torch.nn.functional.sigmoid(x)
+
+  x = torch.nn.functional.dropout(x, p=p, training=training, inplace=inplace)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> input = torch.randn(10, 5)
+
+  >>> weight = torch.randn(8, 5)
+
+  >>> output = dropout_sigmoid_linear(input, weight, p=0.3, training=True)
+
+  >>> output.shape
+
+  torch.Size([10, 8])
+
+
+  Additional constraints:
+
+  The function applies dropout only if the `training` parameter is set to `True`. The `inplace` parameter
+  allows for in-place operations to save memory.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 6
+  torch_cnt: 3
+  func_inputs: 'def dropout_sigmoid_linear(input: torch.Tensor, weight: torch.Tensor, bias=None, p=0.5,
+    training=True, inplace=False) -> torch.Tensor: Input tensor of shape :math:`(*, \text{in\_features})`.
+    Weight tensor of shape :math:`(\text{out\_features}, \text{in\_features})`. Bias tensor of shape :math:`(\text{out\_features})`.
+    Default is `None`. Probability of an element to be zeroed in dropout. Default: 0.5 If `True`, applies
+    dropout during training. Default: `True` If `True`, performs the operation in-'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- dropout
+source:
+  channel: T
+  file: dropout_sigmoid_linear.py
+  name: dropout_sigmoid_linear
+  difficulty: '3'
+  params_cnt: 6
+  torch_cnt: 3
+gold_kernel: data/TritonBench_T_v1/dropout_sigmoid_linear.py

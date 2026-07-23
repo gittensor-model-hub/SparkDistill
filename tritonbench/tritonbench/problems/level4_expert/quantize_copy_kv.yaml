@@ -1,0 +1,62 @@
+id: quantize_copy_kv
+level: 4
+category: kernel_generation
+title: Quantize Copy Kv
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `quantize_copy_kv.py` (repo: S-LoRA/S-LoRA).
+
+
+  Task description:
+
+  The code defines a Triton kernel `_fwd_kernel_destindex_copy_quantize_kv` and a Python wrapper function
+  `destindex_copy_quantize_kv`. The kernel processes the input tensor `K` by loading it according to the
+  block size specified by `BLOCK_DMODEL` and `BLOCK_HEAD`. The function operates across multiple heads
+  as specified by `head_num`. The kernel uses the `DestLoc` array to determine the destination index where
+  each sequence element should be copied to in the output tensor `Out`. It calculates the absolute maximum
+  for each head slice to determine a scaling factor, which is then used to quantize the data to int8.
+  This quantized data is stored in `Out`, and the scaling factors are stored in `Out_scale`. The kernel
+  uses 1 warp, and the grid size is determined by the sequence length of `DestLoc`. The function assumes
+  `K`, `Out`, and `Out_scale` have consistent dimensions for heads and the model. The wrapper function
+  sets up this operation by defining grid and block sizes, strides, and invoking the kernel.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- matmul
+- quantization
+- elementwise
+- reduction
+source:
+  channel: G
+  file: quantize_copy_kv.py
+  repo: S-LoRA/S-LoRA
+  difficulty: '4'
+  star: 1760
+  simp_instru_len: 150
+  comp_instru_len: 240
+  output_triton_len: 829
+gold_kernel: data/TritonBench_G_v1/quantize_copy_kv.py

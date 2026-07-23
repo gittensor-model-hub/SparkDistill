@@ -1,0 +1,67 @@
+id: softmax_reducev
+level: 4
+category: kernel_generation
+title: Softmax Reducev
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `softmax_reducev.py` (repo: S-LoRA/S-LoRA).
+
+
+  Task description:
+
+  The ''_fwd_kernel'' Triton kernel performs a forward computation for a token-wise softmax reduction
+  involving several key steps. The kernel operates on three-dimensional data structured by ''Logics'',
+  ''V'', and ''Out'', together with indices and sequence metadata (''B_Loc'', ''B_Start_Loc'', ''B_Seqlen'')
+  which are crucial for handling variable-length sequences within a batch. The primary purpose is to apply
+  a scaled dot-product attention mechanism, which includes a softmax computation on logits and a weighted
+  summation. Within the function, the grid is defined over batch and head dimensions, indicated by ''program_id(0)''
+  and ''program_id(1)''. The kernel iteratively processes blocks of the sequence, as determined by ''BLOCK_N'',
+  calculating maximum exponentials ''e_max'', probabilities ''p'', and an accumulated weighted sum ''acc''
+  over the sequence. This is achieved by carefully loading indices with ''tl.load'', performing exponentiation
+  and normalization, and ensuring numerical stability through max-shifted exponentials. Post-loop, results
+  in ''acc'' are normalized by the sum of exponentials and stored into ''Out''. The helper function ''token_softmax_reducev_fwd''
+  is responsible for launching ''_fwd_kernel'' across all combinations of batch and head via the grid,
+  setting up strides and block sizes using input tensor strides and the model dimension ''BLOCK_DMODEL''.
+  Execution parameters include a configurable number of warps and stages for performance tuning.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- attention
+- matmul
+- softmax
+- elementwise
+- reduction
+source:
+  channel: G
+  file: softmax_reducev.py
+  repo: S-LoRA/S-LoRA
+  difficulty: '3'
+  star: 1760
+  simp_instru_len: 221
+  comp_instru_len: 332
+  output_triton_len: 1134
+gold_kernel: data/TritonBench_G_v1/softmax_reducev.py

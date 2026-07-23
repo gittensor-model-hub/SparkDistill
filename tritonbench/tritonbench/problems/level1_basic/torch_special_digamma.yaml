@@ -1,0 +1,42 @@
+id: torch_special_digamma
+level: 1
+category: kernel_translation
+title: Torch Special Digamma
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.special.digamma`.\n\
+  \nOperator description:\nComputes the logarithmic derivative of the gamma function on input. This function\
+  \ is similar to SciPy's scipy.special.digamma. From PyTorch 1.8 onwards, the digamma function returns\
+  \ -Inf for 0, previously it returned NaN for 0.\n\nTarget Python signature / call pattern:\ndigamma(input,\
+  \ *, out=None) -> Tensor; Args: input (Tensor): the tensor to compute the digamma function on; Keyword\
+  \ args: out (Tensor, optional): the output tensor.\n\nMathematical definition:\n\\digamma(x) = \\frac{d}{dx}\
+  \ \\ln\\left(\\Gamma\\left(x\\right)\\right) = \\frac{\\Gamma'(x)}{\\Gamma(x)}\n\nPyTorch reference\
+  \ snippet:\n```python\ntorch.special.digamma(a)\n```\n\nExample / usage notes:\nExample::\n\n    >>>\
+  \ a = torch.tensor([1, 0.5])\n    >>> torch.special.digamma(a)\n    tensor([-0.5772, -1.9635])\n\nAdditional\
+  \ constraints:\nThis function is similar to SciPy's scipy.special.digamma. From PyTorch 1.8 onwards,\
+  \ the digamma function returns -Inf for 0, previously it returned NaN for 0.\n\nRequirements (SparkDistill\
+  \ / TritonBench harness):\n- Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell\
+  \ SM120\n- Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)\n\
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n- Add @triton.autotune\
+  \ when there are meaningful tile/block choices\n- Provide a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 2
+  torch_cnt: 1
+  func_inputs: 'digamma(input, *, out=None) -> Tensor; Args: input (Tensor): the tensor to compute the
+    digamma function on; Keyword args: out (Tensor, optional): the output tensor.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+source:
+  channel: T
+  file: digamma.py
+  name: torch.special.digamma
+  difficulty: '2'
+  params_cnt: 2
+  torch_cnt: 1
+gold_kernel: data/TritonBench_T_v1/digamma.py

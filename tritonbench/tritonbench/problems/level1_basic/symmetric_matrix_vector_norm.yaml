@@ -1,0 +1,98 @@
+id: symmetric_matrix_vector_norm
+level: 1
+category: kernel_translation
+title: Symmetric Matrix Vector Norm
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `symmetric_matrix_vector_norm`.
+
+
+  Operator description:
+
+  Computes the matrix-vector product for a symmetric matrix `A` and a vector `x`, with scaling factors
+  `alpha` and `beta`. Then calculates the norm of the resulting vector `y`. The operation performed is:
+  1. `y = alpha * torch.mv(A, x) + beta * y`, assuming `A` is symmetric. 2. `norm = torch.norm(y, p)`.
+
+
+  Target Python signature / call pattern:
+
+  def symmetric_matrix_vector_norm(A: torch.Tensor, x: torch.Tensor, alpha: float, beta: float, p: float
+  = 2.0) -> torch.Tensor: A (Tensor): A symmetric matrix of shape `(n, n)`. x (Tensor): A vector of shape
+  `(n,)`. alpha (float): Scalar multiplier for the matrix-vector product. beta (float): Scalar multiplier
+  added to `y`. p (float, optional): Order of the norm. Default is 2.0 (Euclidean norm).
+
+
+  Mathematical definition:
+
+  y = alpha * torch.mv(A, x) + beta * y
+
+  norm = torch.norm(y, p)
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  y = alpha * torch.mv(A, x) + beta * x
+
+  norm = torch.norm(y, p)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> A = torch.tensor([[2.0, -1.0], [-1.0, 2.0]])
+
+  >>> x = torch.tensor([1.0, 1.0])
+
+  >>> alpha = 1.5
+
+  >>> beta = 0.5
+
+  >>> result = symmetric_matrix_vector_norm(A, x, alpha, beta)
+
+  >>> print(result)
+
+
+  Additional constraints:
+
+  Assumes `A` is symmetric.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 4
+  torch_cnt: 2
+  func_inputs: 'def symmetric_matrix_vector_norm(A: torch.Tensor, x: torch.Tensor, alpha: float, beta:
+    float, p: float = 2.0) -> torch.Tensor: A (Tensor): A symmetric matrix of shape `(n, n)`. x (Tensor):
+    A vector of shape `(n,)`. alpha (float): Scalar multiplier for the matrix-vector product. beta (float):
+    Scalar multiplier added to `y`. p (float, optional): Order of the norm. Default is 2.0 (Euclidean
+    norm).'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: T
+  file: symmetric_matrix_vector_norm.py
+  name: symmetric_matrix_vector_norm
+  difficulty: '2'
+  params_cnt: 4
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/symmetric_matrix_vector_norm.py

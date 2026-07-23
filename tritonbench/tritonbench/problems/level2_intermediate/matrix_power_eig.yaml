@@ -1,0 +1,57 @@
+id: matrix_power_eig
+level: 2
+category: kernel_translation
+title: Matrix Power Eig
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `matrix_power_eig`.\n\
+  \nOperator description:\nComputes the matrix power A^k of a square matrix A using eigendecomposition.\
+  \ It relies on A being diagonalizable and computes the power through the equation A^k = V diag(Λ^k)\
+  \ V^(-1), where Λ and V are the eigenvalues and eigenvectors of A. It allows for fractional powers of\
+  \ matrices and supports real or complex exponents. If A is not diagonalizable, the result may not be\
+  \ accurate.\n\nTarget Python signature / call pattern:\ndef matrix_power_eig(A, k, *, out=None) -> Tensor\n\
+  Args:\n    A (Tensor): tensor of shape `(*, n, n)` where `*` is zero or more batch dimensions consisting\
+  \ of square matrices.\n    k (float or complex): the exponent to which the matrix :attr:`A` is to be\
+  \ raised.\n\nKeyword args:\n    out (Tensor, optional): output tensor. Ignored if `None`. Default: `None`.\n\
+  \nMathematical definition:\nA^k = V diag(Λ^k) V^{-1}, where A = V diag(Λ) V^{-1}, and Λ^k denotes the\
+  \ element-wise power of the eigenvalues.\n\nPyTorch reference snippet:\n```python\ntorch.linalg.eig,\
+  \ torch.diag_embed, torch.linalg.inv, torch.copy_\n```\n\nExample / usage notes:\n>>> import torch\n\
+  >>> A = torch.tensor([[2.0, 0.0], [0.0, 3.0]])\n>>> k = 2\n>>> matrix_power_eig(A, k)\ntensor([[4.+0.j,\
+  \ 0.+0.j],\n        [0.+0.j, 9.+0.j]])\n>>> # Compare with torch.matrix_power\n>>> torch.matrix_power(A,\
+  \ k)\ntensor([[4., 0.],\n        [0., 9.]])\n>>> # Non-integer exponent\n>>> k = 0.5\n>>> matrix_power_eig(A,\
+  \ k)\ntensor([[1.4142+0.j, 0.0000+0.j],\n        [0.0000+0.j, 1.7321+0.j]])\n>>> # Example with real\
+  \ matrix but complex eigenvalues\n>>> A = torch.tensor([[0.0, -1.0], [1.0, 0.0]])\n>>> k = 0.5\n>>>\
+  \ matrix_power_eig(A, k)\ntensor([[0.7071+0.0000j, -0.7071+0.0000j],\n        [0.7071+0.0000j,  0.7071+0.0000j]])\n\
+  \nAdditional constraints:\nSupports input of float, double, cfloat, and cdouble dtypes. Also supports\
+  \ batches of matrices, output has the same batch dimensions. Note that the computed A^k may be complex\
+  \ even if A is real, due to complex eigenvalues. Warning: If A is not diagonalizable, the result may\
+  \ not be accurate. Gradients might be numerically unstable if the distance between any two eigenvalues\
+  \ is close to zero.\n\nRequirements (SparkDistill / TritonBench harness):\n- Translate the PyTorch reference\
+  \ into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics: include torch.allclose vs the\
+  \ reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor\
+  \ over tl.make_block_ptr\n- Add @triton.autotune when there are meaningful tile/block choices\n- Provide\
+  \ a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 3
+  torch_cnt: 4
+  func_inputs: "def matrix_power_eig(A, k, *, out=None) -> Tensor\nArgs:\n    A (Tensor): tensor of shape\
+    \ `(*, n, n)` where `*` is zero or more batch dimensions consisting of square matrices.\n    k (float\
+    \ or complex): the exponent to which the matrix :attr:`A` is to be raised.\n\nKeyword args:\n    out\
+    \ (Tensor, optional): output tensor. Ignored if `None`. Default: `None`."
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+- embedding
+source:
+  channel: T
+  file: matrix_power_eig.py
+  name: matrix_power_eig
+  difficulty: '3'
+  params_cnt: 3
+  torch_cnt: 4
+gold_kernel: data/TritonBench_T_v1/matrix_power_eig.py

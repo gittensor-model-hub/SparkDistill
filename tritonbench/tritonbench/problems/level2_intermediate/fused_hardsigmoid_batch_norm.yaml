@@ -1,0 +1,94 @@
+id: fused_hardsigmoid_batch_norm
+level: 2
+category: kernel_translation
+title: Fused Hardsigmoid Batch Norm
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `fused_hardsigmoid_batch_norm`.
+
+
+  Operator description:
+
+  Applies Batch Normalization followed by the Hardsigmoid activation function on the input tensor `x`.
+  This function performs batch normalization on `x` using the specified parameters and then applies Hardsigmoid
+  activation element-wise on the normalized output.
+
+
+  Target Python signature / call pattern:
+
+  fused_hardsigmoid_batch_norm(x: torch.Tensor, running_mean: torch.Tensor, running_var: torch.Tensor,
+  weight: torch.Tensor = None, bias: torch.Tensor = None, training: bool = False, momentum: float = 0.1,
+  eps: float = 1e-5, inplace: bool = False) -> torch.Tensor: Args: x (Tensor): Input tensor for batch
+  normalization and activation. running_mean (Tensor): The running mean buffer (persistent). running_var
+  (Tensor): The running variance buffer (persistent). weight (Tensor, optional): Learnable weight of size
+  C for the normalized tensor. Default: ``None`` bias (Tensor, optional): Learnable bias of size C for
+  the normalized tensor. Default: ``None`` training (bool, optional): Flag for training mode, used to
+  update running estimates. Default: ``False`` momentum (float, optional): The value for the running mean
+  and variance momentum. Default: ``0.1`` eps (float, optional): Small constant added to variance to improve
+  numerical stability. Default: ``1e-5`` inplace (bool, optional): If ``True``, perform Hardsigmoid in-place.
+  Default: ``False``
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  torch.nn.functional.batch_norm(x, running_mean, running_var, weight, bias, training, momentum, eps);
+  torch.nn.functional.hardsigmoid(normalized_x, inplace=inplace)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> x = torch.randn(4, 3, 32, 32) >>> running_mean = torch.zeros(3) >>> running_var = torch.ones(3)
+  >>> weight = torch.ones(3) >>> bias = torch.zeros(3) >>> output = fused_hardsigmoid_batch_norm(x, running_mean,
+  running_var, weight, bias, training=True) >>> print(output.shape) torch.Size([4, 3, 32, 32])
+
+
+  Additional constraints:
+
+  The function includes optional parameters for learnable weight and bias, a training flag to update running
+  estimates, momentum for running mean and variance, a small constant `eps` for numerical stability, and
+  an `inplace` option for Hardsigmoid.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 8
+  torch_cnt: 2
+  func_inputs: 'fused_hardsigmoid_batch_norm(x: torch.Tensor, running_mean: torch.Tensor, running_var:
+    torch.Tensor, weight: torch.Tensor = None, bias: torch.Tensor = None, training: bool = False, momentum:
+    float = 0.1, eps: float = 1e-5, inplace: bool = False) -> torch.Tensor: Args: x (Tensor): Input tensor
+    for batch normalization and activation. running_mean (Tensor): The running mean buffer (persistent).
+    running_var (Tensor): The running variance buffer (persistent). weight (Tensor, optional): Learnable
+    weig'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- normalization
+- elementwise
+- reduction
+- fused
+source:
+  channel: T
+  file: fused_hardsigmoid_batch_norm.py
+  name: fused_hardsigmoid_batch_norm
+  difficulty: '2'
+  params_cnt: 8
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/fused_hardsigmoid_batch_norm.py

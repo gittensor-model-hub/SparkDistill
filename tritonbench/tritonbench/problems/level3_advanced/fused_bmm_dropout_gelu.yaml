@@ -1,0 +1,74 @@
+id: fused_bmm_dropout_gelu
+level: 3
+category: kernel_translation
+title: Fused Bmm Dropout Gelu
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `fused_bmm_dropout_gelu`.\n\
+  \nOperator description:\nPerforms a fused operation combining batch matrix multiplication, dropout,\
+  \ and GELU activation. It computes the batch matrix multiplication of two input tensors, applies dropout\
+  \ to the result, and then applies the GELU activation function.\n\nTarget Python signature / call pattern:\n\
+  fused_bmm_dropout_gelu(input1, input2, p=0.5, training=True, inplace=False, approximate='none', *, out=None)\
+  \ -> Tensor\n- **input1** (Tensor): First input tensor for batch matrix multiplication, of shape (B,\
+  \ N, M), where B is the batch size.\n- **input2** (Tensor): Second input tensor for batch matrix multiplication,\
+  \ of shape (B, M, P).\n- **p** (float, optional): Probability of an element to be zeroed in the dropout\
+  \ layer. Default: `0.5`.\n- **training** (bool, optional): Apply dropout if `True`. Default: `True`.\n\
+  - **inplace** (bool, optional): If set to `True`, will perform the dropout operation in-place. Default:\
+  \ `False`.\n- **approximate** (str, optional): Can be `'none'` or `'tanh'`. The approximation to use\
+  \ for GELU. Default: `'none'`.\n- **out** (Tensor, optional): Output tensor. Ignored if `None`. Default:\
+  \ `None`.\n\nMathematical definition:\nGiven two input tensors X and Y, this function computes:\n\n\\\
+  [\n\\begin{align*}\nZ &= \\text{bmm}(X, Y) \\\\\nD &= \\text{Dropout}(Z, p) \\\\\nO &= \\text{GELU}(D)\n\
+  \\end{align*}\n\\]\n\nwhere:\n\n- \\text{bmm}(X, Y) performs batch matrix multiplication.\n- \\text{Dropout}(Z,\
+  \ p) randomly zeroes elements of Z with probability p.\n- \\text{GELU}(D) applies the Gaussian Error\
+  \ Linear Unit activation function element-wise to D.\n\nPyTorch reference snippet:\n```python\nZ = torch.bmm(input1,\
+  \ input2)\nD = torch.nn.functional.dropout(Z, p=p, training=training, inplace=inplace)\nO = torch.nn.functional.gelu(D,\
+  \ approximate=approximate)\n```\n\nExample / usage notes:\n```python\nimport torch\nimport torch.nn.functional\
+  \ as F\n\ndef fused_bmm_dropout_gelu(input1, input2, p=0.5, training=True, inplace=False, approximate='none',\
+  \ *, out=None):\n    Z = torch.bmm(input1, input2)\n    D = torch.nn.functional.dropout(Z, p=p, training=training,\
+  \ inplace=inplace)\n    O = torch.nn.functional.gelu(D, approximate=approximate)\n    if out is not\
+  \ None:\n        out.copy_(O)\n        return out\n    return O\n\n# Example usage\nB, N, M, P = 2,\
+  \ 3, 4, 5  # Batch size, dimensions\ninput1 = torch.randn(B, N, M)\ninput2 = torch.randn(B, M, P)\n\n\
+  output = fused_bmm_dropout_gelu(input1, input2, p=0.2, training=True)\nprint(\"Output shape:\", output.shape)\n\
+  # Output shape: torch.Size([2, 3, 5])\n```\n\nAdditional constraints:\n- The shapes of `input1` and\
+  \ `input2` must be compatible for batch matrix multiplication: `input1` of shape `(B, N, M)` and `input2`\
+  \ of shape `(B, M, P)` result in an output of shape `(B, N, P)`.\n- The `dropout` is applied during\
+  \ training when `training=True`. Set `training=False` to disable dropout during evaluation.\n- The `GELU`\
+  \ activation is applied element-wise to the output of dropout.\n- All operations are differentiable\
+  \ and support autograd.\n\nRequirements (SparkDistill / TritonBench harness):\n- Translate the PyTorch\
+  \ reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics: include torch.allclose\
+  \ vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor\
+  \ over tl.make_block_ptr\n- Add @triton.autotune when there are meaningful tile/block choices\n- Provide\
+  \ a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 6
+  torch_cnt: 3
+  func_inputs: 'fused_bmm_dropout_gelu(input1, input2, p=0.5, training=True, inplace=False, approximate=''none'',
+    *, out=None) -> Tensor
+
+    - **input1** (Tensor): First input tensor for batch matrix multiplication, of shape (B, N, M), where
+    B is the batch size.
+
+    - **input2** (Tensor): Second input tensor for batch matrix multiplication, of shape (B, M, P).
+
+    - **p** (float, optional): Probability of an element to be zeroed in the dropout layer. Default: `0.5`.
+
+    - **training** (bool, optional): Apply dropout if `True`. D'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- dropout
+- fused
+source:
+  channel: T
+  file: fused_bmm_dropout_gelu.py
+  name: fused_bmm_dropout_gelu
+  difficulty: '3'
+  params_cnt: 6
+  torch_cnt: 3
+gold_kernel: data/TritonBench_T_v1/fused_bmm_dropout_gelu.py

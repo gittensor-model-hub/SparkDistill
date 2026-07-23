@@ -1,0 +1,22 @@
+id: off_by_one_pid
+level: bugfix
+category: kernel_debugging
+title: Off-by-One program_id Blocking
+prompt: Vector add silently drops the first BLOCK_SIZE elements. Find the grid indexing bug.
+input_code: "@triton.jit\ndef add_kernel(x_ptr, y_ptr, out_ptr, n_elements, BLOCK_SIZE: tl.constexpr):\n\
+  \    pid = tl.program_id(0)\n    block_start = (pid + 1) * BLOCK_SIZE\n    offsets = block_start + tl.arange(0,\
+  \ BLOCK_SIZE)\n    mask = offsets < n_elements\n    x = tl.load(x_ptr + offsets, mask=mask)\n    y =\
+  \ tl.load(y_ptr + offsets, mask=mask)\n    tl.store(out_ptr + offsets, x + y, mask=mask)\n"
+expected_fix: Use block_start = pid * BLOCK_SIZE, not (pid + 1) * BLOCK_SIZE
+required_patterns:
+- '@triton.jit'
+tags:
+- debugging
+- elementwise
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+source:
+  channel: synthetic
+  file: off_by_one_pid.py
+  difficulty: bugfix

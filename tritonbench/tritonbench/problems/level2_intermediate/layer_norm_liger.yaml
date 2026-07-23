@@ -1,0 +1,56 @@
+id: layer_norm_liger
+level: 2
+category: kernel_generation
+title: Layer Norm Liger
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `layer_norm_liger.py` (repo: linkedin/Liger-Kernel).\n\nTask description:\nThe given code implements\
+  \ layer normalization using Triton's just-in-time (JIT) compiler, allowing efficient GPU execution.\
+  \ The layer normalization operation is split into two phases: forward and backward passes, each implemented\
+  \ with its Triton kernel.\n\n    `_layer_norm_forward_kernel` calculates layer normalization for each\
+  \ row of the input matrix `X`. It loads input, weight, and bias tensors, computes the mean and variance,\
+  \ and stores the results in `Y` after applying normalization using `W` and `B`. This kernel is called\
+  \ within `layer_norm_forward`, which manages input reshaping, output initialization, and kernel configuration.\n\
+  \n    `_layer_norm_backward_kernel` computes gradients with respect to inputs, weights, and biases.\
+  \ It processes a block of rows per program instance, computes gradients iteratively, and stores results\
+  \ in `DX`, `DW`, and `DB`. The kernel considers the number of streaming multiprocessors available (`sm_count`)\
+  \ for efficient distribution of workload.\n\n    `layer_norm_forward` initializes the forward process\
+  \ by reshaping inputs and calling the forward kernel. It checks input dimensions and creates output\
+  \ placeholders for `Y`, `Mean`, and `RSTD`, setting up kernel launch parameters like `BLOCK_SIZE` and\
+  \ `num_warps`.\n\n    `layer_norm_backward` prepares and launches the backward kernel, consolidating\
+  \ partial derivatives computed per GPU program into `DW` and `DB` to obtain gradients w.r.t weights\
+  \ and biases.\n\n    `LigerLayerNormFunction` integrates these operations within a PyTorch custom autograd\
+  \ function. It wraps `layer_norm_forward` and `layer_norm_backward` to support end-to-end differentiation.\
+  \ The `forward` method executes `layer_norm_forward`, saving inputs and results. The `backward` method\
+  \ uses stored values to compute and return gradients via `layer_norm_backward`.\n\n    Relevant details:\n\
+  \    - `calculate_settings`: Determines appropriate `BLOCK_SIZE` and warp count for kernel execution.\n\
+  \    - `tl.constexpr` arguments: Used to pass constants like block size to kernels.\n    - Kernel launch:\
+  \ Parameters like strides and dimensions are crucial for indexing and data handling within kernels.\n\
+  \nRequirements (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell\
+  \ (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use\
+  \ @triton.jit kernels with correct boundary masking\n- Include @triton.autotune with at least 3 configs\
+  \ when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose correctness test\n\
+  - Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally skip autotune\
+  \ for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- normalization
+- elementwise
+- reduction
+source:
+  channel: G
+  file: layer_norm_liger.py
+  repo: linkedin/Liger-Kernel
+  difficulty: '3'
+  star: 3606
+  simp_instru_len: 365
+  comp_instru_len: 509
+  output_triton_len: 2986
+gold_kernel: data/TritonBench_G_v1/layer_norm_liger.py

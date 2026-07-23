@@ -1,0 +1,65 @@
+id: torch_logspace
+level: 1
+category: kernel_translation
+title: Torch Logspace
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.logspace`.\n\
+  \nOperator description:\nCreates a one-dimensional tensor of size 'steps' whose values are evenly spaced\
+  \ from base^start to base^end, inclusive, on a logarithmic scale with a specified base. The tensor values\
+  \ are generated in a logarithmic progression from base^start to base^end using the specified number\
+  \ of steps.\n\nTarget Python signature / call pattern:\nlogspace(start, end, steps, base=10.0, *, out=None,\
+  \ dtype=None, layout=torch.strided, device=None, requires_grad=False) -> Tensor\n\nArgs:\n    start\
+  \ (float or Tensor): the starting value for the set of points. If `Tensor`, it must be 0-dimensional\n\
+  \    end (float or Tensor): the ending value for the set of points. If `Tensor`, it must be 0-dimensional\n\
+  \    steps (int): size of the constructed tensor\n    base (float, optional): base of the logarithm\
+  \ function. Default: 10.0.\n\nKeyword arguments:\n    out (Tensor, optional): the output tensor.\n \
+  \   dtype (torch.dtype, optional): the data type to perform the computation in. Default: if None, uses\
+  \ the global default dtype (see torch.get_default_dtype()) when both start and end are real, and corresponding\
+  \ complex dtype when either is complex.\n    layout (torch.layout, optional): the desired layout of\
+  \ returned Tensor. Default: torch.strided.\n    device (torch.device, optional): the desired device\
+  \ of returned tensor. Default: if None, uses the current device for the default tensor type (see torch.set_default_device).\
+  \ device will be the CPU for CPU tensor types and the current CUDA device for CUDA tensor types.\n \
+  \   requires_grad (bool, optional): If autograd should record operations on the returned tensor. Default:\
+  \ False.\n\nMathematical definition:\n(\text{base}^{\text{start}}, \text{base}^{(\text{start} + \frac{\t\
+  ext{end} - \text{start}}{ \text{steps} - 1})}, \\ldots, \text{base}^{(\text{start} + (\text{steps} -\
+  \ 2) * \frac{\text{end} - \text{start}}{ \text{steps} - 1})}, \text{base}^{\text{end}})\n\nPyTorch reference\
+  \ snippet:\n```python\ntorch.logspace(start, end, steps, base=10.0, *, out=None, dtype=None, layout=torch.strided,\
+  \ device=None, requires_grad=False)\n```\n\nExample / usage notes:\n>>> torch.logspace(start=-10, end=10,\
+  \ steps=5)\ntensor([ 1.0000e-10,  1.0000e-05,  1.0000e+00,  1.0000e+05,  1.0000e+10])\n>>> torch.logspace(start=0.1,\
+  \ end=1.0, steps=5)\ntensor([  1.2589,   2.1135,   3.5481,   5.9566,  10.0000])\n>>> torch.logspace(start=0.1,\
+  \ end=1.0, steps=1)\ntensor([1.2589])\n>>> torch.logspace(start=2, end=2, steps=1, base=2)\ntensor([4.0])\n\
+  \nAdditional constraints:\nFrom PyTorch 1.11, the 'steps' argument is required. Use steps=100 to restore\
+  \ the previous behavior. The function allows specifying various properties of the output tensor such\
+  \ as dtype, layout, and device.\n\nRequirements (SparkDistill / TritonBench harness):\n- Translate the\
+  \ PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics: include torch.allclose\
+  \ vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor\
+  \ over tl.make_block_ptr\n- Add @triton.autotune when there are meaningful tile/block choices\n- Provide\
+  \ a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 8
+  torch_cnt: 1
+  func_inputs: "logspace(start, end, steps, base=10.0, *, out=None, dtype=None, layout=torch.strided,\
+    \ device=None, requires_grad=False) -> Tensor\n\nArgs:\n    start (float or Tensor): the starting\
+    \ value for the set of points. If `Tensor`, it must be 0-dimensional\n    end (float or Tensor): the\
+    \ ending value for the set of points. If `Tensor`, it must be 0-dimensional\n    steps (int): size\
+    \ of the constructed tensor\n    base (float, optional): base of the logarithm function. Default:\
+    \ 10.0.\n\nKeyword arguments:\n    ou"
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- rope
+- elementwise
+source:
+  channel: T
+  file: logspace.py
+  name: torch.logspace
+  difficulty: '1'
+  params_cnt: 8
+  torch_cnt: 1
+gold_kernel: data/TritonBench_T_v1/logspace.py

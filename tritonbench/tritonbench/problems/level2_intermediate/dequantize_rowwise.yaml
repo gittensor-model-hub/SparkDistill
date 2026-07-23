@@ -1,0 +1,65 @@
+id: dequantize_rowwise
+level: 2
+category: kernel_generation
+title: Dequantize Rowwise
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `dequantize_rowwise.py` (repo: bitsandbytes-foundation/bitsandbytes).
+
+
+  Task description:
+
+  The Triton kernel ''_dequantize_rowwise'' is designed for row-wise dequantization of the input tensor
+  ''x''. The kernel takes pointers to the input tensor ''x_ptr'', the state tensor ''state_x'', the output
+  tensor ''output_ptr'', a precomputed inverse of 127, the total number of elements ''n_elements'', a
+  block size ''BLOCK_SIZE'', and ''P2'', which is the nearest power of two of the number of columns. Each
+  kernel instance processes a single row identified by ''pid'', the program ID in axis 0. The ''block_start''
+  variable calculates the starting index for the current block, and ''arange'' creates an index range
+  up to ''P2''. ''offsets'' computes the global memory offsets for loading the input tensor. The input
+  values are loaded with ''tl.load'' using these offsets and a mask to ensure out-of-bound accesses are
+  ignored. The maximum value for the row is loaded from ''state_x'', and each element is dequantized by
+  multiplying with the maximum value and ''inv_127''. The results are stored back to ''output_ptr''. The
+  Python function ''dequantize_rowwise'' is a wrapper that prepares the output tensor, computes ''P2''
+  for efficient memory alignment, and sets up the execution grid to invoke the Triton kernel. It assumes
+  the input tensor is on CUDA, ensuring compatibility with Triton''s GPU-based execution.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- quantization
+- elementwise
+- reduction
+source:
+  channel: G
+  file: dequantize_rowwise.py
+  repo: bitsandbytes-foundation/bitsandbytes
+  difficulty: '2'
+  star: 6354
+  simp_instru_len: 136
+  comp_instru_len: 322
+  output_triton_len: 433
+gold_kernel: data/TritonBench_G_v1/dequantize_rowwise.py

@@ -1,0 +1,25 @@
+id: swapped_mn_tiles
+level: bugfix
+category: kernel_debugging
+title: Swapped M/N Tile Offsets in Matmul
+prompt: Matmul writes a transposed-looking result due to swapped program ids. Fix indexing.
+input_code: "@triton.jit\ndef gemm_kernel(a_ptr, b_ptr, c_ptr, M, N, K, BLOCK_M: tl.constexpr, BLOCK_N:\
+  \ tl.constexpr, BLOCK_K: tl.constexpr):\n    pid_m = tl.program_id(0)\n    pid_n = tl.program_id(1)\n\
+  \    # BUG: swapped\n    offs_m = pid_n * BLOCK_M + tl.arange(0, BLOCK_M)\n    offs_n = pid_m * BLOCK_N\
+  \ + tl.arange(0, BLOCK_N)\n    offs_k = tl.arange(0, BLOCK_K)\n    a = tl.load(a_ptr + offs_m[:, None]\
+  \ * K + offs_k[None, :])\n    b = tl.load(b_ptr + offs_k[:, None] * N + offs_n[None, :])\n    acc =\
+  \ tl.zeros((BLOCK_M, BLOCK_N), dtype=tl.float32)\n    acc += tl.dot(a, b)\n    tl.store(c_ptr + offs_m[:,\
+  \ None] * N + offs_n[None, :], acc)\n"
+expected_fix: pid_m drives M offsets, pid_n drives N offsets
+required_patterns:
+- '@triton.jit'
+tags:
+- debugging
+- matmul
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+source:
+  channel: synthetic
+  file: swapped_mn_tiles.py
+  difficulty: bugfix

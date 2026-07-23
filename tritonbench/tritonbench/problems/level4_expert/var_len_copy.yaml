@@ -1,0 +1,61 @@
+id: var_len_copy
+level: 4
+category: kernel_generation
+title: Var Len Copy
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `var_len_copy.py` (repo: S-LoRA/S-LoRA).
+
+
+  Task description:
+
+  The `var_len_copy_kernel_triton` is a kernel designed to perform variable-length copy operations from
+  a source array to a destination array. The kernel function accepts pointers to arrays `old_a_start`,
+  `old_a_len`, `old_a_location`, `new_a_start`, `new_a_location`, and a constant `BLOCK_SIZE`. The `a_id`
+  is the unique identifier for the current program instance, determining which segment of data to copy.
+  For each segment, defined by `a_id`, the function reads the starting index and length from `old_a_start`
+  and `old_a_len`, respectively, and performs a looped copy using Triton''s `tl.load` and `tl.store` commands.
+  The `old_offset` and `new_offset` are used to iterate over elements within the block, while masks ensure
+  that out-of-bound accesses are prevented. The function `launch_var_len_copy_triton` prepares and launches
+  the kernel with the grid size equal to the number of segments to copy, and specifies `BLOCK_SIZE` as
+  256.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- matmul
+- reduction
+source:
+  channel: G
+  file: var_len_copy.py
+  repo: S-LoRA/S-LoRA
+  difficulty: '3'
+  star: 1760
+  simp_instru_len: 115
+  comp_instru_len: 255
+  output_triton_len: 398
+gold_kernel: data/TritonBench_G_v1/var_len_copy.py

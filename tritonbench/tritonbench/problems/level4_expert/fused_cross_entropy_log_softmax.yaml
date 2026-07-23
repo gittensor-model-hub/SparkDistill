@@ -1,0 +1,64 @@
+id: fused_cross_entropy_log_softmax
+level: 4
+category: kernel_translation
+title: Fused Cross Entropy Log Softmax
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `fused_cross_entropy_log_softmax`.\n\
+  \nOperator description:\nThis function computes the cross entropy loss with log softmax applied to the\
+  \ input logits. It combines log softmax activation and cross entropy loss calculation in a numerically\
+  \ stable way. The log softmax is applied to the input logits, and the cross entropy loss is computed\
+  \ between the normalized logits and the target. The function allows customization with options such\
+  \ as which dimension to apply the log softmax, manual rescaling weights for each class, handling of\
+  \ ignored targets, reduction method for loss aggregation, and label smoothing to modify the target distribution.\n\
+  \nTarget Python signature / call pattern:\ndef fused_cross_entropy_log_softmax(input: torch.Tensor,\
+  \ target: torch.Tensor, dim: int = 1, weight: torch.Tensor = None, ignore_index: int = -100, reduction:\
+  \ str = 'mean', label_smoothing: float = 0.0) -> torch.Tensor\nArgs:\n    input (Tensor): Input tensor\
+  \ of logits, where softmax will be computed along `dim`.\n    target (Tensor): Ground truth class indices\
+  \ or probabilities.\n    dim (int, optional): Dimension along which to compute log softmax. Default\
+  \ is 1.\n    weight (Tensor, optional): Manual rescaling weight for each class.\n    ignore_index (int,\
+  \ optional): Specifies a target value that is ignored and does not contribute to the input gradient.\
+  \ Default: -100.\n    reduction (str, optional): Specifies the reduction to apply to the output: 'none'\
+  \ | 'mean' | 'sum'. Default: 'mean'.\n    label_smoothing (float, optional): Specifies the amount of\
+  \ smoothing to be applied, where 0.0 means no smoothing. Default: 0.0.\n\nMathematical definition:\n\
+  log_softmax(x_i) = log(exp(x_i) / sum(exp(x)))\nCE(y, p) = -sum(y * log(p))\n\nPyTorch reference snippet:\n\
+  ```python\nlog_probs = torch.nn.functional.log_softmax(input, dim=dim)\nloss = torch.nn.functional.cross_entropy(log_probs,\
+  \ target, weight=weight, ignore_index=ignore_index, reduction=reduction, label_smoothing=label_smoothing)\n\
+  ```\n\nExample / usage notes:\n>>> input = torch.randn(3, 5, requires_grad=True)\n>>> target = torch.randint(5,\
+  \ (3,), dtype=torch.int64)\n>>> loss = fused_cross_entropy_log_softmax(input, target)\n>>> print(loss)\n\
+  >>> loss.backward()\n\nAdditional constraints:\nThe function integrates the log softmax and cross entropy\
+  \ loss computation into a single operation for numerical stability. The input and target tensors must\
+  \ be of compatible shapes, where the input is expected to have logits of size (N, C) and target should\
+  \ have size (N,) for class indices.\n\nRequirements (SparkDistill / TritonBench harness):\n- Translate\
+  \ the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics: include\
+  \ torch.allclose vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary masks;\
+  \ prefer tl.make_tensor_descriptor over tl.make_block_ptr\n- Add @triton.autotune when there are meaningful\
+  \ tile/block choices\n- Provide a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 7
+  torch_cnt: 2
+  func_inputs: "def fused_cross_entropy_log_softmax(input: torch.Tensor, target: torch.Tensor, dim: int\
+    \ = 1, weight: torch.Tensor = None, ignore_index: int = -100, reduction: str = 'mean', label_smoothing:\
+    \ float = 0.0) -> torch.Tensor\nArgs:\n    input (Tensor): Input tensor of logits, where softmax will\
+    \ be computed along `dim`.\n    target (Tensor): Ground truth class indices or probabilities.\n  \
+    \  dim (int, optional): Dimension along which to compute log softmax. Default is 1.\n    weight (Tensor,\
+    \ optional): Manua"
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- softmax
+- elementwise
+- reduction
+- fused
+source:
+  channel: T
+  file: fused_cross_entropy_log_softmax.py
+  name: fused_cross_entropy_log_softmax
+  difficulty: '4'
+  params_cnt: 7
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/fused_cross_entropy_log_softmax.py
