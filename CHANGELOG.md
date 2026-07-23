@@ -34,31 +34,6 @@ All notable changes to SparkDistill are documented here. The format follows
   never filled its architecture bucket. `record_merged_ledger_entry` now calls
   `apply_verified_report_to_frontiers` (and backfills the Hopper frontier from
   `2026-07-15-magicrails-hopper-v2`).
-- **Canonical-dataset gate no longer skips non-mapping recipe dataset entries**:
-  `assert_recipe_uses_canonical_dataset` only inspected dict entries with a string
-  `path`, so a bare-string dataset entry (`datasets: ["some-org/private-set"]`) or a
-  mapping without a `path` silently passed the canonical-only training-track rule. It
-  now resolves the path from either shape and flags anything that is not exactly the
-  canonical mining path, closing a route to train on a non-canonical dataset.
-
-- **Malformed miner proof artifacts no longer crash the dataset gate**: `check_proof_dir`
-  parses `gpu_attestation.json` / `dataset_manifest.json` through a helper that rejects
-  invalid JSON and valid-JSON-but-not-an-object payloads as ordinary gate issues, guards a
-  non-integer `rows_total`, and rejects a non-object `gpu_attestation.tdx`. These files come
-  from the submitter's Hugging Face repo; previously they raised `JSONDecodeError` /
-  `AttributeError` / `TypeError` out of `gate_registry_submission` — which has no
-  `try`/`except` — so `dataset_registry.yml` failed with a traceback instead of reporting
-  `dataset:REJECT`.
-
-- **Malformed training-track proof bundles no longer crash the gate**: `verify_submission`
-  parses `manifest.json` / `eval_scores.json` through a new `load_bundle_json` helper and
-  requires `eval_scores.scores` to be an object, returning `eval:REJECT`
-  (`reason: malformed_bundle`) instead of raising; `training_track_gate` uses the same
-  helper for its pre-verify `manifest.json` read. The bundle is downloaded from the
-  submitter's Hugging Face repo, so a non-object/malformed artifact previously raised
-  `TypeError` / `KeyError` / `AttributeError` / `JSONDecodeError` out of the ungated
-  `verify_submission` call and failed `training_track.yml` with a traceback — violating
-  that helper's documented contract that unreadable bundles return a clean `error`.
 
 ## [0.1.3] — 2026-07-21
 
