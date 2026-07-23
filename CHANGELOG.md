@@ -6,6 +6,7 @@ All notable changes to SparkDistill are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- **Malformed attestation ``devices`` no longer crashes the training-track gate**: `eval.training_gpus.claimed_hwmodels` only expands `claims["devices"]` when it is a mapping. A hand-rolled proof bundle shipping `devices` as a list or string (the miner-controlled `attestation["claims"]` JSON, see `eval.verify`) previously raised `AttributeError: 'list' object has no attribute 'values'` out of `check_training_claims`; it now fails closed as a clean non-corroboration.
 - **Registry mix export uses SparkProof publish path**: `eval.mix_registry` now delegates
   to SparkProof's `trajectory_to_messages_record` (same as HF publish) instead of
   `teacher.format`. Empty or failed-validation trajectories are skipped (not coerced

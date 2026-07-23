@@ -39,7 +39,9 @@ def claimed_hwmodels(claims: dict) -> list[str]:
     flattened or hand-rolled claim shapes still corroborate.
     """
     models: list[str] = []
-    for source in (claims, *(claims.get("devices") or {}).values()):
+    devices = claims.get("devices")
+    device_sources = devices.values() if isinstance(devices, dict) else ()
+    for source in (claims, *device_sources):
         if not isinstance(source, dict):
             continue
         hwmodel = source.get("hwmodel")

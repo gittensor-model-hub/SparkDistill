@@ -67,3 +67,21 @@ def test_absent_attestation_or_claims_still_skips_corroboration():
     # Attestation is optional; absence is handled by the caller, not here.
     assert attestation_corroborates_training_gpu("NVIDIA B200", None)
     assert attestation_corroborates_training_gpu("NVIDIA B200", {"passed": True, "claims": {}})
+
+
+def test_malformed_devices_claims_do_not_crash_the_gate():
+    # ``attestation["claims"]`` is miner-controlled JSON (see eval.verify), so a
+    # hand-rolled bundle can ship ``devices`` as a list or string instead of the
+    # per-device mapping a real NRAS decode produces. That must fail closed as a
+    # clean non-corroboration, not raise AttributeError out of check_training_claims
+    # and crash the verify gate with a traceback.
+    for bad_devices in ([{"hwmodel": "B200"}], "B200", 42):
+        assert not attestation_corroborates_training_gpu(
+            "NVIDIA B200",
+            {"passed": True, "claims": {"devices": bad_devices}},
+        )
+    # A top-level hwmodel still corroborates even when devices is malformed.
+    assert attestation_corroborates_training_gpu(
+        "NVIDIA B200",
+        {"passed": True, "claims": {"hwmodel": "NVIDIA B200", "devices": ["nope"]}},
+    )
