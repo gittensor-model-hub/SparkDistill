@@ -26,6 +26,15 @@ All notable changes to SparkDistill are documented here. The format follows
   `apply_verified_report_to_frontiers` (and backfills the Hopper frontier from
   `2026-07-15-magicrails-hopper-v2`).
 
+- **Malformed miner proof artifacts no longer crash the dataset gate**: `check_proof_dir`
+  parses `gpu_attestation.json` / `dataset_manifest.json` through a helper that rejects
+  invalid JSON and valid-JSON-but-not-an-object payloads as ordinary gate issues, guards a
+  non-integer `rows_total`, and rejects a non-object `gpu_attestation.tdx`. These files come
+  from the submitter's Hugging Face repo; previously they raised `JSONDecodeError` /
+  `AttributeError` / `TypeError` out of `gate_registry_submission` — which has no
+  `try`/`except` — so `dataset_registry.yml` failed with a traceback instead of reporting
+  `dataset:REJECT`.
+
 ## [0.1.3] — 2026-07-21
 
 Training-track CI fail-closes forged attestation JSON; dataset/registry gates no longer
