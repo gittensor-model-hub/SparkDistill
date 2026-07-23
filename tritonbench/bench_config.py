@@ -34,6 +34,10 @@ BLACKWELL_PROFILES: dict[str, dict[str, float | str]] = {
 # Override with: export TRITONBENCH_PYTHON=/path/to/python
 PY_INTERPRETER = os.environ.get("TRITONBENCH_PYTHON", sys.executable)
 
+# Set to 0/false/off to force the legacy per-kernel subprocess validator path
+# (default keeps a warm GPU worker across TritonBench.run()).
+# TRITONBENCH_VALIDATOR_WORKER=1
+
 DATA_G_DIR = REPO_ROOT / "data" / "TritonBench_G_v1"
 DATA_T_DIR = REPO_ROOT / "data" / "TritonBench_T_v1"
 STATS_G_PATH = REPO_ROOT / "data" / "TritonBench_G_v1.json"
