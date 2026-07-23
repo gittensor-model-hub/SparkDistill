@@ -10,6 +10,7 @@ import pytest
 from eval.mix_registry import (
     MIX_VERSION,
     load_registry,
+    load_trajectories_jsonl,
     mix_registry_datasets,
     resolve_proof_dir,
     select_registry_entries,
@@ -31,10 +32,7 @@ def _registry_entry(miner: str, sha: str, *, rows: int = 2) -> dict:
 
 def _repair_trajectory(task_prompt: str, response: str, *, gpu_architecture: str = "hopper-h100") -> dict:
     return {
-        "prompt": (
-            "Your prior Triton 3.7.1 answer failed hardware validation.\n"
-            "Failure: triton_api\nTrace tail:\n"
-        ),
+        "prompt": ("Your prior Triton 3.7.1 answer failed hardware validation.\nFailure: triton_api\nTrace tail:\n"),
         "response": response,
         "metadata": {
             "tier": "repair",
@@ -380,3 +378,66 @@ def test_load_registry_validates_entries(tmp_path: Path):
     registry_path.write_text(json.dumps({"miner": "alice"}) + "\n", encoding="utf-8")
     with pytest.raises(ValueError, match="invalid registry entry"):
         load_registry(registry_path)
+
+
+def _write_trajectories(tmp_path: Path, *lines: str) -> Path:
+    path = tmp_path / "trajectories.jsonl"
+    path.write_text("".join(line + "\n" for line in lines), encoding="utf-8")
+    return path
+
+
+def test_load_trajectories_jsonl_accepts_objects_and_skips_blank_lines(tmp_path: Path):
+    path = _write_trajectories(
+        tmp_path,
+        json.dumps({"prompt": "p1", "response": "r1"}),
+        "",
+        json.dumps({"prompt": "p2", "response": "r2"}),
+    )
+
+    rows = load_trajectories_jsonl(path)
+
+    assert [row["prompt"] for row in rows] == ["p1", "p2"]
+
+
+@pytest.mark.parametrize(
+    "bad_line, kind",
+    [
+        ("[1, 2]", "list"),
+        ('"a bare string"', "str"),
+        ("42", "int"),
+        ("null", "NoneType"),
+        ("true", "bool"),
+    ],
+)
+def test_load_trajectories_jsonl_rejects_non_object_rows(tmp_path: Path, bad_line: str, kind: str):
+    """A miner bundle row that is valid JSON but not an object must not reach
+    the SFT conversion, where dict access raised an AttributeError that
+    `gate_registry_pr` does not catch (dataset workflow died with a traceback).
+    """
+    path = _write_trajectories(tmp_path, json.dumps({"prompt": "p", "response": "r"}), bad_line)
+
+    with pytest.raises(ValueError, match="must be a JSON object") as excinfo:
+        load_trajectories_jsonl(path)
+
+    assert kind in str(excinfo.value)
+    assert "trajectories.jsonl:2" in str(excinfo.value)
+
+
+def test_load_trajectories_jsonl_reports_invalid_json_with_line_number(tmp_path: Path):
+    path = _write_trajectories(tmp_path, json.dumps({"prompt": "p", "response": "r"}), "{not valid json")
+
+    with pytest.raises(ValueError, match="invalid JSON") as excinfo:
+        load_trajectories_jsonl(path)
+
+    assert "trajectories.jsonl:2" in str(excinfo.value)
+
+
+def test_malformed_trajectory_row_raises_a_gate_catchable_error(tmp_path: Path):
+    """Regression guard: the registry gate only catches (OSError, RuntimeError,
+    ValueError) around mining aggregation, so a malformed row must raise one of
+    those — never AttributeError/TypeError.
+    """
+    path = _write_trajectories(tmp_path, '"not an object"')
+
+    with pytest.raises((OSError, RuntimeError, ValueError)):
+        load_trajectories_jsonl(path)

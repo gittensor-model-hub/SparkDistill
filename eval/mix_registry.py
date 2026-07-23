@@ -234,7 +234,9 @@ def _classify_row(
     return working.classify(row)
 
 
-def _add_row_to_registry(working: Any, row: dict[str, Any], fingerprint_row: Callable[[dict[str, Any]], Any] | None) -> None:
+def _add_row_to_registry(
+    working: Any, row: dict[str, Any], fingerprint_row: Callable[[dict[str, Any]], Any] | None
+) -> None:
     if fingerprint_row is not None:
         working.add(fingerprint_row(row))
     else:
@@ -242,12 +244,29 @@ def _add_row_to_registry(working: Any, row: dict[str, Any], fingerprint_row: Cal
 
 
 def load_trajectories_jsonl(path: Path) -> list[dict[str, Any]]:
+    """Load trajectory rows, rejecting malformed or non-object lines cleanly.
+
+    These rows come from a miner-controlled Hugging Face bundle, so a bad line
+    must surface as a ``ValueError`` the registry gate already handles (turning
+    it into a ``dataset:REJECT`` with a helpful message). Without the type
+    check, a line that is valid JSON but not an object flowed on to
+    ``trajectory_to_sft_record`` and raised ``AttributeError`` from dict access
+    — which ``gate_registry_pr`` does not catch, so the dataset workflow died
+    with a traceback instead of rejecting the submission.
+    """
     rows: list[dict[str, Any]] = []
     with path.open(encoding="utf-8") as handle:
-        for line in handle:
+        for line_no, line in enumerate(handle, start=1):
             line = line.strip()
-            if line:
-                rows.append(json.loads(line))
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"{path}:{line_no}: invalid JSON: {exc}") from exc
+            if not isinstance(row, dict):
+                raise ValueError(f"{path}:{line_no}: trajectory row must be a JSON object, got {type(row).__name__}")
+            rows.append(row)
     return rows
 
 
@@ -406,7 +425,9 @@ def verify_mix_manifest(
             if expected_rows and actual_rows != expected_rows:
                 issues.append(f"rows_total mismatch: manifest={expected_rows} sft={actual_rows}")
 
-            selected_total = sum(int(component.get("rows_selected") or 0) for component in manifest.get("components") or [])
+            selected_total = sum(
+                int(component.get("rows_selected") or 0) for component in manifest.get("components") or []
+            )
             if selected_total and actual_rows != selected_total:
                 issues.append(f"component rows_selected sum ({selected_total}) != sft rows ({actual_rows})")
 
@@ -453,8 +474,7 @@ def _cmd_mix(args: argparse.Namespace) -> int:
 def _cmd_verify(args: argparse.Namespace) -> int:
     report = verify_mix_manifest(args.manifest, sft_path=args.sft, registry_path=args.registry)
     print(
-        f"mix verified={report['verified']} rows={report.get('rows_total')} "
-        f"components={report.get('component_count')}",
+        f"mix verified={report['verified']} rows={report.get('rows_total')} components={report.get('component_count')}",
         file=sys.stderr,
     )
     if report["issues"]:
