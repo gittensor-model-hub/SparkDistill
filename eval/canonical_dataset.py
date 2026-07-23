@@ -161,18 +161,24 @@ def assert_recipe_uses_canonical_dataset(recipe: dict[str, Any]) -> list[str]:
     if not isinstance(datasets, list) or not datasets:
         return issues
 
-    allowed = {CANONICAL_TRAINING_DATASET_PATH}
+    allowed = CANONICAL_TRAINING_DATASET_PATH
     for index, entry in enumerate(datasets):
-        if not isinstance(entry, dict):
-            continue
-        data_path = entry.get("path")
-        if not isinstance(data_path, str) or not data_path.strip():
-            continue
-        normalized = data_path.strip()
-        if normalized not in allowed:
+        # A dataset entry may be an Axolotl mapping ({path: ...}) or, in shorthand
+        # configs, a bare string path. Resolve the path either way and require it
+        # to be exactly the canonical path. Previously non-dict entries and dicts
+        # without a string `path` were silently skipped, so a recipe could smuggle
+        # in a non-canonical dataset (e.g. `datasets: ["some-org/private-set"]`)
+        # and pass the canonical-only gate.
+        if isinstance(entry, str):
+            normalized = entry.strip()
+        elif isinstance(entry, dict) and isinstance(entry.get("path"), str):
+            normalized = entry["path"].strip()
+        else:
+            normalized = None
+        if normalized != allowed:
             issues.append(
-                f"datasets[{index}].path must be {CANONICAL_TRAINING_DATASET_PATH!r} "
-                f"(canonical mining mix only), got {normalized!r}"
+                f"datasets[{index}].path must be {allowed!r} "
+                f"(canonical mining mix only), got {(normalized if normalized is not None else entry)!r}"
             )
     return issues
 
