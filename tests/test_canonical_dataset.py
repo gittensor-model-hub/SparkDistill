@@ -48,6 +48,25 @@ def test_recipe_rejects_non_canonical_paths():
     assert any(CANONICAL_TRAINING_DATASET_PATH in issue for issue in issues)
 
 
+def test_recipe_rejects_bare_string_non_canonical_dataset():
+    # A bare-string dataset entry (Axolotl shorthand) must not bypass the
+    # canonical-only rule by being silently skipped.
+    recipe = {"datasets": ["some-org/private-hf-dataset"]}
+    issues = assert_recipe_uses_canonical_dataset(recipe)
+    assert any(CANONICAL_TRAINING_DATASET_PATH in issue for issue in issues)
+
+
+def test_recipe_rejects_dataset_entry_without_path():
+    recipe = {"datasets": [{"type": "chat_template"}]}
+    issues = assert_recipe_uses_canonical_dataset(recipe)
+    assert any(CANONICAL_TRAINING_DATASET_PATH in issue for issue in issues)
+
+
+def test_recipe_accepts_bare_string_canonical_path():
+    recipe = {"datasets": [CANONICAL_TRAINING_DATASET_PATH]}
+    assert assert_recipe_uses_canonical_dataset(recipe) == []
+
+
 def test_training_track_checkbox():
     assert is_training_track_pr("- [x] **Training/evaluation improvement**")
     assert is_training_track_pr("- [x] Training/evaluation improvement")
