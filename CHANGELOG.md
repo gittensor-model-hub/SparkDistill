@@ -50,16 +50,6 @@ All notable changes to SparkDistill are documented here. The format follows
   `try`/`except` — so `dataset_registry.yml` failed with a traceback instead of reporting
   `dataset:REJECT`.
 
-- **Malformed training-track proof bundles no longer crash the gate**: `verify_submission`
-  parses `manifest.json` / `eval_scores.json` through a new `load_bundle_json` helper and
-  requires `eval_scores.scores` to be an object, returning `eval:REJECT`
-  (`reason: malformed_bundle`) instead of raising; `training_track_gate` uses the same
-  helper for its pre-verify `manifest.json` read. The bundle is downloaded from the
-  submitter's Hugging Face repo, so a non-object/malformed artifact previously raised
-  `TypeError` / `KeyError` / `AttributeError` / `JSONDecodeError` out of the ungated
-  `verify_submission` call and failed `training_track.yml` with a traceback — violating
-  that helper's documented contract that unreadable bundles return a clean `error`.
-
 ## [0.1.3] — 2026-07-21
 
 Training-track CI fail-closes forged attestation JSON; dataset/registry gates no longer

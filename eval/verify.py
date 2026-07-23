@@ -372,25 +372,6 @@ def check_checkpoint_manifest(manifest: dict, checkpoint_path: Path | None) -> b
     return checkpoint_manifest(checkpoint_path) == expected
 
 
-def load_bundle_json(bundle_dir: Path, name: str) -> tuple[dict | None, str | None]:
-    """Parse a proof-bundle artifact into a JSON object.
-
-    The bundle is downloaded from the submitter's Hugging Face repo, so a
-    malformed or non-object artifact must come back as a readable error string
-    the training-track gate can report — not as a ``JSONDecodeError`` /
-    ``AttributeError`` escaping into CI as a traceback.
-
-    Returns ``(payload, error)``; exactly one is ever non-None.
-    """
-    try:
-        payload = json.loads((bundle_dir / name).read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        return None, f"{name} is not valid JSON: {exc}"
-    if not isinstance(payload, dict):
-        return None, f"{name} must be a JSON object, got {type(payload).__name__}"
-    return payload, None
-
-
 def verify_submission(
     bundle_dir: Path,
     frontier: dict[str, float] | None,
@@ -408,27 +389,8 @@ def verify_submission(
     instead of tier scoring the submission is labeled `eval:BASELINE` — its
     scores then seed `runs/frontier.json` for the next submission to beat.
     """
-    manifest, manifest_error = load_bundle_json(bundle_dir, "manifest.json")
-    scores_payload, scores_error = load_bundle_json(bundle_dir, "eval_scores.json")
-    bundle_error = manifest_error or scores_error
-    if manifest is None or scores_payload is None or bundle_error is not None:
-        return {
-            "verified": False,
-            "reason": "malformed_bundle",
-            "issues": [bundle_error or "proof bundle could not be read"],
-            "label": "eval:REJECT",
-            "run_id": (manifest or {}).get("run_id"),
-        }
-
-    claimed = scores_payload.get("scores")
-    if not isinstance(claimed, dict):
-        return {
-            "verified": False,
-            "reason": "malformed_bundle",
-            "issues": ["eval_scores.json must contain a 'scores' object"],
-            "label": "eval:REJECT",
-            "run_id": manifest.get("run_id"),
-        }
+    manifest = json.loads((bundle_dir / "manifest.json").read_text())
+    claimed = json.loads((bundle_dir / "eval_scores.json").read_text())["scores"]
     gpu_architecture = resolve_bundle_gpu_architecture(manifest)
 
     if attestation is not None and not attestation.get("passed"):

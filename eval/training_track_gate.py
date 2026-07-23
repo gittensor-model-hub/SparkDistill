@@ -394,7 +394,7 @@ def _download_and_verify_bundle(
     from huggingface_hub import snapshot_download
 
     from eval.frontiers import load_frontier_scores
-    from eval.verify import load_bundle_json, resolve_bundle_gpu_architecture, verify_submission
+    from eval.verify import resolve_bundle_gpu_architecture, verify_submission
 
     attestation = None
     attestation_path = find_attestation_path(changed_paths)
@@ -414,9 +414,7 @@ def _download_and_verify_bundle(
     if not (bundle_dir / "manifest.json").exists() or not (bundle_dir / "eval_scores.json").exists():
         return None, None, None, bundle_dir  # already flagged by verify_remote_proof_bundle
 
-    manifest, manifest_error = load_bundle_json(bundle_dir, "manifest.json")
-    if manifest is None:
-        return None, None, f"proof bundle {manifest_error}", bundle_dir
+    manifest = json.loads((bundle_dir / "manifest.json").read_text(encoding="utf-8"))
     frontier = load_frontier_scores(resolve_bundle_gpu_architecture(manifest))
 
     report = verify_submission(bundle_dir, frontier, attestation=attestation)
