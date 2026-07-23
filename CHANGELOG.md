@@ -6,6 +6,11 @@ All notable changes to SparkDistill are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- **Registry mix export uses SparkProof publish path**: `eval.mix_registry` now delegates
+  to SparkProof's `trajectory_to_messages_record` (same as HF publish) instead of
+  `teacher.format`. Empty or failed-validation trajectories are skipped (not coerced
+  into empty assistant turns), multi-turn episodes are preferred, and repair rows use
+  `prompt_meta.prompt` instead of the validator wrapper. Closes the approach in #213.
 - **Claim binding uses signed NRAS ``eat_nonce``, not editable JSON** : `check_claim_binding`
   / `check_attestation_integrity` require `eat_nonce` from JWKS-verified platform or
   per-device JWTs (`REMOTE_GPU_CLAIMS`) to equal `claim_sha256(bundle)`. Miner-editable
