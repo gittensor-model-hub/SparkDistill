@@ -442,3 +442,11 @@ def test_main_skips_label_when_pr_already_merged(tmp_path, monkeypatch):
     )
     assert rc == 0
     assert label_calls == []
+
+
+def test_validate_registry_entry_rejects_non_object():
+    from eval.registry_gate import validate_registry_entry
+
+    assert validate_registry_entry(["not", "a", "dict"]) == [
+        "must be a JSON object, got list"
+    ]

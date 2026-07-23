@@ -100,6 +100,11 @@ def load_registry(path: Path) -> list[dict[str, Any]]:
             row = json.loads(line)
         except json.JSONDecodeError as exc:
             raise ValueError(f"{path}:{line_no}: invalid JSON: {exc}") from exc
+        if not isinstance(row, dict):
+            raise ValueError(
+                f"{path}:{line_no}: invalid registry entry: must be a JSON object, "
+                f"got {type(row).__name__}"
+            )
         issues = validate_registry_entry(row)
         if issues:
             raise ValueError(f"{path}:{line_no}: invalid registry entry: {'; '.join(issues)}")
