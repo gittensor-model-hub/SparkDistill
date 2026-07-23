@@ -20,6 +20,15 @@ All notable changes to SparkDistill are documented here. The format follows
   dataset-track TDX checks extract the 64-byte REPORTDATA from the quote at the TDX v4
   offset and compare to `tdx_report_data(claim_sha256|nonce)`. Forged `tdx.report_data`
   JSON can no longer rebind a genuine quote; JSON/quote mismatches are rejected.
+- **Attested GSM8K regression sample can no longer forge a score by duplicating
+  problem_ids**: `verify_regression_sample` (validator side) recomputed
+  `correct / len(problems)` while iterating over the miner-controlled `responses`
+  list without checking coverage, so a bundle whose `responses` duplicated one
+  correct answer (or cherry-picked easy problems) recomputed to an arbitrary
+  `exact_match` — e.g. 50 copies of one correct answer verified as `1.0`, slipping
+  a regressed gsm8k past the attested no-GPU floor. `verify_regression_sample` now
+  requires the responses to answer each frozen problem exactly once (the same
+  coverage invariant `build_regression_sample` already enforced miner-side).
 - **Training-track merge now seeds / raises ``runs/frontiers.json``**: the ledger
   workflow only wrote `ledger.jsonl` + `result.json`, so Hopper `eval:BASELINE` (#120)
   never filled its architecture bucket. `record_merged_ledger_entry` now calls

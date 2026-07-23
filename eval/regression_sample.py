@@ -108,6 +108,23 @@ def verify_regression_sample(
     if not isinstance(responses, list):
         return issues + ["regression sample missing responses list"]
 
+    # Coverage guard (mirror build_regression_sample): the responses must answer
+    # each frozen problem exactly once. compute_exact_match divides the correct
+    # count by len(problems) while iterating over `responses`, so without this a
+    # miner could forge an arbitrary score by duplicating or cherry-picking
+    # problem_ids — e.g. 50 copies of one correct answer recomputes to exact_match
+    # 1.0 — and slip a regressed gsm8k past the attested no-GPU floor.
+    expected_ids = {int(row["problem_id"]) for row in problems}
+    try:
+        response_ids = [int(item["problem_id"]) for item in responses]
+    except (KeyError, TypeError, ValueError):
+        return issues + ["regression sample responses must each carry an integer problem_id"]
+    if len(response_ids) != len(problems) or set(response_ids) != expected_ids:
+        return issues + [
+            f"regression sample must answer each of the {len(problems)} frozen problems "
+            "exactly once (no missing, extra, or duplicate problem_ids)"
+        ]
+
     try:
         recomputed = compute_exact_match(responses, problems)
     except ValueError as exc:

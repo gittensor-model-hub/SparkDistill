@@ -66,3 +66,29 @@ def test_build_regression_sample_rejects_incomplete_ids():
     responses = _all_correct_responses()[:-1]
     with pytest.raises(ValueError, match=f"expected {REGRESSION_PROBLEM_COUNT} responses"):
         build_regression_sample(responses)
+
+
+def test_verify_regression_sample_rejects_duplicated_problem_ids():
+    # A forged sample that duplicates one correct answer to reach exact_match 1.0
+    # must be rejected by the validator — build refuses to produce it, but the
+    # bundle content is miner-controlled, so verify must guard coverage itself.
+    correct = _all_correct_responses()
+    forged = [dict(correct[0]) for _ in range(REGRESSION_PROBLEM_COUNT)]
+    sample = {
+        "version": build_regression_sample(correct)["version"],
+        "benchmark": REGRESSION_BENCHMARK_KEY,
+        "problem_set_path": build_regression_sample(correct)["problem_set_path"],
+        "problem_set_sha256": build_regression_sample(correct)["problem_set_sha256"],
+        "rows_total": REGRESSION_PROBLEM_COUNT,
+        "exact_match": 1.0,
+        "responses": forged,
+    }
+    issues = verify_regression_sample(sample, claimed_gsm8k=1.0)
+    assert any("exactly once" in issue for issue in issues)
+
+
+def test_verify_regression_sample_rejects_incomplete_ids():
+    sample = build_regression_sample(_all_correct_responses())
+    sample["responses"] = sample["responses"][:-1]
+    issues = verify_regression_sample(sample, claimed_gsm8k=1.0)
+    assert any("exactly once" in issue for issue in issues)
