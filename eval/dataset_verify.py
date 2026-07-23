@@ -80,6 +80,24 @@ def _sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _load_proof_json(proof_dir: Path, name: str) -> tuple[dict | None, list[str]]:
+    """Parse a miner-supplied proof artifact into a JSON object.
+
+    These files come from the submitter's Hugging Face repo, so malformed JSON
+    or a valid-JSON-but-not-an-object payload must surface as an ordinary gate
+    issue (``dataset:REJECT``) rather than a ``JSONDecodeError`` / later
+    ``AttributeError`` escaping the gate and failing the dataset workflow with
+    a traceback.
+    """
+    try:
+        payload = json.loads((proof_dir / name).read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return None, [f"{name} is not valid JSON: {exc}"]
+    if not isinstance(payload, dict):
+        return None, [f"{name} must be a JSON object, got {type(payload).__name__}"]
+    return payload, []
+
+
 def _check_dataset_tdx_attestation(attestation: dict) -> list[str]:
     """Production dataset bundles must include TDX bound to the dataset nonce."""
     if "tdx" not in attestation:
@@ -90,6 +108,8 @@ def _check_dataset_tdx_attestation(attestation: dict) -> list[str]:
             "gpu_attestation.tdx required for production dataset bundles — "
             "regenerate on an Intel TDX guest with configfs-tsm provisioned"
         ]
+    if not isinstance(tdx, dict):
+        return [f"gpu_attestation.tdx must be a JSON object, got {type(tdx).__name__}"]
     nonce = attestation.get("nonce") or ""
     if not nonce:
         return ["gpu_attestation.tdx present but dataset nonce missing"]
@@ -100,19 +120,13 @@ def _check_dataset_tdx_attestation(attestation: dict) -> list[str]:
         return ["gpu_attestation.tdx missing quote_b64"]
     quote_report_data = extract_report_data_from_quote(quote_b64)
     if quote_report_data is None:
-        return [
-            "gpu_attestation.tdx quote_b64 is too short or unparseable to extract REPORTDATA"
-        ]
+        return ["gpu_attestation.tdx quote_b64 is too short or unparseable to extract REPORTDATA"]
     expected = tdx_report_data(nonce).hex()
     if quote_report_data.lower() != expected:
-        return [
-            "gpu_attestation.tdx quote REPORTDATA does not match dataset attestation nonce"
-        ]
+        return ["gpu_attestation.tdx quote REPORTDATA does not match dataset attestation nonce"]
     json_report_data = str(tdx.get("report_data") or "").lower()
     if json_report_data and json_report_data != quote_report_data.lower():
-        return [
-            "gpu_attestation.tdx report_data JSON does not match REPORTDATA inside quote_b64"
-        ]
+        return ["gpu_attestation.tdx report_data JSON does not match REPORTDATA inside quote_b64"]
     return []
 
 
@@ -125,14 +139,19 @@ def check_proof_dir(proof_dir: Path, claimed_sha256: str | None = None) -> tuple
     if issues:
         return issues, 0, None
 
-    attestation = json.loads((proof_dir / "gpu_attestation.json").read_text())
+    attestation, attestation_issues = _load_proof_json(proof_dir, "gpu_attestation.json")
+    dataset_manifest, manifest_issues = _load_proof_json(proof_dir, "dataset_manifest.json")
+    issues.extend(attestation_issues)
+    issues.extend(manifest_issues)
+    if attestation is None or dataset_manifest is None:
+        return issues, 0, None
+
     if not attestation.get("passed"):
         issues.append("gpu_attestation.passed is false")
     if not attestation.get("nonce"):
         issues.append("gpu_attestation.nonce missing — bundle predates content-bound attestation")
     issues.extend(_check_dataset_tdx_attestation(attestation))
 
-    dataset_manifest = json.loads((proof_dir / "dataset_manifest.json").read_text())
     if not dataset_manifest.get("passed"):
         issues.append("release gate did not pass (dataset_manifest.passed is false)")
     if dataset_manifest.get("blocked_rows"):
@@ -145,7 +164,12 @@ def check_proof_dir(proof_dir: Path, claimed_sha256: str | None = None) -> tuple
     if claimed_sha256 and actual_sha != claimed_sha256:
         issues.append("trajectories.jsonl sha256 does not match the hash claimed in the PR")
 
-    rows = int(dataset_manifest.get("rows_total") or 0)
+    raw_rows = dataset_manifest.get("rows_total") or 0
+    try:
+        rows = int(raw_rows)
+    except (TypeError, ValueError):
+        issues.append(f"dataset_manifest.rows_total must be an integer, got {type(raw_rows).__name__}")
+        return issues, 0, None
     actual_rows = sum(1 for line in (proof_dir / "trajectories.jsonl").read_text().splitlines() if line.strip())
     if actual_rows != rows:
         issues.append(f"rows_total mismatch: manifest={rows} trajectories.jsonl={actual_rows}")
@@ -240,7 +264,9 @@ def _resolve_proof_dir(hf_repo: str | None, proof_path: Path | None) -> Path:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--hf-repo", default=None, help="HF datasets repo id from the miner's PR")
-    parser.add_argument("--proof-path", type=Path, default=None, help="local proof/bundle dir (alternative to --hf-repo)")
+    parser.add_argument(
+        "--proof-path", type=Path, default=None, help="local proof/bundle dir (alternative to --hf-repo)"
+    )
     parser.add_argument("--claimed-sha256", default=None, help="trajectories_sha256 claimed in the PR text")
     parser.add_argument(
         "--sparkproof-root",
