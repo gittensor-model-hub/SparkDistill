@@ -249,7 +249,13 @@ def hf_repo_from_url(url: str) -> str:
     return match.group(1)
 
 
-def validate_registry_entry(entry: dict[str, Any]) -> list[str]:
+def validate_registry_entry(entry: Any) -> list[str]:
+    # A valid-JSON but non-object line (list/number/string) must yield a clean
+    # issue, not an AttributeError on the .get() calls below. load_registry turns
+    # a non-empty issue list into its documented ValueError(file:line), and the
+    # dataset gate into a dataset:REJECT — same class as parse_added_registry_lines.
+    if not isinstance(entry, dict):
+        return [f"registry entry must be a JSON object, got {type(entry).__name__}"]
     issues: list[str] = []
     for field in REQUIRED_FIELDS:
         if not entry.get(field):

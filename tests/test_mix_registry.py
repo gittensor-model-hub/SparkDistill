@@ -405,6 +405,15 @@ def test_load_registry_validates_entries(tmp_path: Path):
         load_registry(registry_path)
 
 
+def test_load_registry_rejects_non_object_line(tmp_path: Path):
+    # A valid-JSON but non-object line must surface load_registry's clean
+    # ValueError(file:line), not an AttributeError from validate_registry_entry.
+    registry_path = tmp_path / "registry.jsonl"
+    registry_path.write_text("[1, 2, 3]\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="must be a JSON object"):
+        load_registry(registry_path)
+
+
 def test_trajectory_to_sft_record_skips_null_response(sparkproof_root: Path):
     export_fn = _import_trajectory_exporter(sparkproof_root)
     row = _trajectory("task prompt", "good code")

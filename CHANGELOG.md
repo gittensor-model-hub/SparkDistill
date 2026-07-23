@@ -16,6 +16,13 @@ All notable changes to SparkDistill are documented here. The format follows
   per-device JWTs (`REMOTE_GPU_CLAIMS`) to equal `claim_sha256(bundle)`. Miner-editable
   `attestation["claims"]` can no longer rebind a stolen valid NRAS token to another
   bundle. Aligns with SparkProof `verify_nras_token(..., expected_nonce=)`.
+- **`validate_registry_entry` rejects non-object lines instead of crashing**: a
+  valid-JSON but non-object registry line (a list / number / string) raised
+  `AttributeError: 'list' object has no attribute 'get'`, which propagated through
+  `mix_registry.load_registry` — defeating its documented `ValueError(file:line)` (it
+  only caught `JSONDecodeError`) and crashing `export_registry_snapshot` / `mix_registry`
+  tooling with an opaque traceback. `validate_registry_entry` now returns a clean
+  "must be a JSON object" issue, matching the `parse_added_registry_lines` guard.
 - **TDX binding reads REPORTDATA from ``quote_b64``, not JSON**: `check_tdx_binding` and
   dataset-track TDX checks extract the 64-byte REPORTDATA from the quote at the TDX v4
   offset and compare to `tdx_report_data(claim_sha256|nonce)`. Forged `tdx.report_data`
