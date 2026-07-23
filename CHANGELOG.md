@@ -48,6 +48,14 @@ All notable changes to SparkDistill are documented here. The format follows
   now resolves the path from either shape and flags anything that is not exactly the
   canonical mining path, closing a route to train on a non-canonical dataset.
 
+- **Malformed miner trajectory rows no longer crash the dataset gate**:
+  `load_trajectories_jsonl` rejects a line that is valid JSON but not an object, and
+  reports unparseable lines with a `path:line` prefix — both as `ValueError`. Such a row
+  previously flowed into `trajectory_to_sft_record`, where dict access raised
+  `AttributeError`; `gate_registry_pr` only catches `(OSError, RuntimeError, ValueError)`
+  around mining aggregation, so `dataset_registry.yml` died with a traceback instead of
+  reporting a clean `dataset:REJECT`.
+
 ## [0.1.3] — 2026-07-21
 
 Training-track CI fail-closes forged attestation JSON; dataset/registry gates no longer
