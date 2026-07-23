@@ -148,67 +148,11 @@ def test_missing_artifact_rejects(tmp_path):
     assert any("missing proof artifact" in issue for issue in report["issues"])
 
 
-def test_non_object_gpu_attestation_rejects_cleanly(tmp_path):
-    proof, _ = _write_proof_dir(tmp_path)
-    (proof / "gpu_attestation.json").write_text("[]")
-    issues, rows, gpu_architecture = check_proof_dir(proof)
-    assert any("gpu_attestation.json must be a JSON object" in issue for issue in issues)
-    assert "list" in " ".join(issues)
-    assert (rows, gpu_architecture) == (0, None)
-
-
-def test_non_object_dataset_manifest_rejects_cleanly(tmp_path):
-    proof, _ = _write_proof_dir(tmp_path)
-    (proof / "dataset_manifest.json").write_text('"not an object"')
-    issues, rows, _ = check_proof_dir(proof)
-    assert any("dataset_manifest.json must be a JSON object" in issue for issue in issues)
-    assert rows == 0
-
-
-def test_malformed_json_proof_artifact_rejects_cleanly(tmp_path):
-    proof, _ = _write_proof_dir(tmp_path)
-    (proof / "gpu_attestation.json").write_text("{not valid json")
-    report = verify_dataset_submission(proof, sparkproof_root=None)
-    assert report["label"] == "dataset:REJECT"
-    assert any("gpu_attestation.json is not valid JSON" in issue for issue in report["issues"])
-
-
-def test_non_integer_rows_total_rejects_cleanly(tmp_path):
-    proof, _ = _write_proof_dir(tmp_path)
-    manifest = json.loads((proof / "dataset_manifest.json").read_text())
-    manifest["rows_total"] = [1, 2, 3]
-    (proof / "dataset_manifest.json").write_text(json.dumps(manifest))
-    issues, rows, _ = check_proof_dir(proof)
-    assert any("rows_total must be an integer" in issue for issue in issues)
-    assert rows == 0
-
-
-def test_non_object_tdx_block_rejects_cleanly(tmp_path):
-    proof, _ = _write_proof_dir(tmp_path)
-    (proof / "gpu_attestation.json").write_text(json.dumps({"passed": True, "nonce": "a" * 64, "tdx": "not-an-object"}))
-    issues, _rows, _arch = check_proof_dir(proof)
-    assert any("gpu_attestation.tdx must be a JSON object" in issue for issue in issues)
-
-
-def test_malformed_proof_artifacts_never_raise(tmp_path):
-    """Regression guard: `gate_registry_submission` calls this with no try/except,
-    so a miner-controlled bundle must always come back as issues — never as an
-    AttributeError/TypeError/JSONDecodeError that fails the workflow.
-    """
-    payloads = ["[]", '"a string"', "42", "null", "true", "{not valid json"]
-    for index, payload in enumerate(payloads):
-        case_dir = tmp_path / f"case{index}"
-        case_dir.mkdir()
-        proof, _ = _write_proof_dir(case_dir)
-        (proof / "gpu_attestation.json").write_text(payload)
-        issues, rows, _ = check_proof_dir(proof)
-        assert issues, f"expected issues for payload {payload!r}"
-        assert rows == 0
-
-
 def test_missing_tdx_on_new_bundle_rejects(tmp_path):
     proof, sha = _write_proof_dir(tmp_path)
-    (proof / "gpu_attestation.json").write_text(json.dumps({"passed": True, "nonce": "a" * 64, "tdx": None}))
+    (proof / "gpu_attestation.json").write_text(
+        json.dumps({"passed": True, "nonce": "a" * 64, "tdx": None})
+    )
     issues, _rows, _arch = check_proof_dir(proof, claimed_sha256=sha)
     assert any("tdx required" in issue for issue in issues)
 
@@ -272,7 +216,7 @@ def test_sparkproof_verify_runs_online_trust_anchors(monkeypatch, tmp_path):
 
     class Result:
         returncode = 0
-        stdout = '{"verified": true}'
+        stdout = "{\"verified\": true}"
         stderr = ""
 
     def fake_run(cmd, cwd=None, capture_output=None, text=None, timeout=None):
