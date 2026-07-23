@@ -1,0 +1,49 @@
+id: torch_nn_functional_adaptive_avg_pool2d
+level: 3
+category: kernel_translation
+title: Torch Nn Functional Adaptive Avg Pool2D
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.nn.functional.adaptive_avg_pool2d`.\n\
+  \nOperator description:\nApply a 2D adaptive average pooling over an input signal composed of several\
+  \ input planes. The output is of size H x W, for any input size. The number of output features is equal\
+  \ to the number of input planes. The target output size of the image can be a tuple (H, W) or a single\
+  \ H for a square image H x H. H and W can be either an int, or None which means the size will be the\
+  \ same as that of the input.\n\nTarget Python signature / call pattern:\ndef adaptive_avg_pool2d(output_size)\
+  \ -> Tensor\nArgs:\n    output_size: the target output size (single integer or double-integer tuple)\n\
+  \nShape:\n    - Input: (N, C, H_in, W_in) or (C, H_in, W_in)\n    - Output: (N, C, S_0, S_1) or (C,\
+  \ S_0, S_1), where S=output_size\n\nPyTorch reference snippet:\n```python\nnn.AdaptiveAvgPool2d\n```\n\
+  \nExample / usage notes:\n>>> # target output size of 5x7 >>> m = nn.AdaptiveAvgPool2d((5, 7)) >>> input\
+  \ = torch.randn(1, 64, 8, 9) >>> output = m(input) >>> # target output size of 7x7 (square) >>> m =\
+  \ nn.AdaptiveAvgPool2d(7) >>> input = torch.randn(1, 64, 10, 9) >>> output = m(input) >>> # target output\
+  \ size of 10x7 >>> m = nn.AdaptiveAvgPool2d((None, 7)) >>> input = torch.randn(1, 64, 10, 9) >>> output\
+  \ = m(input)\n\nAdditional constraints:\nThe target output size can be a single integer for square images\
+  \ or a tuple for rectangular dimensions. H and W can be None to retain input dimensions.\n\nRequirements\
+  \ (SparkDistill / TritonBench harness):\n- Translate the PyTorch reference into Triton 3.7.1 kernels\
+  \ for Blackwell SM120\n- Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate\
+  \ for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n\
+  - Add @triton.autotune when there are meaningful tile/block choices\n- Provide a launcher and a small\
+  \ self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 1
+  torch_cnt: 1
+  func_inputs: "def adaptive_avg_pool2d(output_size) -> Tensor\nArgs:\n    output_size: the target output\
+    \ size (single integer or double-integer tuple)\n\nShape:\n    - Input: (N, C, H_in, W_in) or (C,\
+    \ H_in, W_in)\n    - Output: (N, C, S_0, S_1) or (C, S_0, S_1), where S=output_size"
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- reduction
+- convolution
+source:
+  channel: T
+  file: adaptive_avg_pool2d.py
+  name: torch.nn.functional.adaptive_avg_pool2d
+  difficulty: '3'
+  params_cnt: 1
+  torch_cnt: 1
+gold_kernel: data/TritonBench_T_v1/adaptive_avg_pool2d.py

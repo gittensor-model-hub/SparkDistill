@@ -1,0 +1,59 @@
+id: fused_index_select_eq
+level: 4
+category: kernel_translation
+title: Fused Index Select Eq
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `fused_index_select_eq`.\n\
+  \nOperator description:\nPerforms a fused operation combining index selection and element-wise equality\
+  \ comparison. It selects elements from the input tensor along a specified dimension using provided indices\
+  \ and then performs an element-wise equality comparison between the selected elements and another tensor\
+  \ or scalar. The result is a boolean tensor of the same shape as the selected elements, indicating where\
+  \ the comparisons are true.\n\nTarget Python signature / call pattern:\nfused_index_select_eq(input,\
+  \ dim, index, other, *, out=None) -> Tensor. Args: input (Tensor): The input tensor X. dim (int): The\
+  \ dimension along which to index. index (IntTensor or LongTensor): The indices to select along dimension\
+  \ dim. other (Tensor or float): The tensor or value Y to compare with the selected tensor. out (Tensor,\
+  \ optional): Output tensor. Ignored if None. Default: None\n\nMathematical definition:\nGiven an input\
+  \ tensor X, dimension \text{dim}, index tensor I, and another tensor or scalar Y, the function computes:\n\
+  \n1. **Index Selection:**\n\nSelect elements from X along dimension \text{dim} using indices I:\n\n\\\
+  [\nS = \\text{index\\_select}(X, \\text{dim}, I)\n\\]\n\n2. **Element-wise Equality Comparison:**\n\n\
+  Compare the selected tensor S with Y element-wise:\n\n\\[\nO = (S == Y)\n\\]\n\nThe output tensor O\
+  \ is a boolean tensor of the same shape as S.\n\nPyTorch reference snippet:\n```python\nselected = torch.index_select(input,\
+  \ dim, index)\noutput = torch.eq(selected, other)\n```\n\nExample / usage notes:\n```python\nimport\
+  \ torch\n\ndef fused_index_select_eq(input, dim, index, other, *, out=None):\n    selected = torch.index_select(input,\
+  \ dim, index)\n    output = torch.eq(selected, other)\n    if out is not None:\n        out.copy_(output)\n\
+  \        return out\n    return output\n\n# Example usage\ninput = torch.tensor([[1, 2], [3, 4], [5,\
+  \ 6]])\nother = torch.tensor([[1, 2], [5, 6]])\nindex = torch.tensor([0, 2])  # Select first and third\
+  \ rows\ndim = 0\n\noutput = fused_index_select_eq(input, dim=dim, index=index, other=other)\nprint(\"\
+  Output:\")\nprint(output)\n# Output:\n# tensor([[ True,  True],\n#         [ True,  True]])\n```\n\n\
+  Additional constraints:\n- The shapes of the selected tensor S and other must be broadcastable for the\
+  \ element-wise comparison.\n- If other is a scalar, it is broadcasted to the shape of S.\n- The function\
+  \ supports autograd for gradient computation, although the output is a boolean tensor.\n\nRequirements\
+  \ (SparkDistill / TritonBench harness):\n- Translate the PyTorch reference into Triton 3.7.1 kernels\
+  \ for Blackwell SM120\n- Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate\
+  \ for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n\
+  - Add @triton.autotune when there are meaningful tile/block choices\n- Provide a launcher and a small\
+  \ self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 4
+  torch_cnt: 2
+  func_inputs: 'fused_index_select_eq(input, dim, index, other, *, out=None) -> Tensor. Args: input (Tensor):
+    The input tensor X. dim (int): The dimension along which to index. index (IntTensor or LongTensor):
+    The indices to select along dimension dim. other (Tensor or float): The tensor or value Y to compare
+    with the selected tensor. out (Tensor, optional): Output tensor. Ignored if None. Default: None'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- fused
+source:
+  channel: T
+  file: fused_index_select_eq.py
+  name: fused_index_select_eq
+  difficulty: '4'
+  params_cnt: 4
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/fused_index_select_eq.py

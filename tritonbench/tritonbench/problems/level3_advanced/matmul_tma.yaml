@@ -1,0 +1,60 @@
+id: matmul_tma
+level: 3
+category: kernel_generation
+title: Matmul Tma
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `matmul_tma.py` (repo: triton-lang/triton).
+
+
+  Task description:
+
+  The Triton kernel `matmul_tma_load_store` is designed to perform block-based matrix multiplication.
+  It uses the `tl.make_block_ptr` function to create block pointers for matrices A, B, and C, each with
+  specific shapes and strides, which facilitate efficient loading of sub-matrices. The parameters `BLOCK_M`,
+  `BLOCK_N`, and `BLOCK_K` define the shape of these sub-matrices. The kernel loads blocks of A and B
+  using `tl.load` and computes the matrix product using `tl.dot`. If `OUTPUT_F16` is set, it converts
+  the result to float16 before storing it with `tl.store`. The Python wrapper `warpper_tma_load_store`
+  generates random matrices A and B, optionally transposes them, allocates matrix C, and calls the kernel.
+  The wrapper accepts multiple parameters like matrix dimensions (M, N, K), number of warps and CTAs,
+  transpose flags for A and B, and the output format for C.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- convolution
+source:
+  channel: G
+  file: matmul_tma.py
+  repo: triton-lang/triton
+  difficulty: '3'
+  star: 13556
+  simp_instru_len: 123
+  comp_instru_len: 235
+  output_triton_len: 933
+gold_kernel: data/TritonBench_G_v1/matmul_tma.py

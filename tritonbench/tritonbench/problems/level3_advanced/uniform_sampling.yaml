@@ -1,0 +1,49 @@
+id: uniform_sampling
+level: 3
+category: kernel_generation
+title: Uniform Sampling
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `uniform_sampling.py` (repo: FlagOpen/FlagGems).\n\nTask description:\nThe `uniform_kernel`\
+  \ function in Triton is designed to generate uniform random numbers on the GPU within a specified range\
+  \ `[from_, to)`. It accepts several parameters: `out_ptr` is a pointer to where the result is stored,\
+  \ `N` is the total number of random numbers to generate, `philox_seed` and `philox_offset` are used\
+  \ for initializing the Philox random number generator, and `from_` and `to` define the range of random\
+  \ numbers. The block size `BLOCK` determines the number of threads per block.\n\n            A key part\
+  \ of the kernel is utilizing Triton's Philox function, which takes the seed and offset to generate four\
+  \ random numbers (`r0`, `r1`, `r2`, `r3`). These random uints are then converted to floats in the `[0,\
+  \ 1)` range using `uint_to_uniform_float`, and scaled to the specified range `[from_, to)`.\n\n    \
+  \        To efficiently manage memory, the kernel uses a loop to calculate offsets (`off_0`, `off_1`,\
+  \ `off_2`, `off_3`) for storing the four random numbers generated per loop iteration. Each number is\
+  \ conditionally stored based on its offset relative to `N`, using Triton's `tl.store` function with\
+  \ an eviction policy set to \"evict_first\". The kernel also includes heuristics to optimize `BLOCK`\
+  \ size and `num_warps` based on `N`.\n\n            The `uniform_` function is a high-level wrapper\
+  \ that initializes the Philox generator state using the `philox_cuda_seed_offset` function, calculates\
+  \ the grid size, and invokes the kernel with the appropriate parameters. It ensures the kernel is executed\
+  \ within the context of the current CUDA device using `torch.cuda.device`.\n\nRequirements (SparkDistill\
+  \ / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer\
+  \ tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct\
+  \ boundary masking\n- Include @triton.autotune with at least 3 configs when tile sizes matter\n- Provide\
+  \ a Python launcher + grid and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot\
+  \ reductions\n- Print a short note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- reduction
+- convolution
+source:
+  channel: G
+  file: uniform_sampling.py
+  repo: FlagOpen/FlagGems
+  difficulty: '3'
+  star: 347
+  simp_instru_len: 141
+  comp_instru_len: 408
+  output_triton_len: 1455
+gold_kernel: data/TritonBench_G_v1/uniform_sampling.py

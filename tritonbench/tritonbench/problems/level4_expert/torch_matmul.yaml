@@ -1,0 +1,55 @@
+id: torch_matmul
+level: 4
+category: kernel_translation
+title: Torch Matmul
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.matmul`.\n\
+  \nOperator description:\nMatrix product of two tensors. The behavior depends on the dimensionality of\
+  \ the tensors: 1D tensors return a dot product; 2D tensors return a matrix-matrix product; 1D and 2D\
+  \ tensors return a matrix-vector product; N-dimensional tensors (N > 2) return a batched matrix multiply\
+  \ with broadcasting support. Sparse layouts are supported for 2D matrix-matrix products. TensorFloat32\
+  \ is supported. On certain ROCm devices, float16 inputs use different precision for backward. The 1D\
+  \ dot product version does not support an out parameter.\n\nTarget Python signature / call pattern:\n\
+  matmul(input, other, *, out=None) -> Tensor\nArguments:\n    input (Tensor): the first tensor to be\
+  \ multiplied\n    other (Tensor): the second tensor to be multiplied\nKeyword args:\n    out (Tensor,\
+  \ optional): the output tensor.\n\nPyTorch reference snippet:\n```python\ntorch.matmul(tensor1, tensor2)\n\
+  ```\n\nExample / usage notes:\n>>> # vector x vector\n>>> tensor1 = torch.randn(3)\n>>> tensor2 = torch.randn(3)\n\
+  >>> torch.matmul(tensor1, tensor2).size()\ntorch.Size([])\n>>> # matrix x vector\n>>> tensor1 = torch.randn(3,\
+  \ 4)\n>>> tensor2 = torch.randn(4)\n>>> torch.matmul(tensor1, tensor2).size()\ntorch.Size([3])\n>>>\
+  \ # batched matrix x broadcasted vector\n>>> tensor1 = torch.randn(10, 3, 4)\n>>> tensor2 = torch.randn(4)\n\
+  >>> torch.matmul(tensor1, tensor2).size()\ntorch.Size([10, 3])\n>>> # batched matrix x batched matrix\n\
+  >>> tensor1 = torch.randn(10, 3, 4)\n>>> tensor2 = torch.randn(10, 4, 5)\n>>> torch.matmul(tensor1,\
+  \ tensor2).size()\ntorch.Size([10, 3, 5])\n>>> # batched matrix x broadcasted matrix\n>>> tensor1 =\
+  \ torch.randn(10, 3, 4)\n>>> tensor2 = torch.randn(4, 5)\n>>> torch.matmul(tensor1, tensor2).size()\n\
+  torch.Size([10, 3, 5])\n\nAdditional constraints:\nSparse support is a beta feature and some layout(s)/dtype/device\
+  \ combinations may not be supported, or may not have autograd support. If you notice missing functionality\
+  \ please open a feature request.\n\nRequirements (SparkDistill / TritonBench harness):\n- Translate\
+  \ the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics: include\
+  \ torch.allclose vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary masks;\
+  \ prefer tl.make_tensor_descriptor over tl.make_block_ptr\n- Add @triton.autotune when there are meaningful\
+  \ tile/block choices\n- Provide a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 3
+  torch_cnt: 1
+  func_inputs: "matmul(input, other, *, out=None) -> Tensor\nArguments:\n    input (Tensor): the first\
+    \ tensor to be multiplied\n    other (Tensor): the second tensor to be multiplied\nKeyword args:\n\
+    \    out (Tensor, optional): the output tensor."
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- sparse
+source:
+  channel: T
+  file: matmul.py
+  name: torch.matmul
+  difficulty: '4'
+  params_cnt: 3
+  torch_cnt: 1
+gold_kernel: data/TritonBench_T_v1/matmul.py

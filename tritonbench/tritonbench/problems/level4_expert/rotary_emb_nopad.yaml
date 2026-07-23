@@ -1,0 +1,68 @@
+id: rotary_emb_nopad
+level: 4
+category: kernel_generation
+title: Rotary Emb Nopad
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `rotary_emb_nopad.py` (repo: hpcaitech/ColossalAI).
+
+
+  Task description:
+
+  The Triton kernel code implements the `rotary_embedding` function, which provides rotary positional
+  embeddings for transformer architectures. It operates in two modes based on the presence of `k_cache`.
+  The `rotary_embedding_kernel` is invoked when `k_cache` is None and processes the query (`q`) and key
+  (`k`) tensors by loading precomputed cosine (`cos`) and sine (`sin`) values according to their strides
+  and positions. It then applies these trigonometric values to the tensors to perform a rotation operation
+  defined as: out_q0 = loaded_q0 * loaded_cos - loaded_q1 * loaded_sin and out_q1 = loaded_q0 * loaded_sin
+  + loaded_q1 * loaded_cos for the queries and similarly for the keys if applicable. The `fused_rotary_embedding_kernel_v2`
+  handles the case when `k_cache` is provided. This involves using block-wise operations for cache management.
+  For this, it utilizes additional input tensors like `block_tables` to determine storage positions within
+  the cache and `kv_lengths` for past sequence length information. Both kernels leverage trigonometric
+  identities to rotate the embeddings and conditionally store results based on the compute strategy defined
+  by `grid` settings which scale based on input tensor dimensions and number of threads (`num_warps`).
+  Essential inputs include `q`, `k`, `cos`, `sin`, and optionally `k_cache`, `block_tables`, and `kv_lengths`.
+  Important constants like `Q_HEAD_NUM` and `HEAD_DIM` are used to define structural properties of the
+  input tensors.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- rope
+- elementwise
+- reduction
+- embedding
+- fused
+source:
+  channel: G
+  file: rotary_emb_nopad.py
+  repo: hpcaitech/ColossalAI
+  difficulty: '4'
+  star: 38848
+  simp_instru_len: 238
+  comp_instru_len: 380
+  output_triton_len: 3607
+gold_kernel: data/TritonBench_G_v1/rotary_emb_nopad.py

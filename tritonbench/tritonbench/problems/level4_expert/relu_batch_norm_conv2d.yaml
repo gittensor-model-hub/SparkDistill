@@ -1,0 +1,77 @@
+id: relu_batch_norm_conv2d
+level: 4
+category: kernel_translation
+title: Relu Batch Norm Conv2D
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `relu_batch_norm_conv2d`.\n\
+  \nOperator description:\nApplies a 2D convolution over the input tensor, followed by batch normalization\
+  \ and then applies the ReLU activation function element-wise to the normalized result. This combined\
+  \ operation is useful for applying feature extraction, normalization, and non-linearity in one step,\
+  \ commonly used in convolutional neural networks (CNNs).\n\nTarget Python signature / call pattern:\n\
+  def relu_batch_norm_conv2d(input, weight, bias=None, stride=1, padding=0, dilation=1, groups=1, running_mean=None,\
+  \ running_var=None, bn_weight=None, bn_bias=None, training=False, momentum=0.1, eps=1e-5, inplace=False)\
+  \ -> Tensor\n\nArgs:\n    input (Tensor): The input tensor of shape (minibatch, in_channels, iH, iW).\n\
+  \    weight (Tensor): The convolution filters of shape (out_channels, in_channels / groups, kH, kW).\n\
+  \    bias (Tensor, optional): Optional bias tensor of shape (out_channels). Default: None.\n    stride\
+  \ (int or tuple, optional): The stride of the convolution kernel. Default: 1.\n    padding (int, tuple,\
+  \ or string, optional): Padding added to all sides of the input. Default: 0.\n    dilation (int or tuple,\
+  \ optional): The spacing between kernel elements. Default: 1.\n    groups (int, optional): Number of\
+  \ blocked connections from input channels to output channels. Default: 1.\n    running_mean (Tensor,\
+  \ optional): The running mean for batch normalization. Default: None.\n    running_var (Tensor, optional):\
+  \ The running variance for batch normalization. Default: None.\n    bn_weight (Tensor, optional): Learnable\
+  \ scaling factor for batch normalization (gamma). Default: None.\n    bn_bias (Tensor, optional): Learnable\
+  \ shift factor for batch normalization (beta). Default: None.\n    training (bool, optional): If True,\
+  \ updates running statistics for batch normalization. Default: False.\n    momentum (float, optional):\
+  \ Value for updating the running mean and variance in batch normalization. Default: 0.1.\n    eps (float,\
+  \ optional): A small value added for numerical stability in batch normalization. Default: 1e-5.\n  \
+  \  inplace (bool, optional): If True, performs ReLU in-place. Default: False.\n\nMathematical definition:\n\
+  out = ReLU(BatchNorm(conv2d(input)))\nReLU(x) = max(0, x)\ny = \\frac{x - \\mathrm{E}[x]}{\\sqrt{\\\
+  mathrm{Var}[x] + \\epsilon}} * \\gamma + \\beta\n\nPyTorch reference snippet:\n```python\nconv_result\
+  \ = torch.nn.functional.conv2d(input, weight, bias=bias, stride=stride, padding=padding, dilation=dilation,\
+  \ groups=groups)\nbn_result = torch.nn.functional.batch_norm(conv_result, running_mean, running_var,\
+  \ bn_weight, bn_bias, training=training, momentum=momentum, eps=eps)\nreturn torch.nn.functional.relu(bn_result,\
+  \ inplace=inplace)\n```\n\nExample / usage notes:\n>>> import torch\n>>> import torch.nn.functional\
+  \ as F\n>>> # Define input tensor, filters, and batch normalization parameters\n>>> inputs = torch.randn(1,\
+  \ 3, 5, 5)\n>>> filters = torch.randn(6, 3, 3, 3)\n>>> running_mean = torch.zeros(6)\n>>> running_var\
+  \ = torch.ones(6)\n>>> bn_weight = torch.ones(6)\n>>> bn_bias = torch.zeros(6)\n>>> # Apply relu_batch_norm_conv2d\
+  \ with padding\n>>> result = relu_batch_norm_conv2d(inputs, filters, running_mean=running_mean, running_var=running_var,\
+  \ bn_weight=bn_weight, bn_bias=bn_bias, padding=1, training=True)\n>>> result.shape\ntorch.Size([1,\
+  \ 6, 5, 5])\n\n>>> # Apply relu_batch_norm_conv2d without batch norm weights and with stride 2\n>>>\
+  \ result = relu_batch_norm_conv2d(inputs, filters, running_mean=running_mean, running_var=running_var,\
+  \ padding=1, stride=2, training=True)\n>>> result.shape\ntorch.Size([1, 6, 3, 3])\n\nAdditional constraints:\n\
+  The function combines convolution, batch normalization, and ReLU activation in a single step, which\
+  \ is a common pattern in CNNs for efficient computation.\n\nRequirements (SparkDistill / TritonBench\
+  \ harness):\n- Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve\
+  \ numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit\
+  \ + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n- Add @triton.autotune\
+  \ when there are meaningful tile/block choices\n- Provide a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 15
+  torch_cnt: 3
+  func_inputs: "def relu_batch_norm_conv2d(input, weight, bias=None, stride=1, padding=0, dilation=1,\
+    \ groups=1, running_mean=None, running_var=None, bn_weight=None, bn_bias=None, training=False, momentum=0.1,\
+    \ eps=1e-5, inplace=False) -> Tensor\n\nArgs:\n    input (Tensor): The input tensor of shape (minibatch,\
+    \ in_channels, iH, iW).\n    weight (Tensor): The convolution filters of shape (out_channels, in_channels\
+    \ / groups, kH, kW).\n    bias (Tensor, optional): Optional bias tensor of shape (out_channels). Default:\
+    \ N"
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- normalization
+- elementwise
+- reduction
+- convolution
+source:
+  channel: T
+  file: relu_batch_norm_conv2d.py
+  name: relu_batch_norm_conv2d
+  difficulty: '4'
+  params_cnt: 15
+  torch_cnt: 3
+gold_kernel: data/TritonBench_T_v1/relu_batch_norm_conv2d.py

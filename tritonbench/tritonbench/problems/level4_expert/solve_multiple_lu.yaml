@@ -1,0 +1,61 @@
+id: solve_multiple_lu
+level: 4
+category: kernel_translation
+title: Solve Multiple Lu
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `solve_multiple_lu`.\n\
+  \nOperator description:\nSolves multiple linear systems with the same coefficient matrix using LU decomposition.\
+  \ Given a square matrix A and multiple right-hand side vectors B, this function computes the solutions\
+  \ X to the linear systems A X = B by performing the LU decomposition of A and reusing it to solve for\
+  \ multiple right-hand sides efficiently. Supports batch dimensions.\n\nTarget Python signature / call\
+  \ pattern:\ndef solve_multiple_lu(A, Bs, *, pivot=True, out=None) -> Tensor\n\n    - **A** (Tensor):\
+  \ Coefficient matrix of shape `(*, n, n)`, where `*` is zero or more batch dimensions.\n    - **Bs**\
+  \ (Tensor): Right-hand side tensor of shape `(*, n, k)`, where `k` is the number of right-hand sides.\n\
+  \    - **pivot** (bool, optional): Controls whether to compute the LU decomposition with partial pivoting\
+  \ (`True`) or without pivoting (`False`). Default: `True`.\n    - **out** (Tensor, optional): Output\
+  \ tensor. Ignored if `None`. Default: `None`.\n\nMathematical definition:\nLU Decomposition:\nA = P\
+  \ L U\n- P is a permutation matrix.\n- L is a lower triangular matrix with unit diagonal elements.\n\
+  - U is an upper triangular matrix.\nSolving Linear Systems:\nFor each b_i in B, compute x_i by:\n- Apply\
+  \ permutation: b'_i = P^T b_i\n- Solve L y_i = b'_i\n- Solve U x_i = y_i\n\nPyTorch reference snippet:\n\
+  ```python\nP, L, U = torch.linalg.lu(A, pivot=pivot)\nBs_perm = torch.matmul(P.transpose(-2, -1), Bs)\n\
+  Y = torch.linalg.solve_triangular(L, Bs_perm, upper=False, unitriangular=True)\nX = torch.linalg.solve_triangular(U,\
+  \ Y, upper=True)\n```\n\nExample / usage notes:\n```python\nimport torch\n\nA = torch.tensor([[3., 1.,\
+  \ 2.],\n                  [6., 3., 4.],\n                  [3., 1., 5.]])\nb1 = torch.tensor([0., -1.,\
+  \ 2.])\nb2 = torch.tensor([1., 0., 3.])\nBs = torch.stack([b1, b2], dim=1)  # Shape (3, 2)\nX = solve_multiple_lu(A,\
+  \ Bs)\nx1 = X[:, 0]\nx2 = X[:, 1]\nprint(\"Solution x1:\", x1)\nprint(\"Solution x2:\", x2)\n# Verify\
+  \ the solutions\nprint(\"Residual for x1:\", A @ x1 - b1)\nprint(\"Residual for x2:\", A @ x2 - b2)\n\
+  ```\n\nAdditional constraints:\nThis function efficiently reuses the LU decomposition of A to solve\
+  \ multiple linear systems with different right-hand sides. If `pivot=False`, no permutation is applied.\
+  \ Supports batch dimensions.\n\nRequirements (SparkDistill / TritonBench harness):\n- Translate the\
+  \ PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics: include torch.allclose\
+  \ vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor\
+  \ over tl.make_block_ptr\n- Add @triton.autotune when there are meaningful tile/block choices\n- Provide\
+  \ a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 4
+  torch_cnt: 4
+  func_inputs: "def solve_multiple_lu(A, Bs, *, pivot=True, out=None) -> Tensor\n\n    - **A** (Tensor):\
+    \ Coefficient matrix of shape `(*, n, n)`, where `*` is zero or more batch dimensions.\n    - **Bs**\
+    \ (Tensor): Right-hand side tensor of shape `(*, n, k)`, where `k` is the number of right-hand sides.\n\
+    \    - **pivot** (bool, optional): Controls whether to compute the LU decomposition with partial pivoting\
+    \ (`True`) or without pivoting (`False`). Default: `True`.\n    - **out** (Tensor, optional): Output\
+    \ tensor. Igno"
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+source:
+  channel: T
+  file: solve_multiple_lu.py
+  name: solve_multiple_lu
+  difficulty: '4'
+  params_cnt: 4
+  torch_cnt: 4
+gold_kernel: data/TritonBench_T_v1/solve_multiple_lu.py

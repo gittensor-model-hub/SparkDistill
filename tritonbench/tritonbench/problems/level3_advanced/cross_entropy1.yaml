@@ -1,0 +1,59 @@
+id: cross_entropy1
+level: 3
+category: kernel_generation
+title: Cross Entropy1
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `cross_entropy1.py` (repo: intelligent-machine-learning/dlrover).\n\nTask description:\nThis\
+  \ script provides a highly optimized cross-entropy loss function using Triton for efficient GPU execution,\
+  \ particularly suitable for large-scale distributed machine learning tasks. It introduces two main kernels,\
+  \ `cross_entropy_fwd_kernel` and `cross_entropy_bwd_kernel`, written in Triton language that enable\
+  \ high-performance computation with fine-grained control over execution.\n\n    The forward kernel,\
+  \ `cross_entropy_fwd_kernel`, calculates the LSE and the smoothed cross-entropy loss. It uses block-level\
+  \ parallelism and supports label smoothing, where a proportion of the true label probability is distributed\
+  \ among all classes. The kernel uses Triton’s `program_id` to identify the executing thread block and\
+  \ manage access to specific data partitions. It includes heuristics to determine whether label smoothing\
+  \ is applied and whether the dataset is split across multiple devices (useful for tensor parallelism).\n\
+  \n    The backward kernel, `cross_entropy_bwd_kernel`, computes the gradient of the cross-entropy loss\
+  \ with respect to the logits. This involves calculating the gradient of LSE and adjusting probabilities\
+  \ based on the presence of label smoothing. It uses similar block-level indexing to parallelize this\
+  \ computation efficiently across GPU cores.\n\n    The `CrossEntropyLoss` class encapsulates these kernels\
+  \ within a PyTorch autograd function. Its static `forward` method sets up the context, computes losses,\
+  \ manages optional distributed operations, and saves necessary tensors for the backward pass. The `backward`\
+  \ method applies the backward kernel to compute gradients.\n\n    The auxiliary function `cross_entropy_loss`\
+  \ is a user-friendly wrapper around the `CrossEntropyLoss.apply` method. It handles parameter passing\
+  \ for common usage patterns, such as enabling/disabling label smoothing and configuring tensor parallelism.\n\
+  \n    Parameters for these functions include:\n    - `logits`: a 2D tensor containing model predictions\
+  \ before softmax.\n    - `labels`: a 1D tensor with the actual class labels.\n    - `smoothing`: a float\
+  \ controlling label smoothing intensity.\n    - `lse_square_scale`: controls LSE regularization.\n \
+  \   - `ignored_index`: specifies label indices to ignore in loss computation.\n    - `process_group`:\
+  \ defines the communication group for distributed settings.\n\n    This module ensures efficient computation\
+  \ and gradient propagation in neural networks, especially when working with large vocabularies or extensive\
+  \ multi-GPU setups.\n\nRequirements (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1 on\
+  \ workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n\
+  - Use @triton.jit kernels with correct boundary masking\n- Include @triton.autotune with at least 3\
+  \ configs when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose correctness\
+  \ test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally skip\
+  \ autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- softmax
+- elementwise
+- reduction
+source:
+  channel: G
+  file: cross_entropy1.py
+  repo: intelligent-machine-learning/dlrover
+  difficulty: '4'
+  star: 1285
+  simp_instru_len: 322
+  comp_instru_len: 552
+  output_triton_len: 3144
+gold_kernel: data/TritonBench_G_v1/cross_entropy1.py

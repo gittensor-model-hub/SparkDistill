@@ -1,0 +1,69 @@
+id: parallel_retention_attention
+level: 4
+category: kernel_generation
+title: Parallel Retention Attention
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `parallel_retention_attention.py` (repo: josStorer/RWKV-Runner).
+
+
+  Task description:
+
+  The code utilizes Triton to accelerate parallel attention mechanisms, commonly used in transformer models,
+  on GPUs. It introduces `parallel_retention_fwd_kernel` and `parallel_retention_bwd_kernel` as the core
+  computational kernels. These kernels employ Triton block pointers for optimized data access patterns
+  and execute parallel computations over the sequence length and attention heads. The forward kernel calculates
+  the attention outputs by performing scaled dot-product operations between the query (`q`), key (`k`),
+  and value (`v`) tensors. It incorporates decay factors computed from the head index to adjust the attention
+  weights, ensuring numerical stability and enhancing performance. The output (`o`) tensor is computed
+  through accumulation and rescaling steps involving iterative block-level operations. The `ParallelRetentionFunction`
+  class defines custom autograd functions for the forward and backward passes using the kernels. The `forward`
+  method precomputes constants, including block sizes and scaling factors, and launches the forward kernel,
+  while preserving the inputs for gradient computation. In contrast, the `backward` method leverages the
+  stored inputs and the `do` (gradient of the output) tensor to compute gradients of the inputs (`dq`,
+  `dk`, `dv`). It does so by invoking two sub-kernels: `_parallel_retention_bwd_dq` for the query gradient
+  and `_parallel_retention_bwd_dkv` for the key and value gradients. The implementation carefully manages
+  tensor dimensions and strides, ensuring contiguous memory accesses for efficient GPU execution. Overall,
+  the design showcases advanced techniques in GPU programming, balancing performance with clarity through
+  modular function decomposition.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- attention
+- matmul
+- elementwise
+- reduction
+source:
+  channel: G
+  file: parallel_retention_attention.py
+  repo: josStorer/RWKV-Runner
+  difficulty: '4'
+  star: 5337
+  simp_instru_len: 167
+  comp_instru_len: 363
+  output_triton_len: 6988
+gold_kernel: data/TritonBench_G_v1/parallel_retention_attention.py

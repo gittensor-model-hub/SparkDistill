@@ -1,0 +1,56 @@
+id: torch_rand
+level: 2
+category: kernel_translation
+title: Torch Rand
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.rand`.\n\
+  \nOperator description:\nReturns a tensor filled with random numbers from a uniform distribution on\
+  \ the interval [0, 1). The shape of the tensor is defined by the variable argument size.\n\nTarget Python\
+  \ signature / call pattern:\nrand(*size, *, generator=None, out=None, dtype=None, layout=torch.strided,\
+  \ device=None, requires_grad=False, pin_memory=False) -> Tensor\n\nArgs:\n    size (int...): a sequence\
+  \ of integers defining the shape of the output tensor. Can be a variable number of arguments or a collection\
+  \ like a list or tuple.\n\nKeyword args:\n    generator (:class:`torch.Generator`, optional): a pseudorandom\
+  \ number generator for sampling\n    out (Tensor, optional): the output tensor.\n    dtype (:class:`torch.dtype`,\
+  \ optional): the desired data type of returned tensor. Default: if ``None``, uses a global default (see\
+  \ :func:`torch.set_default_dtype`).\n    layout (:class:`torch.layout`, optional): the desired layout\
+  \ of returned Tensor. Default: ``torch.strided``.\n    device (:class:`torch.device`, optional): the\
+  \ desired device of returned tensor. Default: if ``None``, uses the current device for the default tensor\
+  \ type (see :func:`torch.set_default_device`). :attr:`device` will be the CPU for CPU tensor types and\
+  \ the current CUDA device for CUDA tensor types.\n    requires_grad (bool, optional): If autograd should\
+  \ record operations on the returned tensor. Default: ``False``.\n    pin_memory (bool, optional): If\
+  \ set, returned tensor would be allocated in the pinned memory. Works only for CPU tensors. Default:\
+  \ ``False``.\n\nPyTorch reference snippet:\n```python\ntorch.rand(4); torch.rand(2, 3)\n```\n\nExample\
+  \ / usage notes:\n>>> torch.rand(4)\ntensor([ 0.5204,  0.2503,  0.3525,  0.5673])\n>>> torch.rand(2,\
+  \ 3)\ntensor([[ 0.8237,  0.5781,  0.6879],\n        [ 0.3816,  0.7249,  0.0998]])\n\nAdditional constraints:\n\
+  The function can take a variable number of arguments to define the shape of the tensor. It supports\
+  \ optional parameters for generator, output tensor, data type, layout, device, autograd recording, and\
+  \ pinned memory.\n\nRequirements (SparkDistill / TritonBench harness):\n- Translate the PyTorch reference\
+  \ into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics: include torch.allclose vs the\
+  \ reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor\
+  \ over tl.make_block_ptr\n- Add @triton.autotune when there are meaningful tile/block choices\n- Provide\
+  \ a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 8
+  torch_cnt: 2
+  func_inputs: "rand(*size, *, generator=None, out=None, dtype=None, layout=torch.strided, device=None,\
+    \ requires_grad=False, pin_memory=False) -> Tensor\n\nArgs:\n    size (int...): a sequence of integers\
+    \ defining the shape of the output tensor. Can be a variable number of arguments or a collection like\
+    \ a list or tuple.\n\nKeyword args:\n    generator (:class:`torch.Generator`, optional): a pseudorandom\
+    \ number generator for sampling\n    out (Tensor, optional): the output tensor.\n    dtype (:class:`torch.dtype`,\
+    \ optio"
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags: []
+source:
+  channel: T
+  file: rand.py
+  name: torch.rand
+  difficulty: '2'
+  params_cnt: 8
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/rand.py

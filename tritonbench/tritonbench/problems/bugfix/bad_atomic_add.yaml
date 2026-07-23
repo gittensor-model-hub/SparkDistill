@@ -1,0 +1,22 @@
+id: bad_atomic_add
+level: bugfix
+category: kernel_debugging
+title: Race Without Atomic on Reduction
+prompt: Histogram kernel has a data race on concurrent bin updates. Fix synchronization.
+input_code: "@triton.jit\ndef hist_kernel(x_ptr, hist_ptr, n, n_bins, BLOCK: tl.constexpr):\n    pid =\
+  \ tl.program_id(0)\n    offs = pid * BLOCK + tl.arange(0, BLOCK)\n    mask = offs < n\n    x = tl.load(x_ptr\
+  \ + offs, mask=mask, other=0)\n    bins = tl.minimum(x.to(tl.int32), n_bins - 1)\n    # BUG: plain store\
+  \ races\n    tl.store(hist_ptr + bins, tl.load(hist_ptr + bins) + 1, mask=mask)\n"
+expected_fix: Use tl.atomic_add for concurrent updates to the same address
+required_patterns:
+- '@triton.jit'
+tags:
+- debugging
+- reduction
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+source:
+  channel: synthetic
+  file: bad_atomic_add.py
+  difficulty: bugfix

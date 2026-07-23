@@ -1,0 +1,65 @@
+id: layer_norm_welfold
+level: 3
+category: kernel_generation
+title: Layer Norm Welfold
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `layer_norm_welfold.py` (repo: pytorch/benchmark).
+
+
+  Task description:
+
+  The function `fused_native_layer_norm_no_welford` implements a layer normalization operation without
+  Welford''s method using Triton to accelerate the computation on a GPU. The Triton kernel `triton_red_fused_native_layer_norm_no_welford`
+  is used to compute the layer normalization in parallel. The kernel is defined with two autotuning configurations
+  that adjust the block sizes (`XBLOCK` and `RBLOCK`) for performance tuning. The kernel operates by first
+  loading input data and computing the mean across a dimension specified by `xnumel` and `rnumel`. It
+  accumulates data in blocks and computes the mean using Triton''s `tl.sum` function. After computing
+  the mean, it calculates the variance and then the inverse standard deviation using the reciprocal square
+  root function `libdevice.rsqrt`. These intermediate results (mean and inverse standard deviation) are
+  stored in output buffers `in_out_ptr0` and `in_out_ptr1`. Finally, the kernel normalizes the input data
+  by subtracting the mean, multiplying by the inverse standard deviation, and applying scale and shift
+  using additional input parameters `in_ptr1` and `in_ptr2`. This processed data is stored in `out_ptr0`,
+  which is part of the function''s return values. The function manages CUDA devices and streams explicitly
+  and utilizes Triton''s grid function to define the launch configuration for the kernel.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- normalization
+- elementwise
+- reduction
+- fused
+source:
+  channel: G
+  file: layer_norm_welfold.py
+  repo: pytorch/benchmark
+  difficulty: '3'
+  star: 879
+  simp_instru_len: 158
+  comp_instru_len: 319
+  output_triton_len: 1648
+gold_kernel: data/TritonBench_G_v1/layer_norm_welfold.py

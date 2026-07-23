@@ -1,0 +1,64 @@
+id: softmax_log
+level: 3
+category: kernel_translation
+title: Softmax Log
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `softmax_log`.\n\
+  \nOperator description:\nApplies the natural logarithm element-wise on the input tensor, followed by\
+  \ applying the softmax function along the specified dimension. This combined operation scales input\
+  \ values to a range between 0 and 1, summing to 1 after the logarithmic transformation. It allows transformation\
+  \ of the input tensor into a probability distribution.\n\nTarget Python signature / call pattern:\n\
+  def softmax_log(input, dim=-1, dtype=None) -> Tensor: \nArgs:\n    input (Tensor): The input tensor\
+  \ on which logarithm and softmax are applied.\n    dim (int): The dimension along which softmax will\
+  \ be computed. Default: -1.\n    dtype (:class:`torch.dtype`, optional): The desired data type of the\
+  \ returned tensor. If specified, the input tensor is cast to :attr:`dtype` before the operation is performed.\
+  \ Useful for preventing data type overflows. Default: None.\nExample:\n    >>> import torch\n    >>>\
+  \ import torch.nn.functional as F\n    >>> # Define input tensor\n    >>> input = torch.rand(3, 4) *\
+  \ 10\n    >>> # Apply softmax_log along the last dimension\n    >>> result = softmax_log(input, dim=1)\n\
+  \    >>> result\n    tensor([[0.1829, 0.1782, 0.2783, 0.3606],\n            [0.3119, 0.1724, 0.3256,\
+  \ 0.1900],\n            [0.2057, 0.2166, 0.2991, 0.2786]])\n\n    >>> # Apply softmax_log along a different\
+  \ dimension\n    >>> result = softmax_log(input, dim=0)\n    >>> result\n    tensor([[0.3122, 0.4444,\
+  \ 0.2720, 0.2159],\n            [0.3879, 0.2167, 0.4226, 0.2165],\n            [0.2999, 0.3389, 0.3055,\
+  \ 0.5676]])\n\nMathematical definition:\nout = Softmax(log(input))\n\nwhere:\n\ny_{i} = \\frac{\\exp(\\\
+  log(x_{i}))}{\\sum_j \\exp(\\log(x_{j}))} = \\frac{x_i}{\\sum_j x_j}\n\nPyTorch reference snippet:\n\
+  ```python\nlog_result = torch.log(input)\nreturn torch.nn.functional.softmax(log_result, dim=dim, dtype=dtype)\n\
+  ```\n\nExample / usage notes:\n>>> import torch\n>>> import torch.nn.functional as F\n>>> # Define input\
+  \ tensor\n>>> input = torch.rand(3, 4) * 10\n>>> # Apply softmax_log along the last dimension\n>>> result\
+  \ = softmax_log(input, dim=1)\n>>> result\ntensor([[0.1829, 0.1782, 0.2783, 0.3606],\n        [0.3119,\
+  \ 0.1724, 0.3256, 0.1900],\n        [0.2057, 0.2166, 0.2991, 0.2786]])\n\n>>> # Apply softmax_log along\
+  \ a different dimension\n>>> result = softmax_log(input, dim=0)\n>>> result\ntensor([[0.3122, 0.4444,\
+  \ 0.2720, 0.2159],\n        [0.3879, 0.2167, 0.4226, 0.2165],\n        [0.2999, 0.3389, 0.3055, 0.5676]])\n\
+  \nAdditional constraints:\nThe function handles optional data type casting to prevent overflow and allows\
+  \ specifying the dimension for softmax application.\n\nRequirements (SparkDistill / TritonBench harness):\n\
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics:\
+  \ include torch.allclose vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary\
+  \ masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n- Add @triton.autotune when there\
+  \ are meaningful tile/block choices\n- Provide a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 3
+  torch_cnt: 2
+  func_inputs: "def softmax_log(input, dim=-1, dtype=None) -> Tensor: \nArgs:\n    input (Tensor): The\
+    \ input tensor on which logarithm and softmax are applied.\n    dim (int): The dimension along which\
+    \ softmax will be computed. Default: -1.\n    dtype (:class:`torch.dtype`, optional): The desired\
+    \ data type of the returned tensor. If specified, the input tensor is cast to :attr:`dtype` before\
+    \ the operation is performed. Useful for preventing data type overflows. Default: None.\nExample:\n\
+    \    >>> import torch\n    >>> i"
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- softmax
+- elementwise
+- reduction
+source:
+  channel: T
+  file: softmax_log.py
+  name: softmax_log
+  difficulty: '4'
+  params_cnt: 3
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/softmax_log.py

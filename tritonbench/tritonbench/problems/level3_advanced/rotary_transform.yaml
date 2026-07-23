@@ -1,0 +1,49 @@
+id: rotary_transform
+level: 3
+category: kernel_debugging
+title: Rotary Transform
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `rotary_transform.py` (repo: microsoft/unilm).\n\nTask description:\nThe `rotary_kernel` function\
+  \ is a Triton kernel that performs rotary position encoding on a tensor `X` using precomputed cosine\
+  \ (`COS`) and sine (`SIN`) matrices. It modifies or populates the output tensor `OUT` with the transformed\
+  \ data. The kernel accommodates both fixed and variable sequence lengths, controlled by the presence\
+  \ of `CU_SEQLENS`. The kernel handles interleaved and non-interleaved formats and allows for in-place\
+  \ transformations and conjugate computations if specified.\n\n        The kernel operates in a three-dimensional\
+  \ grid, processing batches (`pid_batch`), heads (`pid_head`), and sequences (`pid_m`). It calculates\
+  \ transformations by loading blocks of data and applying rotary transformations based on cosine and\
+  \ sine values. The key operations are tailored based on whether the data is interleaved or not, with\
+  \ conditional handling for conjugation using `CONJUGATE`.\n\n        The `apply_rotary` function acts\
+  \ as a high-level interface to the Triton kernel. It accepts the input tensor `x`, cosine and sine matrices,\
+  \ sequence length offsets, and optional cumulative sequence lengths (`cu_seqlens`). The function determines\
+  \ the execution grid and block sizes, aligning them with the input data shape and configuration. It\
+  \ initializes an output tensor, copying non-rotary parts of `x` if required. The function ensures that\
+  \ the kernel is called with appropriate arguments, matching the shape and type expectations set within\
+  \ the kernel logic. This design allows for efficient rotary transformations in transformer architectures.\n\
+  \nRequirements (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell\
+  \ (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use\
+  \ @triton.jit kernels with correct boundary masking\n- Include @triton.autotune with at least 3 configs\
+  \ when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose correctness test\n\
+  - Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally skip autotune\
+  \ for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- mask
+tags:
+- rope
+- elementwise
+- reduction
+- debug
+source:
+  channel: G
+  file: rotary_transform.py
+  repo: microsoft/unilm
+  difficulty: '4'
+  star: 20291
+  simp_instru_len: 108
+  comp_instru_len: 353
+  output_triton_len: 2343
+gold_kernel: data/TritonBench_G_v1/rotary_transform.py

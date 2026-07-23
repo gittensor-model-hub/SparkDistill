@@ -1,0 +1,80 @@
+id: torch_bitwise_and
+level: 2
+category: kernel_translation
+title: Torch Bitwise And
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.bitwise_and`.
+
+
+  Operator description:
+
+  Computes the bitwise AND of input and other. The input tensor must be of integral or Boolean types.
+  For bool tensors, it computes the logical AND.
+
+
+  Target Python signature / call pattern:
+
+  bitwise_and(input, other, *, out=None) -> Tensor; input: the first input tensor; other: the second input
+  tensor; out (Tensor, optional): the output tensor.
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  torch.bitwise_and(torch.tensor([-1, -2, 3], dtype=torch.int8), torch.tensor([1, 0, 3], dtype=torch.int8));
+  torch.bitwise_and(torch.tensor([True, True, False]), torch.tensor([False, True, False]))
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> torch.bitwise_and(torch.tensor([-1, -2, 3], dtype=torch.int8), torch.tensor([1, 0, 3], dtype=torch.int8))
+
+  tensor([1, 0, 3], dtype=torch.int8)
+
+  >>> torch.bitwise_and(torch.tensor([True, True, False]), torch.tensor([False, True, False]))
+
+  tensor([False, True, False])
+
+
+  Additional constraints:
+
+  The input tensors must be of integral or Boolean types.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 3
+  torch_cnt: 2
+  func_inputs: 'bitwise_and(input, other, *, out=None) -> Tensor; input: the first input tensor; other:
+    the second input tensor; out (Tensor, optional): the output tensor.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- quantization
+- elementwise
+source:
+  channel: T
+  file: bitwise_and.py
+  name: torch.bitwise_and
+  difficulty: '2'
+  params_cnt: 3
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/bitwise_and.py

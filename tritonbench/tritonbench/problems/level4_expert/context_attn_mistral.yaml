@@ -1,0 +1,79 @@
+id: context_attn_mistral
+level: 4
+category: kernel_generation
+title: Context Attn Mistral
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `context_attn_mistral.py` (repo: ModelTC/lightllm).
+
+
+  Task description:
+
+  The Triton kernel `_fwd_kernel` implements a scalable sliding window mechanism for performing attention
+  operations in a Transformer architecture. It takes tensors `Q`, `K`, and `V` as inputs along with other
+  parameters like `sm_scale` (to scale query-key scores), and additional metadata (`B_Start_Loc`, `B_Seqlen`)
+  for handling batch sequences efficiently.
+
+
+  Key aspects of `_fwd_kernel`:
+
+  - It operates on a grid defined by `(batch, head, sequence blocks)`, processed in parallel using Triton.
+
+  - `BLOCK_M`, `BLOCK_DMODEL`, and `BLOCK_N` are compile-time constants defining the dimensions of processing
+  blocks.
+
+  - The algorithm iteratively processes `K` and `V` blocks, computes attention scores (`qk`) with a sliding
+  window constraint to focus attention within a localized sequence window.
+
+  - Uses dynamic memory access patterns with offsets to load and store data efficiently.
+
+  - Employs numerically stable operations for computing exponential weights, preventing underflows/overflows.
+
+  - Constructs final output via scaling and accumulating partial results, stored to the output tensor
+  `Out`.
+
+
+  The `context_attention_fwd` function serves as the interface, defining the grid dimensions, ensuring
+  correct input data preparation, and invoking the Triton kernel with proper execution parameters for
+  optimized performance.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- attention
+- rope
+- elementwise
+- reduction
+source:
+  channel: G
+  file: context_attn_mistral.py
+  repo: ModelTC/lightllm
+  difficulty: '4'
+  star: 2647
+  simp_instru_len: 317
+  comp_instru_len: 307
+  output_triton_len: 2231
+gold_kernel: data/TritonBench_G_v1/context_attn_mistral.py

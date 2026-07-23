@@ -1,0 +1,54 @@
+id: int8_matmul_kernel
+level: 4
+category: kernel_generation
+title: Int8 Matmul Kernel
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `int8_matmul_kernel.py` (repo: linkedin/Liger-Kernel).\n\nTask description:\nThe provided code\
+  \ is a Triton-based implementation for efficient matrix multiplication of two matrices `a` and `b`.\
+  \ It utilizes `triton.jit` to compile the `matmul_kernel`, which computes the product using block-wise\
+  \ operations for parallel execution on GPUs. The function `matmul` serves as a wrapper around this kernel\
+  \ to facilitate its usage.\n\n**matmul_kernel Function:**\n- **Inputs:** \n  - Pointers to matrices\
+  \ `a_ptr`, `b_ptr`, and `c_ptr`.\n  - Dimensions `M`, `N`, and `K`.\n  - Strides for each matrix to\
+  \ navigate through memory.\n  - Constants for blocking: `BLOCK_SIZE_M`, `BLOCK_SIZE_N`, `BLOCK_SIZE_K`,\
+  \ `GROUP_SIZE_M`.\n- **Outputs:** \n  - Writes the result to the matrix pointed by `c_ptr`.\n- **Logic:**\n\
+  \  - Calculates thread and block IDs for distribution of work among threads.\n  - Computes the offsets\
+  \ for accessing blocks of `a` and `b`.\n  - Accumulates dot products of int8 elements using four stages\
+  \ of inner loop unrolling, ensuring correctness by shifting and masking operations.\n  - The final result\
+  \ is stored in `c`.\n\n**matmul Function:**\n- **Inputs:** \n  - `a`: A 2D tensor with shape `(M, 4*K)`\
+  \ in `int8` type.\n  - `b`: A 2D tensor with shape `(K, N)` in `uint8` type, packed for efficiency.\n\
+  - **Outputs:** \n  - Returns the resulting matrix `c` of shape `(M, N)` with `int32` type.\n- **Functionality:**\n\
+  \  - Checks for dimensional compatibility and matrix continuity.\n  - Initializes an empty tensor `c`\
+  \ for output.\n  - Defines a lambda `grid` for determining the execution grid size based on block configurations.\n\
+  \  - Launches the `matmul_kernel` with the calculated grid size and required metadata.\n\nRequirements\
+  \ (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x\
+  \ / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use @triton.jit\
+  \ kernels with correct boundary masking\n- Include @triton.autotune with at least 3 configs when tile\
+  \ sizes matter\n- Provide a Python launcher + grid and a torch.allclose correctness test\n- Use fp32\
+  \ accumulators for tl.dot reductions\n- Print a short note if you intentionally skip autotune for a\
+  \ tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+- torch.allclose
+tags:
+- matmul
+- quantization
+- elementwise
+- reduction
+source:
+  channel: G
+  file: int8_matmul_kernel.py
+  repo: linkedin/Liger-Kernel
+  difficulty: '3'
+  star: 3606
+  simp_instru_len: 151
+  comp_instru_len: 489
+  output_triton_len: 2690
+gold_kernel: data/TritonBench_G_v1/int8_matmul_kernel.py

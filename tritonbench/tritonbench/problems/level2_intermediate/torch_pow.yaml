@@ -1,0 +1,47 @@
+id: torch_pow
+level: 2
+category: kernel_translation
+title: Torch Pow
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.pow`.\n\
+  \nOperator description:\nTakes the power of each element in input with exponent and returns a tensor\
+  \ with the result. exponent can be either a single float number or a Tensor with the same number of\
+  \ elements as input. If exponent is a scalar value, the operation applied is out_i = x_i ^ exponent.\
+  \ If exponent is a tensor, the operation applied is out_i = x_i ^ exponent_i. When exponent is a tensor,\
+  \ the shapes of input and exponent must be broadcastable.\n\nTarget Python signature / call pattern:\n\
+  pow(input, exponent, *, out=None) -> Tensor; Args: input (Tensor): the input tensor. exponent (float\
+  \ or tensor): the exponent value; Keyword args: out (Tensor, optional): the output tensor.\n\nMathematical\
+  \ definition:\nout_i = x_i ^ exponent (for scalar exponent)\nout_i = x_i ^ exponent_i (for tensor exponent)\n\
+  \nPyTorch reference snippet:\n```python\ntorch.pow(a, 2)\n torch.pow(a, exp)\n torch.pow(base, exp)\n\
+  ```\n\nExample / usage notes:\n>>> a = torch.randn(4)\n>>> a\ntensor([ 0.4331,  1.2475,  0.6834, -0.2791])\n\
+  >>> torch.pow(a, 2)\ntensor([ 0.1875,  1.5561,  0.4670,  0.0779])\n>>> exp = torch.arange(1., 5.)\n\
+  >>> a = torch.arange(1., 5.)\n>>> a\ntensor([ 1.,  2.,  3.,  4.])\n>>> exp\ntensor([ 1.,  2.,  3., \
+  \ 4.])\n>>> torch.pow(a, exp)\ntensor([   1.,    4.,   27.,  256.])\n\nAdditional constraints:\nThe\
+  \ operation supports both scalar and tensor exponents. When exponent is a tensor, its shape must be\
+  \ broadcastable with the input tensor.\n\nRequirements (SparkDistill / TritonBench harness):\n- Translate\
+  \ the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics: include\
+  \ torch.allclose vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary masks;\
+  \ prefer tl.make_tensor_descriptor over tl.make_block_ptr\n- Add @triton.autotune when there are meaningful\
+  \ tile/block choices\n- Provide a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 3
+  torch_cnt: 3
+  func_inputs: 'pow(input, exponent, *, out=None) -> Tensor; Args: input (Tensor): the input tensor. exponent
+    (float or tensor): the exponent value; Keyword args: out (Tensor, optional): the output tensor.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+source:
+  channel: T
+  file: pow.py
+  name: torch.pow
+  difficulty: '3'
+  params_cnt: 3
+  torch_cnt: 3
+gold_kernel: data/TritonBench_T_v1/pow.py

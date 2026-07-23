@@ -1,0 +1,80 @@
+id: rad2deg_sqrt
+level: 1
+category: kernel_translation
+title: Rad2Deg Sqrt
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `rad2deg_sqrt`.
+
+
+  Operator description:
+
+  This function computes the conversion of angles from radians to degrees and calculates the square root
+  for each element in the input tensor. It returns a tuple where the first element is the converted degrees
+  and the second is the square root of the input tensor elements.
+
+
+  Target Python signature / call pattern:
+
+  def rad2deg_sqrt(input: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]: Args: input (Tensor): The
+  input tensor with angles in radians.
+
+
+  Mathematical definition:
+
+  \text{out}_{i} = \text{input}_{i} \times (180.0 / \pi) \text{out}_{i} = \sqrt{\text{input}_{i}}
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  deg_result = torch.rad2deg(input) sqrt_result = torch.sqrt(input)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> a = torch.tensor([3.142, 1.570, 0.785, 0.0]) >>> deg_result, sqrt_result = rad2deg_sqrt(a) >>> deg_result
+  tensor([180.0233,  89.9544,  45.0000,   0.0000]) >>> sqrt_result tensor([1.7725, 1.2533, 0.8862, 0.0000])
+
+
+  Additional constraints:
+
+  The function uses torch''s rad2deg and sqrt functions to perform the operations.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 1
+  torch_cnt: 2
+  func_inputs: 'def rad2deg_sqrt(input: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]: Args: input
+    (Tensor): The input tensor with angles in radians.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+- convolution
+source:
+  channel: T
+  file: rad2deg_sqrt.py
+  name: rad2deg_sqrt
+  difficulty: '2'
+  params_cnt: 1
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/rad2deg_sqrt.py

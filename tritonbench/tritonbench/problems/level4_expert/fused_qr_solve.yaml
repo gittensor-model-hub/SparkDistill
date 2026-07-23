@@ -1,0 +1,89 @@
+id: fused_qr_solve
+level: 4
+category: kernel_translation
+title: Fused Qr Solve
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `fused_qr_solve`.
+
+
+  Operator description:
+
+  Solves the linear system `Ax = b` using QR decomposition. This function combines the QR decomposition
+  with solving a linear system. Given a matrix `A` and a vector (or matrix) `b`, it performs the QR decomposition
+  of `A` and computes the solution `x` using the formula `x = R^{-1} (Q^T b)`.
+
+
+  Target Python signature / call pattern:
+
+  def fused_qr_solve(A: Tensor, b: Tensor) -> Tensor: A: The matrix `A` of shape `(m, n)` where `m >=
+  n`. b: The right-hand side tensor `b` of shape `(m, k)`.
+
+
+  Mathematical definition:
+
+  x = R^{-1} Q^T b
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  Q, R = torch.linalg.qr(A, mode=''reduced'')
+
+  x = torch.linalg.solve(R, Q.T @ b)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> A = torch.tensor([[12.0, -51.0, 4.0], [6.0, 167.0, -68.0], [-4.0, 24.0, -41.0]])
+
+  >>> b = torch.tensor([[1.0], [2.0], [3.0]])
+
+  >>> x = fused_qr_solve(A, b)
+
+  >>> print(x)
+
+
+  Additional constraints:
+
+  The function assumes `m >= n` for the matrix `A`.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 2
+  torch_cnt: 2
+  func_inputs: 'def fused_qr_solve(A: Tensor, b: Tensor) -> Tensor: A: The matrix `A` of shape `(m, n)`
+    where `m >= n`. b: The right-hand side tensor `b` of shape `(m, k)`.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+- fused
+source:
+  channel: T
+  file: fused_qr_solve.py
+  name: fused_qr_solve
+  difficulty: '3'
+  params_cnt: 2
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/fused_qr_solve.py

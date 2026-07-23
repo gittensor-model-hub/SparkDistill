@@ -1,0 +1,55 @@
+id: determinant_via_qr
+level: 3
+category: kernel_translation
+title: Determinant Via Qr
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `determinant_via_qr`.\n\
+  \nOperator description:\nComputes the determinant of a square matrix using QR decomposition. It performs\
+  \ QR decomposition of a square matrix A in \\mathbb{K}^{n \times n} (where \\mathbb{K} is either \\\
+  mathbb{R} or \\mathbb{C}) and computes the determinant by taking the product of the diagonal elements\
+  \ of R.\n\nTarget Python signature / call pattern:\ndeterminant_via_qr(A, *, mode='reduced', out=None)\
+  \ -> Tensor\n\nMathematical definition:\nThe QR decomposition of A is: A = Q R, where Q is an orthogonal/unitary\
+  \ matrix, R is an upper triangular matrix. The determinant is given by: \\det(A) = \\det(Q)\\cdot \\\
+  prod_{i=1}^{n} R_{ii}. For real matrices, \\det(Q) = \\pm 1. For complex matrices, |\\det(Q)| = 1.\n\
+  \nPyTorch reference snippet:\n```python\ntorch.linalg.qr(A, mode=mode); torch.det(Q); torch.diagonal(R,\
+  \ dim1=-2, dim2=-1); torch.prod(diag_R, dim=-1); torch.det(A); torch.allclose(det_batch, det_builtin_batch)\n\
+  ```\n\nExample / usage notes:\n```python\nimport torch\n\ndef determinant_via_qr(A, *, mode='reduced',\
+  \ out=None):\n    Q, R = torch.linalg.qr(A, mode=mode)\n    # Compute determinant of Q\n    det_Q =\
+  \ torch.det(Q)\n    # Compute product of diagonal elements of R\n    diag_R = torch.diagonal(R, dim1=-2,\
+  \ dim2=-1)\n    prod_diag_R = torch.prod(diag_R, dim=-1)\n    # Compute determinant\n    determinant\
+  \ = det_Q * prod_diag_R\n    if out is not None:\n        out.copy_(determinant)\n        return out\n\
+  \    return determinant\n\n# Example usage\nA = torch.tensor([[2., -2., 18.],\n                  [2.,\
+  \ 1., 0.],\n                  [1., 2., 0.]])\ndet = determinant_via_qr(A)\nprint(\"Determinant:\", det.item())\n\
+  # Verify with torch.det\ndet_builtin = torch.det(A)\nprint(\"Determinant from torch.det:\", det_builtin.item())\n\
+  # Output should be the same\n\n# Batch example\nA_batch = torch.randn(3, 4, 4)\ndet_batch = determinant_via_qr(A_batch)\n\
+  det_builtin_batch = torch.det(A_batch)\nprint(\"Determinant difference:\", torch.allclose(det_batch,\
+  \ det_builtin_batch))\n```\n\nAdditional constraints:\nNumerical stability considerations are important,\
+  \ especially for ill-conditioned matrices. The function explicitly computes \\det(Q) to account for\
+  \ the sign. For complex matrices, the result may be complex.\n\nRequirements (SparkDistill / TritonBench\
+  \ harness):\n- Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve\
+  \ numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit\
+  \ + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n- Add @triton.autotune\
+  \ when there are meaningful tile/block choices\n- Provide a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 3
+  torch_cnt: 6
+  func_inputs: determinant_via_qr(A, *, mode='reduced', out=None) -> Tensor
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+source:
+  channel: T
+  file: determinant_via_qr.py
+  name: determinant_via_qr
+  difficulty: '3'
+  params_cnt: 3
+  torch_cnt: 6
+gold_kernel: data/TritonBench_T_v1/determinant_via_qr.py

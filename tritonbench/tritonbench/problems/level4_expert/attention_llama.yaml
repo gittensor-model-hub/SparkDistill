@@ -1,0 +1,57 @@
+id: attention_llama
+level: 4
+category: kernel_generation
+title: Attention Llama
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `attention_llama.py` (repo: ELS-RD/kernl).\n\nTask description:\nThe Triton JIT kernel `_fwd_kernel`\
+  \ is designed to compute the forward pass of a self-attention mechanism with support for both regular\
+  \ and causal attention (controlled by the `IS_CAUSAL` parameter). It takes in matrices Q, K, and V,\
+  \ which represent the query, key, and value tensors of the attention mechanism. The kernel implements\
+  \ a block-wise approach to handle large input sizes efficiently, processing data in chunks defined by\
+  \ constants `BLOCK_M`, `BLOCK_N`, and `BLOCK_DMODEL`.\n\n            The kernel computes a scaled dot-product\
+  \ between the query and key matrices, applying a softmax operation to generate attention scores. It\
+  \ then applies these scores to the value matrix to produce the output. The `sm_scale` parameter is used\
+  \ to scale the logits before applying the softmax, which is a common practice to stabilize gradients.\
+  \ \n\n            If `IS_CAUSAL` is true, the kernel masks future positions to maintain causality in\
+  \ autoregressive models, ensuring that each position only attends to previous positions.\n\n       \
+  \     The kernel supports mixed-precision computations, leveraging 8-bit floats (FP8) when keys and\
+  \ values are stored as `torch.int8`, controlled by `USE_FP8`. It rematerializes offsets to manage Triton's\
+  \ register pressure effectively.\n\n            The wrapper function `triton_fa` is responsible for\
+  \ invoking `_fwd_kernel`, ensuring the correct configurations and input data formats. It checks data\
+  \ type consistency and adjusts grid and block sizes based on the input dimensions, utilizing a dynamic\
+  \ grid size to cover the full input. The grid is determined by `triton.cdiv(m_size, BLOCK)` for the\
+  \ rows, and `head_size * batch` for the second dimension, to handle all heads in parallel. The kernel\
+  \ uses either 4 or 8 warps based on the block size (`Lk`), and stages are managed with `num_stages=2`\
+  \ to balance register usage and computational latency.\n\nRequirements (SparkDistill / TritonBench harness):\n\
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor\
+  \ over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include\
+  \ @triton.autotune with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid\
+  \ and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short\
+  \ note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- attention
+- matmul
+- softmax
+- quantization
+- elementwise
+- reduction
+source:
+  channel: G
+  file: attention_llama.py
+  repo: ELS-RD/kernl
+  difficulty: '4'
+  star: 1537
+  simp_instru_len: 173
+  comp_instru_len: 440
+  output_triton_len: 2089
+gold_kernel: data/TritonBench_G_v1/attention_llama.py

@@ -1,0 +1,56 @@
+id: ksoftmax_triton
+level: 4
+category: kernel_generation
+title: Ksoftmax Triton
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `ksoftmax_triton.py` (repo: HazyResearch/fly).\n\nTask description:\nThis code defines two Triton\
+  \ kernels and their associated host functions for computing the softmax operation over the last dimension\
+  \ of a 3D tensor and its backward pass.\n\n            The `_softmax` kernel applies a fused softmax\
+  \ operation, which can handle various configurations such as logarithmic softmax (`LOG`), causal masking\
+  \ (`CAUSAL`), and other types of masking (`MASK_TYPE`). The kernel uses Triton primitives like `tl.load`\
+  \ to read inputs and `tl.store` to write outputs. The kernel is designed to operate efficiently by determining\
+  \ an appropriate computational `DEPTH` using Triton's `next_power_of_2` function, ensuring optimized\
+  \ memory access patterns. The `IS_FP16` heuristic checks if the input tensor is half-precision and ensures\
+  \ higher precision calculations if necessary.\n\n            The host function `softmax` handles input\
+  \ validations and tensor preparation, calling `_softmax` with a calculated grid that spans the first\
+  \ two dimensions of the input tensor. It manages strides for accessing elements correctly and sets up\
+  \ any additional parameters required by the kernel.\n\n            The `_softmax_backward` kernel computes\
+  \ gradients for the softmax operation, again supporting options like logarithmic output and causal behavior.\
+  \ It handles the backward pass by adjusting gradients accordingly, using efficient arithmetic operations\
+  \ that leverage Triton's parallelism.\n\n            The function `softmax_backward` validates gradients'\
+  \ shapes and prepares the backward pass's configuration, similarly invoking the JIT-compiled `_softmax_backward`\
+  \ kernel with appropriate parameters. It ensures strides and memory layout are correctly handled for\
+  \ efficient gradient computation.\n\n            Overall, the use of Triton's decorators like `@triton.autotune`,\
+  \ `@triton.heuristics`, and `@triton.jit` highlights this code's focus on performance through compile-time\
+  \ and runtime optimizations. This approach ensures both the forward and backward softmax operations\
+  \ are executed efficiently on supported hardware architectures.\n\nRequirements (SparkDistill / TritonBench\
+  \ harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor\
+  \ over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include\
+  \ @triton.autotune with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid\
+  \ and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short\
+  \ note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- softmax
+- elementwise
+- reduction
+- fused
+source:
+  channel: G
+  file: ksoftmax_triton.py
+  repo: HazyResearch/fly
+  difficulty: '4'
+  star: 195
+  simp_instru_len: 214
+  comp_instru_len: 443
+  output_triton_len: 1997
+gold_kernel: data/TritonBench_G_v1/ksoftmax_triton.py

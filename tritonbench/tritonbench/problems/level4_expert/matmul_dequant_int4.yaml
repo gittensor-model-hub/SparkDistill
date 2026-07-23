@@ -1,0 +1,66 @@
+id: matmul_dequant_int4
+level: 4
+category: kernel_generation
+title: Matmul Dequant Int4
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `matmul_dequant_int4.py` (repo: ModelTC/lightllm).\n\nTask description:\nThe provided code implements\
+  \ two optimized GPU kernels using Triton: `matmul4_kernel` and `dequantize_kernel`. Both kernels leverage\
+  \ Triton's JIT compilation and autotuning capabilities to efficiently handle specific matrix operations\
+  \ commonly used in neural network computations, especially those involving quantized weights.\n\n  \
+  \      1. `matmul4_kernel`:\n            - Purpose: Perform a quantized matrix multiplication where\
+  \ matrix `B` is in a 4-bit integer format, while `A` and `C` are in `float16`.\n            - Inputs:\
+  \ \n                - `a_ptr`, `b_ptr`, `c_ptr`: Pointers to matrices `A`, `B`, and `C`.\n         \
+  \       - `scales_ptr`, `zeros_ptr`: Pointers to scale and zero-point matrices for quantization.\n \
+  \               - `M`, `N`, `K`: Dimensions of the matrices.\n                - `stride_am`, `stride_ak`,\
+  \ `stride_bk`, `stride_bn`, `stride_cm`, `stride_cn`: Strides for memory access.\n                -\
+  \ `stride_scales_g`, `stride_scales_n`, `stride_zeros_g`, `stride_zeros_n`: Strides for scales and zeros.\n\
+  \                - `groupsize`, `NO_GROUPS`: Meta-parameters for group handling.\n            - Operation:\
+  \ Multiplies `A` with a dequantized version of `B`, using provided scales and zeros to adjust the values.\
+  \ It operates on blocks of size `BLOCK_SIZE_M x BLOCK_SIZE_N x BLOCK_SIZE_K`.\n            - Characteristics:\
+  \ Handles grouped scaling efficiently by preloading scales and zero-points, and decomposes the operation\
+  \ into several small matrix multiplies over the specified block sizes.\n\n        2. `dequantize_kernel`:\n\
+  \            - Purpose: Unpacks and dequantizes a 4-bit quantized matrix `B` to full precision.\n  \
+  \          - Inputs:\n                - `b_ptr`: Pointer to the int4 quantized weights.\n          \
+  \      - `b_scale_ptr`, `b_zp_ptr`: Pointers to scale and zero-point matrices.\n                - `fpb_ptr`:\
+  \ Pointer to store the dequantized full precision result.\n                - `K`, `N`, `group_size`:\
+  \ Dimensions and grouping size.\n                - `stride_bk`, `stride_bn`, `stride_bsk`, `stride_bsn`,\
+  \ `stride_bzpk`, `stride_bzpn`, `stride_fpbk`, `stride_fpbn`: Strides for respective matrices.\n   \
+  \         - Operation: Converts packed 4-bit integers into full-precision floats using group-wise scales\
+  \ and zero-points, processing each tile of size `BLOCK_SIZE_K x BLOCK_SIZE_N`.\n\n        Additional\
+  \ Functions:\n        - `dequantize_int4`: A helper function using `dequantize_kernel` to convert an\
+  \ int4 matrix to float.\n        - `matmul_dequantize_int4_s1`: Dequantizes matrix `B` using `dequantize_int4`\
+  \ and performs a matrix multiplication with `A`.\n        - `quantize_int4`: Quantizes a given weight\
+  \ matrix into a 4-bit format, preparing it for use in the above kernels. It calculates scales and zero-points\
+  \ based on groups and packs values into `int32`.\n\n        The code is structured to facilitate the\
+  \ handling of quantized matrices, optimizing for modern hardware's parallel execution capabilities.\
+  \ The kernels are auto-tuned for varying hardware specifications, ensuring efficient execution.\n\n\
+  Requirements (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA\
+  \ SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use @triton.jit\
+  \ kernels with correct boundary masking\n- Include @triton.autotune with at least 3 configs when tile\
+  \ sizes matter\n- Provide a Python launcher + grid and a torch.allclose correctness test\n- Use fp32\
+  \ accumulators for tl.dot reductions\n- Print a short note if you intentionally skip autotune for a\
+  \ tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- matmul
+- quantization
+- elementwise
+- convolution
+source:
+  channel: G
+  file: matmul_dequant_int4.py
+  repo: ModelTC/lightllm
+  difficulty: '5'
+  star: 2647
+  simp_instru_len: 497
+  comp_instru_len: 851
+  output_triton_len: 5582
+gold_kernel: data/TritonBench_G_v1/matmul_dequant_int4.py

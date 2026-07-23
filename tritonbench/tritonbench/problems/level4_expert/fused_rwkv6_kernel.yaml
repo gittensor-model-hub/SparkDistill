@@ -1,0 +1,64 @@
+id: fused_rwkv6_kernel
+level: 4
+category: kernel_generation
+title: Fused Rwkv6 Kernel
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `fused_rwkv6_kernel.py` (repo: sustcsonglin/flash-linear-attention).
+
+
+  Task description:
+
+  The Triton kernel `fused_recurrent_rwkv6_fwd_kernel` is designed for efficient execution of a specific
+  recurrent neural network operation used in the RWKV-6 model. This kernel processes the input tensors
+  `q`, `k`, `v`, `w`, and `u` to perform fused operations that involve recurrent processing over time
+  `T`. The kernel can optionally use an initial hidden state (`USE_INITIAL_STATE`) and store the final
+  hidden state (`STORE_FINAL_STATE`). It supports reversing the input sequence (`REVERSE`). The main compute
+  loop iterates over the sequence length `T` to perform recurrent updates by loading slices of `k`, `v`,
+  and applying operations with `b_w` and `b_u` to update the hidden state and compute the output `b_o`.
+  The function `FusedRecurrentRWKV6Function` is an autograd function that encapsulates the forward pass
+  using this Triton kernel, setting up grid parameters (`BK`, `BV`, `NK`, `NV`) for parallel execution.
+  It manages memory allocation for outputs and optionally for final hidden states, while also saving necessary
+  tensors for backward pass in PyTorch''s autograd. The `fused_recurrent_rwkv6` function acts as a user-facing
+  API to perform this computation, with the ability to scale `q` by `scale` and return both the output
+  tensor and optionally the final hidden state.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- attention
+- matmul
+- fused
+source:
+  channel: G
+  file: fused_rwkv6_kernel.py
+  repo: sustcsonglin/flash-linear-attention
+  difficulty: '3'
+  star: 1382
+  simp_instru_len: 147
+  comp_instru_len: 329
+  output_triton_len: 1928
+gold_kernel: data/TritonBench_G_v1/fused_rwkv6_kernel.py

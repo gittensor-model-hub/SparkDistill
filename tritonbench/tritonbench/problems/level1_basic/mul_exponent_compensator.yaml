@@ -1,0 +1,46 @@
+id: mul_exponent_compensator
+level: 1
+category: kernel_generation
+title: Mul Exponent Compensator
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `mul_exponent_compensator.py` (repo: wenchenvincent/scripts).\n\nTask description:\nThe code\
+  \ defines a Triton kernel `mul_kernel` that multiplies each element of a given source tensor `src` with\
+  \ a constant value referred to as the exponent compensator and stores the result in the destination\
+  \ tensor `dst`. The kernel is designed to work on a portion of the tensor at a time, where the portion\
+  \ size is controlled by a parameter `BLOCK_SIZE`, which is a compile-time constant. The constant exponent\
+  \ compensator is defined as `2.0 ** (127 - 15)` to adjust for exponent bias in floating-point representation.\
+  \ The kernel computes indices for accessing elements in the source tensor using `tl.program_id(0)` to\
+  \ identify the current block and `tl.arange(0, BLOCK_SIZE)` for offsets within the block. Using these\
+  \ indices, it loads the corresponding elements from `src`, multiplies them by the compensator, and stores\
+  \ the results in `dst`.\n\n            The wrapper function `launch_mul_kernel` is provided to set up\
+  \ and invoke this Triton kernel. It takes a PyTorch tensor `src` and an optional block size `BLOCK_SIZE`\
+  \ as arguments. It creates an empty destination tensor `dst` on the CUDA device with the same shape\
+  \ as `src`. It then launches the kernel with the appropriate grid size `(src.shape[0] // BLOCK_SIZE,)`,\
+  \ passing `src`, `dst`, and `BLOCK_SIZE` as parameters. Finally, the function returns the filled destination\
+  \ tensor `dst` containing the results of the multiplication operation.\n\nRequirements (SparkDistill\
+  \ / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer\
+  \ tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct\
+  \ boundary masking\n- Include @triton.autotune with at least 3 configs when tile sizes matter\n- Provide\
+  \ a Python launcher + grid and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot\
+  \ reductions\n- Print a short note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- elementwise
+source:
+  channel: G
+  file: mul_exponent_compensator.py
+  repo: wenchenvincent/scripts
+  difficulty: '1'
+  star: 0
+  simp_instru_len: 122
+  comp_instru_len: 346
+  output_triton_len: 329
+gold_kernel: data/TritonBench_G_v1/mul_exponent_compensator.py

@@ -1,0 +1,66 @@
+id: kldiv_compute
+level: 1
+category: kernel_generation
+title: Kldiv Compute
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `kldiv_compute.py` (repo: motobiubiu/biubiuquik).
+
+
+  Task description:
+
+  The Triton kernel function `kldivergence_kernel` performs element-wise computation of Kullback-Leibler
+  (KL) divergence between two input vectors, `x_ptr` and `y_ptr`, storing results in `output_ptr`. It
+  utilizes a block-wise processing approach, specified by `BLOCK_SIZE`, where each program (or kernel
+  instance) computes over a distinct block of elements. The kernel starts by obtaining a unique program
+  identifier (`pid`) for each execution using `tl.program_id(axis=0)`, which allows computation over a
+  1D grid. For each block, indices are determined by calculating `block_start = pid * BLOCK_SIZE` and
+  creating an `offsets` tensor as `block_start + tl.arange(0, BLOCK_SIZE)`. A `mask` is used to ensure
+  memory accesses are within bounds, protecting against out-of-bounds errors when loading from `x_ptr`
+  and `y_ptr`. Elements of `x` and `y` within the current block are loaded using `tl.load()`, and KL divergence
+  is computed with `output = x * tl.log(x / y)`. This result is conditionally stored in `output_ptr` using
+  `tl.store(output_ptr + offsets, output, mask=mask)`. The function `kldivergence` serves as the Python
+  API, enforcing GPU presence of input tensors and setting up the grid for kernel execution. It defines
+  a grid function, `grid = lambda meta: (triton.cdiv(n_elements, meta[''BLOCK_SIZE'']), )`, which calculates
+  the number of blocks needed to cover all elements. The kernel is then launched with specified block
+  size, processing inputs `x` and `y` and returning the resulting `output`.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: G
+  file: kldiv_compute.py
+  repo: motobiubiu/biubiuquik
+  difficulty: '2'
+  star: 2
+  simp_instru_len: 193
+  comp_instru_len: 398
+  output_triton_len: 417
+gold_kernel: data/TritonBench_G_v1/kldiv_compute.py

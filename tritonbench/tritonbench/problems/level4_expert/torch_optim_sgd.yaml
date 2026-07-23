@@ -1,0 +1,93 @@
+id: torch_optim_sgd
+level: 4
+category: kernel_translation
+title: Torch Optim Sgd
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.optim.SGD`.
+
+
+  Operator description:
+
+  Implements stochastic gradient descent, optionally with momentum, weight decay, dampening, and Nesterov
+  momentum. It can maximize or minimize an objective function and supports different optimization algorithms
+  for performance.
+
+
+  Target Python signature / call pattern:
+
+  def SGD(params, lr=1e-3, momentum=0, weight_decay=0, dampening=0, nesterov=False, maximize=False, foreach=None,
+  differentiable=False, fused=None)
+
+
+  Mathematical definition:
+
+  \begin{aligned} &g_t \leftarrow \nabla_{\theta} f_t (\theta_{t-1}) \\\ &\text{if} \: \lambda \neq 0
+  \\\ &g_t \leftarrow g_t + \lambda \theta_{t-1} \\\ &\text{if} \: \mu \neq 0 \\\ &\text{if} \: t > 1
+  \\\ &\textbf{b}_t \leftarrow \mu \textbf{b}_{t-1} + (1-\tau) g_t \\\ &\text{else} \\\ &\textbf{b}_t
+  \leftarrow g_t \\\ &\text{if} \: \textit{nesterov} \\\ &g_t \leftarrow g_{t} + \mu \textbf{b}_t \\\
+  &\text{else} \\\ &g_t  \leftarrow  \textbf{b}_t \\\ &\text{if} \: \textit{maximize} \\\ &\theta_t \leftarrow
+  \theta_{t-1} + \gamma g_t \\\ &\text{else} \\\ &\theta_t \leftarrow \theta_{t-1} - \gamma g_t \end{aligned}
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  optimizer = torch.optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> optimizer = torch.optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
+
+  >>> optimizer.zero_grad()
+
+  >>> loss_fn(model(input), target).backward()
+
+  >>> optimizer.step()
+
+
+  Additional constraints:
+
+  Nesterov momentum is based on a research paper. The algorithm prioritizes different implementations
+  based on performance. It differs from some traditional frameworks in its handling of momentum. The initial
+  momentum buffer is set to the gradient value at the first step.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 10
+  torch_cnt: 4
+  func_inputs: def SGD(params, lr=1e-3, momentum=0, weight_decay=0, dampening=0, nesterov=False, maximize=False,
+    foreach=None, differentiable=False, fused=None)
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- reduction
+- optimizer
+- fused
+source:
+  channel: T
+  file: SGD.py
+  name: torch.optim.SGD
+  difficulty: '3'
+  params_cnt: 10
+  torch_cnt: 4
+gold_kernel: data/TritonBench_T_v1/SGD.py

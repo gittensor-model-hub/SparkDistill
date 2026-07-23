@@ -1,0 +1,59 @@
+id: int8_quantization
+level: 3
+category: kernel_generation
+title: Int8 Quantization
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `int8_quantization.py` (repo: thu-ml/SageAttention).\n\nTask description:\nThe provided code\
+  \ includes Triton kernels designed to convert query and key matrices into int8 format, suitable for\
+  \ applications requiring low precision and optimized memory usage. The process is encapsulated in two\
+  \ specialized kernels, q_kernel_per_block_int8 and k_kernel_per_block_int8, each responsible for quantizing\
+  \ a block of the respective matrices.\n\n        The q_kernel_per_block_int8 function loads a block\
+  \ of the query matrix, normalizes it by a scaling factor derived from its max absolute value, quantizes\
+  \ to int8 while rounding, and stores both the quantized data and the scaling factor for later reconstruction.\
+  \ The factor ensures precision is maintained post quantization.\n\n        Similarly, the k_kernel_per_block_int8\
+  \ processes key matrices, performing an identical operation tailored for the key matrix dimensions and\
+  \ blocks.\n\n        Both functions are invoked by per_block_int8, which handles the necessary reshaping\
+  \ of input matrices based on dimensionality. It initializes empty int8 and scaling tensors, calculates\
+  \ the grid configuration for kernel execution, and launches the respective Triton kernels with appropriate\
+  \ parameters.\n\n        Inputs and Outputs:\n        - q (torch.Tensor): Input query matrix.\n    \
+  \    - k (torch.Tensor): Input key matrix.\n        - BLKQ, BLKK (int): Block sizes for the kernels'\
+  \ operation.\n        - q_int8, k_int8 (torch.Tensor): Outputs holding the int8 representations.\n \
+  \       - q_scale, k_scale (torch.Tensor): Output scaling factors for precision recovery.\n\n      \
+  \  Key Parameters and Code Flow:\n        - The Triton kernels utilize program_id to distinguish thread\
+  \ execution contexts, calculate offsets for memory access, and utilize block-wise processing via arithmetic\
+  \ with block sizes BLKQ and BLKK.\n        - Input tensors are reshaped for uniform handling irrespective\
+  \ of the original dimensions (3D or 4D tensors).\n        - The scaling ensures that the largest absolute\
+  \ value in each block maps to the range of representable int8 values, with the quantization mimicking\
+  \ nearest integer rounding.\n        - Overall, the implementation serves to efficiently convert matrices\
+  \ to a space-efficient int8 format while storing necessary metadata (scales) for accurate de-quantization.\n\
+  \nRequirements (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell\
+  \ (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use\
+  \ @triton.jit kernels with correct boundary masking\n- Include @triton.autotune with at least 3 configs\
+  \ when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose correctness test\n\
+  - Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally skip autotune\
+  \ for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- attention
+- quantization
+- elementwise
+- reduction
+- convolution
+source:
+  channel: G
+  file: int8_quantization.py
+  repo: thu-ml/SageAttention
+  difficulty: '2'
+  star: 600
+  simp_instru_len: 347
+  comp_instru_len: 499
+  output_triton_len: 1437
+gold_kernel: data/TritonBench_G_v1/int8_quantization.py

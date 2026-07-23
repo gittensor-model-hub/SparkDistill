@@ -1,0 +1,49 @@
+id: torch_sum
+level: 2
+category: kernel_translation
+title: Torch Sum
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.sum`.\n\
+  \nOperator description:\nReturns the sum of each row of the input tensor in the given dimension dim.\
+  \ If dim is a list of dimensions, reduce over all of them. If keepdim is True, the output tensor is\
+  \ of the same size as input except in the dimension(s) dim where it is of size 1. Otherwise, dim is\
+  \ squeezed, resulting in the output tensor having 1 (or len(dim)) fewer dimension(s).\n\nTarget Python\
+  \ signature / call pattern:\ndef sum(input, dim, keepdim=False, *, dtype=None) -> Tensor; input (Tensor):\
+  \ the input tensor.; dim (int or tuple of ints, optional): the dimension or dimensions to reduce.; keepdim\
+  \ (bool): whether the output tensor has :attr:`dim` retained or not.; dtype (:class:`torch.dtype`, optional):\
+  \ the desired data type of returned tensor.\n\nPyTorch reference snippet:\n```python\ntorch.sum(a, 1);\
+  \ torch.sum(b, (2, 1))\n```\n\nExample / usage notes:\n>>> a = torch.randn(4, 4)\n>>> a\ntensor([[ 0.0569,\
+  \ -0.2475,  0.0737, -0.3429],\n        [-0.2993,  0.9138,  0.9337, -1.6864],\n        [ 0.1132,  0.7892,\
+  \ -0.1003,  0.5688],\n        [ 0.3637, -0.9906, -0.4752, -1.5197]])\n>>> torch.sum(a, 1)\ntensor([-0.4598,\
+  \ -0.1381,  1.3708, -2.6217])\n>>> b = torch.arange(4 * 5 * 6).view(4, 5, 6)\n>>> torch.sum(b, (2, 1))\n\
+  tensor([  435.,  1335.,  2235.,  3135.])\n\nAdditional constraints:\nIf dim is a list of dimensions,\
+  \ reduce over all of them. If keepdim is True, the output tensor is of the same size as input except\
+  \ in the dimension(s) dim where it is of size 1. Otherwise, dim is squeezed.\n\nRequirements (SparkDistill\
+  \ / TritonBench harness):\n- Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell\
+  \ SM120\n- Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)\n\
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n- Add @triton.autotune\
+  \ when there are meaningful tile/block choices\n- Provide a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 4
+  torch_cnt: 2
+  func_inputs: 'def sum(input, dim, keepdim=False, *, dtype=None) -> Tensor; input (Tensor): the input
+    tensor.; dim (int or tuple of ints, optional): the dimension or dimensions to reduce.; keepdim (bool):
+    whether the output tensor has :attr:`dim` retained or not.; dtype (:class:`torch.dtype`, optional):
+    the desired data type of returned tensor.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- reduction
+source:
+  channel: T
+  file: sum.py
+  name: torch.sum
+  difficulty: '2'
+  params_cnt: 4
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/sum.py

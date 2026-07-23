@@ -1,0 +1,57 @@
+id: fused_mv_sigmoid_sub
+level: 2
+category: kernel_translation
+title: Fused Mv Sigmoid Sub
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `fused_mv_sigmoid_sub`.\n\
+  \nOperator description:\nPerforms a fused operation combining matrix-vector multiplication, sigmoid\
+  \ activation, and subtraction.\n\nTarget Python signature / call pattern:\nfused_mv_sigmoid_sub(input,\
+  \ vec, other, alpha=1, *, out=None) -> Tensor; input (Tensor): Input matrix A of shape (n, m); vec (Tensor):\
+  \ Input vector \\mathbf{v} of shape (m); other (Tensor or Number): Tensor or scalar b to subtract from\
+  \ the sigmoid output, scaled by \\alpha; alpha (Number, optional): Scalar multiplier for other. Default:\
+  \ `1`; out (Tensor, optional): Output tensor. Ignored if `None`. Default: `None`\n\nMathematical definition:\n\
+  Given an input matrix A, a vector \\mathbf{v}, and another tensor or scalar b, the function computes:\n\
+  \\[\n\\begin{align*}\n\\mathbf{z} &= A \\mathbf{v} \\\\\n\\mathbf{s} &= \\sigma(\\mathbf{z}) = \\frac{1}{1\
+  \ + \\exp(-\\mathbf{z})} \\\\\n\\mathbf{y} &= \\mathbf{s} - \\alpha b\n\\end{align*}\n\\]\n\nPyTorch\
+  \ reference snippet:\n```python\nz = torch.mv(input, vec)\ns = torch.nn.functional.sigmoid(z)\ny = torch.sub(s,\
+  \ other, alpha=alpha)\n```\n\nExample / usage notes:\nimport torch\nimport torch.nn.functional as F\n\
+  \ndef fused_mv_sigmoid_sub(input, vec, other, alpha=1, *, out=None):\n    z = torch.mv(input, vec)\n\
+  \    s = torch.nn.functional.sigmoid(z)\n    y = torch.sub(s, other, alpha=alpha)\n    if out is not\
+  \ None:\n        out.copy_(y)\n        return out\n    return y\n\n# Example usage\ninput = torch.tensor([[1.0,\
+  \ 2.0, 3.0],\n                      [4.0, 5.0, 6.0]])\nvec = torch.tensor([0.1, 0.2, 0.3])\nother =\
+  \ torch.tensor([0.5, 0.5])\nalpha = 1.0\n\noutput = fused_mv_sigmoid_sub(input, vec, other, alpha=alpha)\n\
+  print(\"Output:\", output)\n# Output: tensor([-0.4256, -0.4013])\n\nAdditional constraints:\n- The shapes\
+  \ of `input` and `vec` must be compatible for matrix-vector multiplication.\n- The `other` tensor must\
+  \ be broadcastable to the shape of the output from the sigmoid function.\n- The function supports autograd\
+  \ for gradient computation.\n- All operations are differentiable and support backpropagation.\n\nRequirements\
+  \ (SparkDistill / TritonBench harness):\n- Translate the PyTorch reference into Triton 3.7.1 kernels\
+  \ for Blackwell SM120\n- Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate\
+  \ for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n\
+  - Add @triton.autotune when there are meaningful tile/block choices\n- Provide a launcher and a small\
+  \ self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 5
+  torch_cnt: 3
+  func_inputs: 'fused_mv_sigmoid_sub(input, vec, other, alpha=1, *, out=None) -> Tensor; input (Tensor):
+    Input matrix A of shape (n, m); vec (Tensor): Input vector \mathbf{v} of shape (m); other (Tensor
+    or Number): Tensor or scalar b to subtract from the sigmoid output, scaled by \alpha; alpha (Number,
+    optional): Scalar multiplier for other. Default: `1`; out (Tensor, optional): Output tensor. Ignored
+    if `None`. Default: `None`'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+- fused
+source:
+  channel: T
+  file: fused_mv_sigmoid_sub.py
+  name: fused_mv_sigmoid_sub
+  difficulty: '2'
+  params_cnt: 5
+  torch_cnt: 3
+gold_kernel: data/TritonBench_T_v1/fused_mv_sigmoid_sub.py

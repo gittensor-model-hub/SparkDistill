@@ -1,0 +1,54 @@
+id: attention_fwd_triton2
+level: 4
+category: kernel_generation
+title: Attention Fwd Triton2
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `attention_fwd_triton2.py` (repo: thu-ml/SageAttention).\n\nTask description:\nThis code implements\
+  \ a Triton kernel for the forward pass of an attention operation, typically used in transformers. The\
+  \ `forward` function receives the query (`q`), key (`k`), and value (`v`) tensors, as well as their\
+  \ scaling factors (`q_scale`, `k_scale`). It calculates the attention output `o` through block-wise\
+  \ parallel processing.\n\n            The primary Triton kernel `_attn_fwd` orchestrates the attention\
+  \ mechanism computation. It executes in parallel over multiple blocks defined by `BLOCK_M` and `BLOCK_N`.\
+  \ The kernel sets up index offsets and pointers for `Q`, `K`, and `V` tensors, used to load data efficiently\
+  \ into shared memory. Each thread block handles a subset of the input tensor to compute its contribution\
+  \ to the attention mechanism.\n\n            Inside `_attn_fwd`, the auxiliary kernel `_attn_fwd_inner`\
+  \ performs the main computational loop. It processes blocks of keys and values, calculating their dot\
+  \ products with the queries, scaling them according to `q_scale` and `k_scale`, and applying a maximum\
+  \ reduction for numerical stability. It converts the result into exponentials and normalizes them by\
+  \ a sum, which resembles a softmax operation.\n\n            During each iteration, `acc` stores the\
+  \ accumulated weighted sums of the values, while `l_i` stores the normalization factors. `m_i` is used\
+  \ to track the maximum values for numerical stability. The kernel accumulates the results in `acc`,\
+  \ divides by `l_i` for normalization, and writes back to the output tensor `o`.\n\n            The kernel\
+  \ is launched with a grid configuration based on the dimensions of the query tensor, and the function\
+  \ ultimately returns the output tensor `o`.\n\nRequirements (SparkDistill / TritonBench harness):\n\
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor\
+  \ over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include\
+  \ @triton.autotune with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid\
+  \ and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short\
+  \ note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- attention
+- matmul
+- softmax
+- elementwise
+- reduction
+- convolution
+source:
+  channel: G
+  file: attention_fwd_triton2.py
+  repo: thu-ml/SageAttention
+  difficulty: '4'
+  star: 600
+  simp_instru_len: 281
+  comp_instru_len: 388
+  output_triton_len: 2056
+gold_kernel: data/TritonBench_G_v1/attention_fwd_triton2.py

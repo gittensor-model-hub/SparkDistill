@@ -1,0 +1,60 @@
+id: matrix_vector_multip
+level: 3
+category: kernel_generation
+title: Matrix Vector Multip
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `matrix_vector_multip.py` (repo: FlagOpen/FlagGems).
+
+
+  Task description:
+
+  The provided Triton operator code implements a matrix-vector multiplication kernel, `mv_kernel`, designed
+  for efficient execution on NVIDIA GPUs. It leverages Triton''s Just-In-Time (JIT) compilation and auto-tuning
+  features. The kernel function multiplies a matrix `A` of size N x M with a vector `B` of size M, resulting
+  in an output vector `C` of size N. The kernel is parameterized by constants `BLOCK_N` and `BLOCK_M`
+  which determine the tile sizes for the computation, allowing for optimal parallel processing. Within
+  `mv_kernel`, a loop iterates over the matrix A in blocks of `BLOCK_M` to load sub-matrices and the corresponding
+  block from vector B, performing element-wise multiplication and accumulation in shared memory. The partial
+  results are then reduced along the rows and stored in the output vector `C`. The `mv` function wraps
+  this kernel execution, asserting dimension compatibility and managing CUDA resources for launching the
+  kernel with calculated grid dimensions.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: G
+  file: matrix_vector_multip.py
+  repo: FlagOpen/FlagGems
+  difficulty: '4'
+  star: 347
+  simp_instru_len: 141
+  comp_instru_len: 224
+  output_triton_len: 754
+gold_kernel: data/TritonBench_G_v1/matrix_vector_multip.py

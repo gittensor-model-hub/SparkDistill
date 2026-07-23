@@ -1,0 +1,60 @@
+id: sin_computation
+level: 2
+category: kernel_generation
+title: Sin Computation
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `sin_computation.py` (repo: pytorch/pytorch).
+
+
+  Task description:
+
+  The Triton kernel sin_kernel computes the element-wise sine of a 1D input array. It takes the following
+  parameters: in_ptr0, a pointer to the input data; out_ptr, a pointer to the output data; n_elements,
+  the total number of elements to process; and BLOCK_SIZE, a compile-time constant determining the block
+  of data processed per program instance. The kernel uses tl.program_id(axis=0) to identify which block
+  it is processing and calculates offsets within the data based on the block ID and BLOCK_SIZE. It loads
+  input data using tl.load with masking to prevent out-of-bounds access. After applying tl.sin to compute
+  the sine of each loaded element, it stores the result back into memory using tl.store, again using a
+  mask to ensure only valid memory locations are written. The wrapper function sin_triton initializes
+  the computation by determining the number of elements in the input tensor x, and invokes the sin_kernel,
+  specifying the grid size as the number of elements and setting the BLOCK_SIZE to 4.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- reduction
+source:
+  channel: G
+  file: sin_computation.py
+  repo: pytorch/pytorch
+  difficulty: '2'
+  star: 84636
+  simp_instru_len: 124
+  comp_instru_len: 244
+  output_triton_len: 230
+gold_kernel: data/TritonBench_G_v1/sin_computation.py

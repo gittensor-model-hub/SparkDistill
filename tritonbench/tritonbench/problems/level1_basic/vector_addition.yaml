@@ -1,0 +1,48 @@
+id: vector_addition
+level: 1
+category: kernel_generation
+title: Vector Addition
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `vector_addition.py` (repo: triton-lang/triton).\n\nTask description:\nThe provided code defines\
+  \ a Triton kernel called `add_kernel` and a wrapper function `add` to perform element-wise addition\
+  \ of two CUDA tensors. `add_kernel` is a Triton JIT-compiled function that processes vectors in blocks\
+  \ of a specified size (`BLOCK_SIZE`). The kernel function takes pointers to the input vectors (`x_ptr`\
+  \ and `y_ptr`), an output vector pointer (`output_ptr`), and the number of elements (`n_elements`).\
+  \ It computes the sum of the elements from the two input vectors and stores the result in the output\
+  \ vector. \n\n            The kernel uses `tl.program_id(axis=0)` to determine the block index for a\
+  \ 1D launch grid. `block_start` is calculated using the block index and `BLOCK_SIZE`, and `offsets`\
+  \ are computed for accessing elements within this block. A mask is created to handle out-of-bounds accesses,\
+  \ ensuring operations only occur on valid elements. `tl.load` and `tl.store` functions are utilized\
+  \ with the mask to safely load input elements and store the computed output.\n\n            The `add`\
+  \ function serves as a wrapper, ensuring all tensors are on the CUDA device, calculating the total number\
+  \ of elements, and defining a grid based on the number of elements and `BLOCK_SIZE`. It then launches\
+  \ the kernel with the computed grid. The function returns the output tensor containing the summed elements.\n\
+  \nRequirements (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell\
+  \ (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use\
+  \ @triton.jit kernels with correct boundary masking\n- Include @triton.autotune with at least 3 configs\
+  \ when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose correctness test\n\
+  - Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally skip autotune\
+  \ for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: G
+  file: vector_addition.py
+  repo: triton-lang/triton
+  difficulty: '2'
+  star: 13556
+  simp_instru_len: 88
+  comp_instru_len: 322
+  output_triton_len: 380
+gold_kernel: data/TritonBench_G_v1/vector_addition.py

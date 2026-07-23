@@ -1,0 +1,121 @@
+id: min_gelu
+level: 2
+category: kernel_translation
+title: Min Gelu
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `min_gelu`.
+
+
+  Operator description:
+
+  Computes the Gaussian Error Linear Units (GELU) activation on the input tensor, then returns the minimum
+  value along the specified dimension(s) or over all elements if no dimension is specified. The function
+  supports two methods for computing GELU: exact and approximate using ''tanh''.
+
+
+  Target Python signature / call pattern:
+
+  min_gelu(input, dim=None, keepdim=False, approximate=''none'', out=None) -> Tensor: input (Tensor):
+  The input tensor. dim (int, optional): The dimension to reduce. If ``None``, returns the minimum of
+  all elements. keepdim (bool, optional): Whether the output tensor retains :attr:`dim` as size 1. Default
+  is ``False``. approximate (str, optional): The approximation method for GELU. Default is ''none''. out
+  (Tensor, optional): The output tensor.
+
+
+  Mathematical definition:
+
+  out = min(GELU(input))
+
+
+  GELU(x) = x * Φ(x) if approximate is ''none''
+
+  GELU(x) = 0.5 * x * (1 + Tanh(√(2/π) * (x + 0.044715 * x^3))) if approximate is ''tanh''
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  torch.nn.functional.gelu(input, approximate=approximate)
+
+  torch.min(gelu_result, dim=dim, keepdim=keepdim, out=out)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> import torch
+
+  >>> import torch.nn.functional as F
+
+  >>> a = torch.tensor([[0.5, -1.2, 3.0], [1.5, 0.0, -2.4]])
+
+  >>> result = min_gelu(a)
+
+  >>> result
+
+  tensor(-0.0997)
+
+
+  >>> values, indices = min_gelu(a, dim=1)
+
+  >>> values
+
+  tensor([-0.0997, -0.0952])
+
+  >>> indices
+
+  tensor([1, 2])
+
+
+  >>> result = min_gelu(a, approximate=''tanh'')
+
+  >>> result
+
+  tensor(-0.0997)
+
+
+  Additional constraints:
+
+  Returns a namedtuple (values, indices) if dim is specified, otherwise returns the minimum value tensor.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 5
+  torch_cnt: 2
+  func_inputs: 'min_gelu(input, dim=None, keepdim=False, approximate=''none'', out=None) -> Tensor: input
+    (Tensor): The input tensor. dim (int, optional): The dimension to reduce. If ``None``, returns the
+    minimum of all elements. keepdim (bool, optional): Whether the output tensor retains :attr:`dim` as
+    size 1. Default is ``False``. approximate (str, optional): The approximation method for GELU. Default
+    is ''none''. out (Tensor, optional): The output tensor.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+source:
+  channel: T
+  file: min_gelu.py
+  name: min_gelu
+  difficulty: '2'
+  params_cnt: 5
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/min_gelu.py

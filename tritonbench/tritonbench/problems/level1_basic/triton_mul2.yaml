@@ -1,0 +1,62 @@
+id: triton_mul2
+level: 1
+category: kernel_generation
+title: Triton Mul2
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `triton_mul2.py` (repo: jizhuoran/pyZKP).
+
+
+  Task description:
+
+  The Triton implementation contains two kernels, `mul2_kernel` and `mul2_inplace_kernel`, for multiplying
+  elements of a tensor by 2 using parallel computation. Both kernels use a block size (`BLOCK_SIZE`) to
+  split the computation into manageable chunks. They retrieve the program ID (`pid`) to identify the current
+  block and calculate `block_start`, the starting index for this block. Offsets are computed as `block_start
+  + tl.arange(0, BLOCK_SIZE)` to locate elements within the block. A mask is created to ensure operations
+  stay within `n_elements`, preventing out-of-bounds access. The elements are loaded from memory, doubled,
+  and written back to the specified location using `tl.load` and `tl.store`. The `triton_mul2` function
+  initializes an output tensor, determines the grid size using `triton.cdiv(n_elements, BLOCK_SIZE)`,
+  and calls `mul2_kernel` with appropriate arguments. The `triton_mul2_inplace` function directly modifies
+  the input tensor, using a similar setup to call `mul2_inplace_kernel`. These functions leverage the
+  efficiency of GPU parallelism provided by Triton to scale with the size of input data efficiently.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: G
+  file: triton_mul2.py
+  repo: jizhuoran/pyZKP
+  difficulty: '2'
+  star: 1
+  simp_instru_len: 193
+  comp_instru_len: 295
+  output_triton_len: 494
+gold_kernel: data/TritonBench_G_v1/triton_mul2.py

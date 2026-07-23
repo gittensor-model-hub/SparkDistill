@@ -1,0 +1,23 @@
+id: missing_other_on_masked_load
+level: bugfix
+category: kernel_debugging
+title: Masked Load Without other= Poisoning Reduction
+prompt: Sum reduction is polluted by garbage in masked-out lanes. Fix the load.
+input_code: "@triton.jit\ndef sum_kernel(x_ptr, out_ptr, n, BLOCK: tl.constexpr):\n    offs = tl.program_id(0)\
+  \ * BLOCK + tl.arange(0, BLOCK)\n    mask = offs < n\n    x = tl.load(x_ptr + offs, mask=mask)\n   \
+  \ tl.store(out_ptr + tl.program_id(0), tl.sum(x, axis=0))\n"
+expected_fix: Pass other=0.0 or -inf appropriate for the reduction
+required_patterns:
+- '@triton.jit'
+- mask
+tags:
+- debugging
+- masking
+- reduction
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+source:
+  channel: synthetic
+  file: missing_other_on_masked_load.py
+  difficulty: bugfix

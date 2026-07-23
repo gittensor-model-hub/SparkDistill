@@ -1,0 +1,65 @@
+id: layer_norm_fwd
+level: 3
+category: kernel_generation
+title: Layer Norm Fwd
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `layer_norm_fwd.py` (repo: HazyResearch/ThunderKittens).
+
+
+  Task description:
+
+  The `_layer_norm_fwd_1pass_kernel` function is a Triton-based CUDA kernel for computing layer normalization
+  in a single pass. It is capable of handling several advanced operations: applying dropout, adding biases,
+  and optionally handling residual connections or additional input tensors (`X1`, `W1`, `B1`). The function
+  operates over 2D tensors `X` and `Y` with dimensions MxN. The main inputs are `X`, `Y`, `W` (weights),
+  and `B` (biases). It supports optional components like `RESIDUAL`, `X1`, `W1`, `B1` and involves additional
+  computations like scaling with `ROWSCALE`, random dropout determined by `SEEDS`, and storing results
+  in `DROPOUT_MASK`. The computationally intensive parts are the normalization steps, which involve calculating
+  the mean and variance (except in RMS norm mode), and applying weights and biases to produce the output.
+  This is all highly parallelized for efficiency on GPUs. A collection of configurations and heuristics
+  helps optimize the kernel''s performance based on input size and features used. Outputs include normalized
+  outputs stored in `Y` (and optionally `Y1`), computed mean and inverse standard deviation (for non-RMS
+  normalization), adjusted residuals if `residual_out` is specified, as well as dropout seeds and masks.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- normalization
+- elementwise
+- reduction
+- dropout
+source:
+  channel: G
+  file: layer_norm_fwd.py
+  repo: HazyResearch/ThunderKittens
+  difficulty: '4'
+  star: 1710
+  simp_instru_len: 191
+  comp_instru_len: 308
+  output_triton_len: 2812
+gold_kernel: data/TritonBench_G_v1/layer_norm_fwd.py

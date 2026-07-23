@@ -1,0 +1,53 @@
+id: softmax_triton1
+level: 1
+category: kernel_generation
+title: Softmax Triton1
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `softmax_triton1.py` (repo: pytorch-labs/triton-cpu).\n\nTask description:\nThis Triton-based\
+  \ implementation of the softmax function is optimized for GPU execution by utilizing parallelization\
+  \ across matrix rows. The kernel, `softmax_kernel`, is compiled just-in-time using Triton's `@triton.jit`,\
+  \ making it highly efficient for large-scale data processing.\n\n            `softmax_kernel` is defined\
+  \ to perform the softmax computation for each row independently. The function parameters include pointers\
+  \ to the input and output matrices (`input_ptr`, `output_ptr`), the strides for row advancement (`input_row_stride`,\
+  \ `output_row_stride`), the number of columns (`n_cols`), and a compile-time constant `BLOCK_SIZE` to\
+  \ manage block-wise operations.\n\n            The kernel execution logic involves:\n            - Identifying\
+  \ the current row using `tl.program_id(0)`.\n            - Calculating the starting pointer for this\
+  \ row.\n            - Utilizing a block of threads defined by `BLOCK_SIZE` to handle possible overreach\
+  \ beyond the actual column count.\n            - Loading the row into on-chip memory with masking to\
+  \ handle cases where the block size exceeds column count.\n            - Performing numerical stabilization\
+  \ by subtracting the maximum value from the row elements to ensure stable computation.\n           \
+  \ - Computing the exponentials, followed by normalization to derive the softmax probabilities.\n   \
+  \         - Storing the result back in the output matrix.\n\n            The `softmax` function facilitates\
+  \ kernel execution. It calculates the optimal `BLOCK_SIZE` by finding the smallest power of two greater\
+  \ than the column count and adjusts `num_warps` according to `BLOCK_SIZE` to ensure efficient parallel\
+  \ execution. The function then initializes an output tensor, launches the Triton kernel with one block\
+  \ per input matrix row, and returns the computed softmax result.\n\nRequirements (SparkDistill / TritonBench\
+  \ harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor\
+  \ over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include\
+  \ @triton.autotune with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid\
+  \ and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short\
+  \ note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- softmax
+- elementwise
+- reduction
+source:
+  channel: G
+  file: softmax_triton1.py
+  repo: pytorch-labs/triton-cpu
+  difficulty: '2'
+  star: 35
+  simp_instru_len: 272
+  comp_instru_len: 404
+  output_triton_len: 782
+gold_kernel: data/TritonBench_G_v1/softmax_triton1.py

@@ -1,0 +1,105 @@
+id: fused_pairwise_distance_adaptive_avg_pool2d
+level: 4
+category: kernel_translation
+title: Fused Pairwise Distance Adaptive Avg Pool2D
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `fused_pairwise_distance_adaptive_avg_pool2d`.
+
+
+  Operator description:
+
+  This function applies adaptive average pooling to the input tensors `x1` and `x2` to resize them to
+  the specified `output_size`, and then computes the pairwise distance between the pooled outputs. The
+  function first applies `adaptive_avg_pool2d` to each input tensor, and then calculates the pairwise
+  distance using the specified norm `p`. A small value `eps` is added to avoid division by zero during
+  distance calculation. The function can also retain the reduced dimension of the output via the `keepdim`
+  parameter.
+
+
+  Target Python signature / call pattern:
+
+  def fused_pairwise_distance_adaptive_avg_pool2d(x1: torch.Tensor, x2: torch.Tensor, output_size: int
+  or tuple, p: float = 2.0, eps: float = 1e-6, keepdim: bool = False) -> torch.Tensor: x1 (Tensor): First
+  input tensor for adaptive average pooling and distance calculation. x2 (Tensor): Second input tensor
+  for adaptive average pooling and distance calculation. output_size (int or tuple): The target output
+  size for the adaptive average pooling. p (float, optional): The norm degree for pairwise distance calculation.
+  Default: 2.0 eps (float, optional): Small value to avoid division by zero in pairwise distance. Default:
+  1e-6 keepdim (bool, optional): Whether to keep the reduced dimension. Default: False
+
+
+  Mathematical definition:
+
+  No explicit formula provided. The function applies adaptive average pooling followed by pairwise distance
+  calculation with norm p and epsilon to avoid division by zero.
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  pooled_x1 = torch.nn.functional.adaptive_avg_pool2d(x1, output_size)
+
+  pooled_x2 = torch.nn.functional.adaptive_avg_pool2d(x2, output_size)
+
+  output = torch.nn.functional.pairwise_distance(pooled_x1, pooled_x2, p=p, eps=eps, keepdim=keepdim)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> x1 = torch.randn(4, 3, 32, 32)
+
+  >>> x2 = torch.randn(4, 3, 32, 32)
+
+  >>> output = fused_pairwise_distance_adaptive_avg_pool2d(x1, x2, output_size=(8, 8))
+
+  >>> print(output.shape)
+
+  torch.Size([4, 8, 8])
+
+
+  Additional constraints:
+
+  The function combines adaptive average pooling and pairwise distance calculation in a sequential manner.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 6
+  torch_cnt: 3
+  func_inputs: 'def fused_pairwise_distance_adaptive_avg_pool2d(x1: torch.Tensor, x2: torch.Tensor, output_size:
+    int or tuple, p: float = 2.0, eps: float = 1e-6, keepdim: bool = False) -> torch.Tensor: x1 (Tensor):
+    First input tensor for adaptive average pooling and distance calculation. x2 (Tensor): Second input
+    tensor for adaptive average pooling and distance calculation. output_size (int or tuple): The target
+    output size for the adaptive average pooling. p (float, optional): The norm degree for pairwise dist'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+- convolution
+- fused
+source:
+  channel: T
+  file: fused_pairwise_distance_adaptive_avg_pool2d.py
+  name: fused_pairwise_distance_adaptive_avg_pool2d
+  difficulty: '4'
+  params_cnt: 6
+  torch_cnt: 3
+gold_kernel: data/TritonBench_T_v1/fused_pairwise_distance_adaptive_avg_pool2d.py

@@ -1,0 +1,98 @@
+id: torch_special_polygamma
+level: 4
+category: kernel_translation
+title: Torch Special Polygamma
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.special.polygamma`.
+
+
+  Operator description:
+
+  Computes the n-th derivative of the digamma function on input. The function is implemented for nonnegative
+  integers n >= 0.
+
+
+  Target Python signature / call pattern:
+
+  def polygamma(n, input, *, out=None) -> Tensor: n (int): the order of the polygamma function; input
+  (Tensor): the input tensor.; out (Tensor, optional): the output tensor.
+
+
+  Mathematical definition:
+
+  \psi^{(n)}(x) = \frac{d^{(n)}}{dx^{(n)}} \psi(x)
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  torch.special.polygamma(1, a)
+
+  torch.special.polygamma(2, a)
+
+  torch.special.polygamma(3, a)
+
+  torch.special.polygamma(4, a)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> a = torch.tensor([1, 0.5])
+
+  >>> torch.special.polygamma(1, a)
+
+  tensor([1.64493, 4.9348])
+
+  >>> torch.special.polygamma(2, a)
+
+  tensor([ -2.4041, -16.8288])
+
+  >>> torch.special.polygamma(3, a)
+
+  tensor([ 6.4939, 97.4091])
+
+  >>> torch.special.polygamma(4, a)
+
+  tensor([ -24.8863, -771.4742])
+
+
+  Additional constraints:
+
+  Implemented only for nonnegative integers n >= 0.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 3
+  torch_cnt: 4
+  func_inputs: 'def polygamma(n, input, *, out=None) -> Tensor: n (int): the order of the polygamma function;
+    input (Tensor): the input tensor.; out (Tensor, optional): the output tensor.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags: []
+source:
+  channel: T
+  file: polygamma.py
+  name: torch.special.polygamma
+  difficulty: '4'
+  params_cnt: 3
+  torch_cnt: 4
+gold_kernel: data/TritonBench_T_v1/polygamma.py

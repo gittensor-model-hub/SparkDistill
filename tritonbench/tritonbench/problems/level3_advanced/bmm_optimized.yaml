@@ -1,0 +1,53 @@
+id: bmm_optimized
+level: 3
+category: kernel_generation
+title: Bmm Optimized
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `bmm_optimized.py` (repo: FlagOpen/FlagGems).\n\nTask description:\nThe provided Triton kernel\
+  \ `bmm_kernel` is designed to perform batched matrix multiplication on input tensors A and B, producing\
+  \ an output tensor O. This kernel is optimized for GPU execution, utilizing tiling and parallel processing.\n\
+  \        The key parameters include:\n        - `A`, `B`: Input tensors with shapes (batch, M, K) and\
+  \ (batch, K, N). These tensors are assumed to be contiguous in memory.\n        - `O`: Output tensor\
+  \ with shape (batch, M, N) where the result of the multiplication is stored.\n        - `M`, `N`, `K`:\
+  \ Dimensions representing the sizes of the matrices to be multiplied.\n        - `TILE_M`, `TILE_N`,\
+  \ `TILE_K`: Compile-time constants defining the tile sizes for the matrix multiplication. This tiling\
+  \ strategy divides the matrices into smaller blocks that can be processed in parallel.\n        - `GROUP_M`:\
+  \ Influences the order of computation across different tiles.\n        - `DIVISIBLE_M`, `DIVISIBLE_N`,\
+  \ `DIVISIBLE_K`: Compile-time booleans determining if the dimensions M, N, and K are perfectly divisible\
+  \ by the respective tile sizes, optimizing boundary handling.\n        \n        The kernel calculates\
+  \ grid indices and offsets for processing each tile. Masking is used to handle partial tiles when dimensions\
+  \ aren't perfectly divisible by tile sizes. The main computation involves loading tiles of A and B,\
+  \ performing a matrix multiplication using `tl.dot`, and accumulating the results into the output tile.\n\
+  \        \n        The `bmm` function is a wrapper that initializes the output tensor, determines grid\
+  \ dimensions based on input sizes, and launches the `bmm_kernel` using Triton's `autotune` to find optimal\
+  \ configurations for TILE_M, TILE_N, TILE_K, and other parameters. It ensures the correct execution\
+  \ context on the GPU device and calls the kernel with appropriate arguments.\n\nRequirements (SparkDistill\
+  \ / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer\
+  \ tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct\
+  \ boundary masking\n- Include @triton.autotune with at least 3 configs when tile sizes matter\n- Provide\
+  \ a Python launcher + grid and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot\
+  \ reductions\n- Print a short note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+source:
+  channel: G
+  file: bmm_optimized.py
+  repo: FlagOpen/FlagGems
+  difficulty: '3'
+  star: 347
+  simp_instru_len: 185
+  comp_instru_len: 439
+  output_triton_len: 2251
+gold_kernel: data/TritonBench_G_v1/bmm_optimized.py

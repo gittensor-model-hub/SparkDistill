@@ -1,0 +1,85 @@
+id: torch_sqrt
+level: 1
+category: kernel_translation
+title: Torch Sqrt
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.sqrt`.
+
+
+  Operator description:
+
+  Returns a new tensor with the square-root of the elements of the input tensor. It computes the square
+  root element-wise.
+
+
+  Target Python signature / call pattern:
+
+  sqrt(input, *, out=None) -> Tensor; Args: input (Tensor): the input tensor. Keyword args: out (Tensor,
+  optional): the output tensor.
+
+
+  Mathematical definition:
+
+  \text{out}_{i} = \sqrt{\text{input}_{i}}
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  torch.sqrt(a)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> a = torch.randn(4)
+
+  >>> a
+
+  tensor([-2.0755,  1.0226,  0.0831,  0.4806])
+
+  >>> torch.sqrt(a)
+
+  tensor([    nan,  1.0112,  0.2883,  0.6933])
+
+
+  Additional constraints:
+
+  The function can handle negative inputs, resulting in NaN for those elements.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 2
+  torch_cnt: 1
+  func_inputs: 'sqrt(input, *, out=None) -> Tensor; Args: input (Tensor): the input tensor. Keyword args:
+    out (Tensor, optional): the output tensor.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+source:
+  channel: T
+  file: sqrt.py
+  name: torch.sqrt
+  difficulty: '1'
+  params_cnt: 2
+  torch_cnt: 1
+gold_kernel: data/TritonBench_T_v1/sqrt.py

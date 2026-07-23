@@ -1,0 +1,51 @@
+id: flash_decode2_llama
+level: 3
+category: kernel_generation
+title: Flash Decode2 Llama
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `flash_decode2_llama.py` (repo: ModelTC/lightllm).\n\nTask description:\nThe `_fwd_kernel_flash_decode_stage2`\
+  \ is a Triton JIT-compiled kernel function designed to perform efficient tensor calculations for each\
+  \ batch and head within a defined grid. It processes two main input tensors, `Mid_O` and `Mid_O_LogExpSum`,\
+  \ using their strides and other inputs to compute and store results in the output tensor `O`. Key parameters\
+  \ include:\n            - `B_Seqlen`: Provides sequence lengths for the batches.\n            - `Mid_O`:\
+  \ A tensor of shape [batch, head, seq_block_num, head_dim] used in weighted sum calculations.\n    \
+  \        - `Mid_O_LogExpSum`: A tensor [batch, head, seq_block_num] storing log-exp sum values for each\
+  \ sequence block.\n            - `O`: A tensor [batch, head, head_dim] for storing the final accumulated\
+  \ and normalized output.\n            - Stride parameters for tensors ensure correct indexing: `stride_mid_ob`,\
+  \ `stride_mid_oh`, `stride_mid_os`, `stride_mid_od` for `Mid_O`, and similar for others.\n         \
+  \   - Constants `BLOCK_SEQ` and `BLOCK_DMODEL` define the block sizes for sequences and model dimensions,\
+  \ which guide iteration within the kernel.\n            The kernel uses a double loop: over sequence\
+  \ blocks to accumulate weighted values and a vectorized computation for efficiency. Inside the loop,\
+  \ it computes new logic values, scales existing accumulations, and adjusts for numerical stability.\
+  \ Finally, it normalizes the accumulation by the sum of exponentials and writes the result back to `O`.\
+  \ \n            The wrapper function `flash_decode_stage2` is a PyTorch-compatible function that sets\
+  \ up the computation grid and launches this kernel. It checks the compatibility of model dimensions\
+  \ (`Lk`) and passes the appropriate arguments to the kernel.\n\nRequirements (SparkDistill / TritonBench\
+  \ harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor\
+  \ over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include\
+  \ @triton.autotune with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid\
+  \ and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short\
+  \ note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- attention
+- elementwise
+- reduction
+source:
+  channel: G
+  file: flash_decode2_llama.py
+  repo: ModelTC/lightllm
+  difficulty: '3'
+  star: 2647
+  simp_instru_len: 203
+  comp_instru_len: 434
+  output_triton_len: 987
+gold_kernel: data/TritonBench_G_v1/flash_decode2_llama.py

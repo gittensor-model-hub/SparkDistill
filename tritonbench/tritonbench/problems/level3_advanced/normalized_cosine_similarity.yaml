@@ -1,0 +1,117 @@
+id: normalized_cosine_similarity
+level: 3
+category: kernel_translation
+title: Normalized Cosine Similarity
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `normalized_cosine_similarity`.
+
+
+  Operator description:
+
+  Computes the cosine similarity between two normalized input tensors `x1` and `x2`. This function normalizes
+  `x1` and `x2` along a specified dimension using L_p normalization, and subsequently calculates the cosine
+  similarity between these normalized tensors along the specified dimension. This involves ensuring vectors
+  are scaled to avoid division by zero by introducing small epsilon values both during normalization and
+  similarity computation.
+
+
+  Target Python signature / call pattern:
+
+  def normalized_cosine_similarity(x1: Tensor, x2: Tensor, dim: int = 1, eps_similarity: float = 1e-8,
+  p_norm: float = 2, eps_norm: float = 1e-12) -> Tensor
+
+
+  Mathematical definition:
+
+  The operation is defined as:
+
+
+  similarity = \frac{\text{normalize}(x1) \cdot \text{normalize}(x2)}{\max(\lVert \text{normalize}(x1)
+  \Vert _2, \epsilon) \cdot \max(\lVert \text{normalize}(x2) \Vert _2, \epsilon)}
+
+
+  where the `normalize` function is defined as:
+
+
+  v = \frac{v}{\max(\lVert v \rVert_p, \epsilon)}.
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  torch.nn.functional.normalize(x1, p=p_norm, dim=dim, eps=eps_norm)
+
+  torch.nn.functional.normalize(x2, p=p_norm, dim=dim, eps=eps_norm)
+
+  torch.nn.functional.cosine_similarity(x1_normalized, x2_normalized, dim=dim, eps=eps_similarity)
+
+  ```
+
+
+  Example / usage notes:
+
+  import torch
+
+  import torch.nn.functional as F
+
+  # Define two input tensors
+
+  x1 = torch.randn(100, 128)
+
+  x2 = torch.randn(100, 128)
+
+  # Compute normalized cosine similarity
+
+  result = normalized_cosine_similarity(x1, x2)
+
+  result.shape
+
+  # Adjust norms and epsilon for cosine similarity calculation
+
+  result = normalized_cosine_similarity(x1, x2, dim=0, p_norm=1, eps_similarity=1e-5)
+
+  result.shape
+
+
+  Additional constraints:
+
+  The function allows broadcasting x2 to match x1''s shape. Default values are provided for dimension,
+  normalization, and similarity thresholds to enhance robustness against division by zero.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 6
+  torch_cnt: 3
+  func_inputs: 'def normalized_cosine_similarity(x1: Tensor, x2: Tensor, dim: int = 1, eps_similarity:
+    float = 1e-8, p_norm: float = 2, eps_norm: float = 1e-12) -> Tensor'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+source:
+  channel: T
+  file: normalized_cosine_similarity.py
+  name: normalized_cosine_similarity
+  difficulty: '3'
+  params_cnt: 6
+  torch_cnt: 3
+gold_kernel: data/TritonBench_T_v1/normalized_cosine_similarity.py

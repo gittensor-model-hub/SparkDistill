@@ -1,0 +1,71 @@
+id: relu_max_pool2d_conv2d
+level: 4
+category: kernel_translation
+title: Relu Max Pool2D Conv2D
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `relu_max_pool2d_conv2d`.\n\
+  \nOperator description:\nApplies a 2D convolution over the input tensor, followed by max pooling and\
+  \ then applies the ReLU activation function element-wise to the pooled result. This combined operation\
+  \ is often used in convolutional neural networks (CNNs) for feature extraction, downsampling, and adding\
+  \ non-linearity.\n\nTarget Python signature / call pattern:\nrelu_max_pool2d_conv2d(input, weight, bias=None,\
+  \ conv_stride=1, conv_padding=0, conv_dilation=1, conv_groups=1, pool_kernel_size=2, pool_stride=None,\
+  \ pool_padding=0, pool_dilation=1, pool_ceil_mode=False, inplace=False) -> Tensor: input (Tensor): The\
+  \ input tensor of shape `(minibatch, in_channels, iH, iW)`. weight (Tensor): The convolution filters\
+  \ of shape `(out_channels, in_channels / groups, kH, kW)`. bias (Tensor, optional): Optional bias tensor\
+  \ of shape `(out_channels)`. Default: None. conv_stride (int or tuple, optional): The stride of the\
+  \ convolution kernel. Default: 1. conv_padding (int, tuple, or string, optional): Padding added to all\
+  \ sides of the input in convolution. Default: 0. conv_dilation (int or tuple, optional): The spacing\
+  \ between kernel elements in convolution. Default: 1. conv_groups (int, optional): Number of blocked\
+  \ connections from input channels to output channels in convolution. Default: 1. pool_kernel_size (int\
+  \ or tuple): The size of the pooling region in max pooling. pool_stride (int or tuple, optional): The\
+  \ stride of the pooling operation. Default: `pool_kernel_size`. pool_padding (int or tuple, optional):\
+  \ Padding added to all sides of the input in max pooling. Default: 0. pool_dilation (int or tuple, optional):\
+  \ The stride between elements within a sliding window in max pooling. Default: 1. pool_ceil_mode (bool,\
+  \ optional): If True, uses `ceil` instead of `floor` to compute output shape. Default: False. inplace\
+  \ (bool, optional): If True, performs ReLU in-place. Default: False.\n\nMathematical definition:\n\\\
+  text{out} = \\text{ReLU}(\\text{MaxPool2D}(\\text{conv2d}(\\text{input})))\n\nwhere the ReLU function\
+  \ is applied element-wise as:\n\n    \\text{ReLU}(x) = \\max(0, x)\n\nPyTorch reference snippet:\n```python\n\
+  conv_result = torch.nn.functional.conv2d(input, weight, bias=bias, stride=conv_stride, padding=conv_padding,\
+  \ dilation=conv_dilation, groups=conv_groups)\npooled_result = torch.nn.functional.max_pool2d(conv_result,\
+  \ kernel_size=pool_kernel_size, stride=pool_stride, padding=pool_padding, dilation=pool_dilation, ceil_mode=pool_ceil_mode)\n\
+  return torch.nn.functional.relu(pooled_result, inplace=inplace)\n```\n\nExample / usage notes:\n>>>\
+  \ import torch\n>>> import torch.nn.functional as F\n>>> # Define input tensor and filters\n>>> inputs\
+  \ = torch.randn(1, 3, 32, 32)  # (batch, channels, height, width)\n>>> filters = torch.randn(6, 3, 5,\
+  \ 5)   # (out_channels, in_channels, kH, kW)\n>>> # Apply relu_max_pool2d_conv2d with conv_padding and\
+  \ pool_kernel_size\n>>> result = relu_max_pool2d_conv2d(inputs, filters, conv_padding=2, pool_kernel_size=2)\n\
+  >>> result.shape\ntorch.Size([1, 6, 16, 16])\n\n>>> # Apply relu_max_pool2d_conv2d with custom conv_stride\
+  \ and pool_stride\n>>> result = relu_max_pool2d_conv2d(inputs, filters, conv_stride=2, pool_kernel_size=3,\
+  \ pool_stride=2)\n>>> result.shape\ntorch.Size([1, 6, 8, 8])\n\nAdditional constraints:\nThe function\
+  \ is typically used in CNNs.\n\nRequirements (SparkDistill / TritonBench harness):\n- Translate the\
+  \ PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics: include torch.allclose\
+  \ vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor\
+  \ over tl.make_block_ptr\n- Add @triton.autotune when there are meaningful tile/block choices\n- Provide\
+  \ a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 11
+  torch_cnt: 3
+  func_inputs: 'relu_max_pool2d_conv2d(input, weight, bias=None, conv_stride=1, conv_padding=0, conv_dilation=1,
+    conv_groups=1, pool_kernel_size=2, pool_stride=None, pool_padding=0, pool_dilation=1, pool_ceil_mode=False,
+    inplace=False) -> Tensor: input (Tensor): The input tensor of shape `(minibatch, in_channels, iH,
+    iW)`. weight (Tensor): The convolution filters of shape `(out_channels, in_channels / groups, kH,
+    kW)`. bias (Tensor, optional): Optional bias tensor of shape `(out_channels)`. Default: None. conv_'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+- convolution
+source:
+  channel: T
+  file: relu_max_pool2d_conv2d.py
+  name: relu_max_pool2d_conv2d
+  difficulty: '4'
+  params_cnt: 11
+  torch_cnt: 3
+gold_kernel: data/TritonBench_T_v1/relu_max_pool2d_conv2d.py

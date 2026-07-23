@@ -1,0 +1,79 @@
+id: cos_signbit
+level: 1
+category: kernel_translation
+title: Cos Signbit
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `cos_signbit`.
+
+
+  Operator description:
+
+  Computes the cosine of each element in the input tensor, followed by determining the sign bit for each
+  cosine result, indicating if it is positive or negative.
+
+
+  Target Python signature / call pattern:
+
+  def cos_signbit(input: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]: Args: input (Tensor): The
+  input tensor for which the cosine and sign bit are computed.
+
+
+  Mathematical definition:
+
+  \text{cos\_result} = \cos(\text{input}) \text{sign\_bit} = \text{signbit}(\text{cos\_result})
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  cos_result = torch.cos(input) sign_bit = torch.signbit(cos_result)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> a = torch.tensor([1.4309, 1.2706, -0.8562, 0.9796]) >>> cos_result, sign_bit = cos_signbit(a) >>>
+  cos_result tensor([ 0.1395,  0.2957,  0.6553,  0.5574]) >>> sign_bit tensor([False, False, False, False])
+
+
+  Additional constraints:
+
+  Returns a tuple containing the cosine of each element and a boolean tensor indicating the sign bit of
+  each cosine result.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 1
+  torch_cnt: 2
+  func_inputs: 'def cos_signbit(input: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]: Args: input
+    (Tensor): The input tensor for which the cosine and sign bit are computed.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- reduction
+source:
+  channel: T
+  file: cos_signbit.py
+  name: cos_signbit
+  difficulty: '1'
+  params_cnt: 1
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/cos_signbit.py

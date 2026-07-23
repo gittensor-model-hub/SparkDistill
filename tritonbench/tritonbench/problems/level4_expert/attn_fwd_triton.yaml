@@ -1,0 +1,53 @@
+id: attn_fwd_triton
+level: 4
+category: kernel_generation
+title: Attn Fwd Triton
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `attn_fwd_triton.py` (repo: thu-ml/SageAttention).\n\nTask description:\nThe provided code implements\
+  \ a Triton-based kernel to efficiently compute the forward pass of the attention mechanism, a core component\
+  \ of Transformer models. The central routine `forward(q, k, v, q_scale, k_scale)` utilizes this kernel\
+  \ to apply attention across query (`q`), key (`k`), and value (`v`) matrices with respective scaling\
+  \ factors (`q_scale`, `k_scale`). It creates an empty output tensor `o` to store the results.\n\n  \
+  \          The kernel `_attn_fwd` is invoked with a specific grid configuration that distributes computation\
+  \ across blocks. It processes segments of the input matrices defined by `BLOCK_M` and `BLOCK_N`, effectively\
+  \ handling different stages of the attention mechanism. The kernel reads slices of the input matrices\
+  \ into shared memory, computes scaled dot-products between queries and keys, applies exponential scaling\
+  \ to derive attention weights, and finally aggregates these weights to produce the attention output\
+  \ using the loaded value matrix.\n\n            The `_attn_fwd_inner` function operates in multiple\
+  \ stages based on the `STAGE` parameter, designed to progressively refine the attention computation\
+  \ by adjusting scores, applying softmax transformations, and accumulating results into the `acc` tensor.\
+  \ Each iteration dynamically updates scaling offsets and memory pointers, ensuring proper alignment\
+  \ and data coherence for efficient processing.\n\n            In summary, this implementation harnesses\
+  \ the capabilities of Triton to parallelize the attention computation, crucial for optimizing the performance\
+  \ of models reliant on self-attention mechanisms.\n\nRequirements (SparkDistill / TritonBench harness):\n\
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor\
+  \ over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include\
+  \ @triton.autotune with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid\
+  \ and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short\
+  \ note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- attention
+- matmul
+- softmax
+- rope
+- elementwise
+- reduction
+source:
+  channel: G
+  file: attn_fwd_triton.py
+  repo: thu-ml/SageAttention
+  difficulty: '4'
+  star: 600
+  simp_instru_len: 220
+  comp_instru_len: 333
+  output_triton_len: 2323
+gold_kernel: data/TritonBench_G_v1/attn_fwd_triton.py

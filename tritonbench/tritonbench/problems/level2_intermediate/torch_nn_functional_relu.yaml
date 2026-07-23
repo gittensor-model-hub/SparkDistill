@@ -1,0 +1,46 @@
+id: torch_nn_functional_relu
+level: 2
+category: kernel_translation
+title: Torch Nn Functional Relu
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.nn.functional.relu`.\n\
+  \nOperator description:\nApplies the rectified linear unit function element-wise. This operation compares\
+  \ each element in the input tensor to zero and returns the element itself if it is greater than zero\
+  \ or zero otherwise. The operation can be performed in-place, modifying the input tensor directly if\
+  \ inplace=True.\n\nTarget Python signature / call pattern:\nrelu(input, inplace=False) -> Tensor\n\n\
+  Args:\n    inplace: can optionally do the operation in-place. Default: False\n\nShape:\n    - Input:\
+  \ (*), where * means any number of dimensions.\n    - Output: (*), same shape as the input.\n\nMathematical\
+  \ definition:\nReLU(x) = (x)^+ = max(0, x)\n\nPyTorch reference snippet:\n```python\ntorch.nn.functional.relu(input,\
+  \ inplace=False)\n```\n\nExample / usage notes:\n>>> m = nn.ReLU()\n>>> input = torch.randn(2)\n>>>\
+  \ output = m(input)\nAn implementation of CReLU - https://arxiv.org/abs/1603.05201\n>>> m = nn.ReLU()\n\
+  >>> input = torch.randn(2).unsqueeze(0)\n>>> output = torch.cat((m(input), m(-input)))\n\nAdditional\
+  \ constraints:\nSee torch.nn.ReLU for more details.\n\nRequirements (SparkDistill / TritonBench harness):\n\
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics:\
+  \ include torch.allclose vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary\
+  \ masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n- Add @triton.autotune when there\
+  \ are meaningful tile/block choices\n- Provide a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 2
+  torch_cnt: 1
+  func_inputs: "relu(input, inplace=False) -> Tensor\n\nArgs:\n    inplace: can optionally do the operation\
+    \ in-place. Default: False\n\nShape:\n    - Input: (*), where * means any number of dimensions.\n\
+    \    - Output: (*), same shape as the input."
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+source:
+  channel: T
+  file: relu.py
+  name: torch.nn.functional.relu
+  difficulty: '2'
+  params_cnt: 2
+  torch_cnt: 1
+gold_kernel: data/TritonBench_T_v1/relu.py

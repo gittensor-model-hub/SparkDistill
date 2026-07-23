@@ -1,0 +1,61 @@
+id: index_select_bwd
+level: 2
+category: kernel_generation
+title: Index Select Bwd
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `index_select_bwd.py` (repo: facebookresearch/xformers).
+
+
+  Task description:
+
+  The provided code implements a Triton kernel `index_select_cat_bwd_kernel` and a Python wrapper function
+  `index_select_cat_bwd` to handle the backward operation of index selection followed by concatenation.
+  The function `index_select_cat_bwd` is used in a deep learning context where the forward operation involves
+  selecting certain rows from a source tensor (potentially using concatenation of results from multiple
+  selections) based on the indices provided. The backward operation, therefore, needs to compute the gradient
+  of the source tensor by redistributing the gradient received from the output (`grad_output`) back into
+  the positions specified by `index` within `grad_source`. The Triton kernel processes the data in a grid
+  layout, with the axes of the grid defined by `BLOCK_SIZE_INDEX` and `BLOCK_SIZE_COL`, ensuring parallel
+  computation. The function also includes extensive checks for tensor compatibility, ensuring that the
+  inputs are 2D, CUDA-based, and have appropriate matching strides. The grid configuration is dynamically
+  determined to cover all indices and columns of the inputs.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: G
+  file: index_select_bwd.py
+  repo: facebookresearch/xformers
+  difficulty: '3'
+  star: 8708
+  simp_instru_len: 157
+  comp_instru_len: 242
+  output_triton_len: 1272
+gold_kernel: data/TritonBench_G_v1/index_select_bwd.py

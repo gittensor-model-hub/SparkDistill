@@ -1,0 +1,63 @@
+id: destindex_copy_kv2
+level: 2
+category: kernel_generation
+title: Destindex Copy Kv2
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `destindex_copy_kv2.py` (repo: S-LoRA/S-LoRA).
+
+
+  Task description:
+
+  The provided Triton kernel function `_fwd_kernel_destindex_copy_kv` is a GPU-accelerated operation designed
+  to perform indexed copying of tensor data from `K` to `Out`, directed by indices specified in `Dest_loc`.
+  The function is invoked over a grid of size equal to `seq_len`, derived from the size of `Dest_loc`.
+  The main computation leverages Triton''s parallel execution model by determining the current index using
+  `tl.program_id(0)`. It constructs pointers for both source (`k_ptrs`) and destination (`o_ptrs`) using
+  tensor strides for batch size, head, and depth dimensions. The load operation is masked by `offs_h`
+  to ensure it stays within the valid `head_num` range. The wrapper function `destindex_copy_kv` sets
+  kernel parameters such as strides and grid configuration, validating that the tensor shapes of `K` and
+  `Out` align. It computes `BLOCK_HEAD` to be the next power of 2 of `head_num` for performance optimization,
+  using Triton''s utility function. The kernel is executed with a single warp, suitable for the problem
+  size, and encapsulates the entire logic for transferring indexed data based on head and depth dimensions.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+source:
+  channel: G
+  file: destindex_copy_kv2.py
+  repo: S-LoRA/S-LoRA
+  difficulty: '2'
+  star: 1760
+  simp_instru_len: 194
+  comp_instru_len: 283
+  output_triton_len: 631
+gold_kernel: data/TritonBench_G_v1/destindex_copy_kv2.py

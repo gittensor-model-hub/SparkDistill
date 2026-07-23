@@ -1,0 +1,22 @@
+id: dtype_mismatch_store
+level: bugfix
+category: kernel_debugging
+title: Store FP32 Acc into FP16 Pointer Without Cast
+prompt: Kernel accumulates in fp32 but stores into an fp16 tensor without casting. Fix dtype handling.
+input_code: "@triton.jit\ndef saxpy_kernel(x_ptr, y_ptr, out_ptr, a, n, BLOCK: tl.constexpr):\n    offs\
+  \ = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)\n    mask = offs < n\n    x = tl.load(x_ptr + offs,\
+  \ mask=mask).to(tl.float32)\n    y = tl.load(y_ptr + offs, mask=mask).to(tl.float32)\n    acc = a *\
+  \ x + y\n    tl.store(out_ptr + offs, acc, mask=mask)\n"
+expected_fix: Cast accumulator with .to(tl.float16) before store
+required_patterns:
+- '@triton.jit'
+tags:
+- debugging
+- dtype
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+source:
+  channel: synthetic
+  file: dtype_mismatch_store.py
+  difficulty: bugfix

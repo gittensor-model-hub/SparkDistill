@@ -1,0 +1,66 @@
+id: rmsnorm_fused_llama
+level: 4
+category: kernel_generation
+title: Rmsnorm Fused Llama
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `rmsnorm_fused_llama.py` (repo: S-LoRA/S-LoRA).
+
+
+  Task description:
+
+  The ''rmsnorm_forward'' function performs Root Mean Square (RMS) normalization on an input tensor using
+  a custom Triton kernel, ''_rms_norm_fwd_fused''. The inputs are ''x'', a PyTorch tensor with arbitrary
+  dimensions, and ''weight'', a tensor of the same size as the last dimension of ''x'' for element-wise
+  multiplication after normalization. It outputs ''y'', which is a tensor of the same shape as ''x''.
+  Inside the Triton kernel, ''_rms_norm_fwd_fused'', the function is mapped to each row of the input ''X''.
+  It calculates the variance by loading input elements in blocks of size ''BLOCK_SIZE'', summing their
+  squares, and averaging over the number of columns ''N''. The reciprocal standard deviation (rstd) is
+  computed to normalize each element of the input tensor. The normalized values are then multiplied by
+  the corresponding elements of ''weight'' and stored in the output tensor ''Y''. The operation is conditioned
+  to handle edge cases when the number of columns is not a perfect multiple of ''BLOCK_SIZE'' using masking.
+  Additionally, the ''rmsnorm_forward'' function includes heuristics for deciding the number of Triton
+  warps, managing feature size constraints, and arranging the data for efficient kernel execution.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- matmul
+- normalization
+- elementwise
+- reduction
+- fused
+source:
+  channel: G
+  file: rmsnorm_fused_llama.py
+  repo: S-LoRA/S-LoRA
+  difficulty: '3'
+  star: 1760
+  simp_instru_len: 146
+  comp_instru_len: 291
+  output_triton_len: 777
+gold_kernel: data/TritonBench_G_v1/rmsnorm_fused_llama.py

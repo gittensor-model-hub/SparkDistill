@@ -1,0 +1,54 @@
+id: fused_repeat_interleave_log_softmax
+level: 3
+category: kernel_translation
+title: Fused Repeat Interleave Log Softmax
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `fused_repeat_interleave_log_softmax`.\n\
+  \nOperator description:\nPerforms a fused operation combining element-wise repeat interleave and log-softmax\
+  \ activation. First, the input tensor is repeated along the specified dimension according to the values\
+  \ in 'repeats'. Then, a log-softmax activation is applied to the repeated tensor along the specified\
+  \ dimension. This function is differentiable and supports autograd for gradient computation, making\
+  \ it useful for backpropagation in neural networks.\n\nTarget Python signature / call pattern:\nfused_repeat_interleave_log_softmax(input,\
+  \ repeats, dim=None, *, output_size=None, dtype=None, out=None) -> Tensor\n\nMathematical definition:\n\
+  Given an input tensor X and repeats r, the function computes: 1. Repeat Interleave: The input tensor\
+  \ is repeated along the specified dimension: Y = repeat_interleave(X, r, dim). 2. Log-Softmax Activation:\
+  \ The log-softmax function is applied to the repeated tensor along the specified dimension: Z_i = log(\
+  \ exp(Y_i) / sum_j exp(Y_j) ) where the summation is over the specified dimension.\n\nPyTorch reference\
+  \ snippet:\n```python\nrepeated = torch.repeat_interleave(input, repeats, dim=dim, output_size=output_size)\n\
+  output = torch.nn.functional.log_softmax(repeated, dim=dim, dtype=dtype)\nif out is not None:\n    out.copy_(output)\n\
+  \    return out\nreturn output\n```\n\nExample / usage notes:\nimport torch\nimport torch.nn.functional\
+  \ as F\n\nx = torch.tensor([1.0, 2.0, 3.0])\nrepeats = 2\noutput = fused_repeat_interleave_log_softmax(x,\
+  \ repeats)\nprint('Output:')\nprint(output)\n# Output:\n# tensor([-2.4076, -2.4076, -1.4076, -1.4076,\
+  \ -0.4076, -0.4076])\n\nAdditional constraints:\nThe 'repeats' parameter controls how many times each\
+  \ element is repeated along the specified dimension. The 'dim' parameter specifies the dimension along\
+  \ which to repeat and apply log-softmax. If 'dim' is None, the input is flattened before repeating.\
+  \ All operations are differentiable and support backpropagation.\n\nRequirements (SparkDistill / TritonBench\
+  \ harness):\n- Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve\
+  \ numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit\
+  \ + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n- Add @triton.autotune\
+  \ when there are meaningful tile/block choices\n- Provide a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 6
+  torch_cnt: 2
+  func_inputs: fused_repeat_interleave_log_softmax(input, repeats, dim=None, *, output_size=None, dtype=None,
+    out=None) -> Tensor
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- softmax
+- elementwise
+- reduction
+- fused
+source:
+  channel: T
+  file: fused_repeat_interleave_log_softmax.py
+  name: fused_repeat_interleave_log_softmax
+  difficulty: '3'
+  params_cnt: 6
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/fused_repeat_interleave_log_softmax.py

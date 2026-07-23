@@ -1,0 +1,104 @@
+id: dropout_relu_batch_norm_conv2d
+level: 2
+category: kernel_translation
+title: Dropout Relu Batch Norm Conv2D
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `dropout_relu_batch_norm_conv2d`.
+
+
+  Operator description:
+
+  Applies a 2D convolution followed by batch normalization, ReLU activation, and dropout. Sequentially
+  applies conv2d, batch normalization for stabilizing training and reducing internal covariate shift,
+  ReLU activation function, and dropout where some elements of the tensor are randomly zeroed with probability
+  `p`.
+
+
+  Target Python signature / call pattern:
+
+  dropout_relu_batch_norm_conv2d(input: torch.Tensor, weight: torch.Tensor, bias=None, stride=1, padding=0,
+  dilation=1, groups=1, p=0.5, training=True, inplace=False) -> torch.Tensor; Args: input (Tensor): Input
+  tensor of shape \(N, C_{in}, H, W\). weight (Tensor): Convolution filters of shape \(C_{out}, C_{in}
+  / \text{groups}, kH, kW\). bias (Tensor, optional): Bias tensor of shape \(C_{out}\). Default is None.
+  stride (int or tuple, optional): Stride of the convolution. Default: 1 padding (int, tuple, or str,
+  optional): Implicit padding on both sides of the input. Default: 0 dilation (int or tuple, optional):
+  Spacing between kernel elements. Default: 1 groups (int, optional): Number of blocked connections from
+  input channels to output channels. Default: 1 p (float, optional): Probability of an element to be zeroed
+  in dropout. Default: 0.5 training (bool, optional): If True, applies dropout during training. Default:
+  True inplace (bool, optional): If True, performs the operation in-place. Default: False
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  x = torch.nn.functional.conv2d(input, weight, bias, stride, padding, dilation, groups)
+
+  x = torch.nn.functional.batch_norm(x, running_mean=None, running_var=None, training=training)
+
+  x = torch.nn.functional.relu(x, inplace=inplace)
+
+  x = torch.nn.functional.dropout(x, p=p, training=training, inplace=inplace)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> input = torch.randn(1, 4, 8, 8)
+
+  >>> weight = torch.randn(8, 4, 3, 3)
+
+  >>> output = dropout_relu_batch_norm_conv2d(input, weight, stride=1, padding=1, p=0.5, training=True)
+
+  >>> output.shape
+
+  torch.Size([1, 8, 8, 8])
+
+
+  Additional constraints:
+
+  Output tensor is returned after applying conv2d, batch normalization, ReLU, and dropout.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 9
+  torch_cnt: 4
+  func_inputs: 'dropout_relu_batch_norm_conv2d(input: torch.Tensor, weight: torch.Tensor, bias=None, stride=1,
+    padding=0, dilation=1, groups=1, p=0.5, training=True, inplace=False) -> torch.Tensor; Args: input
+    (Tensor): Input tensor of shape \(N, C_{in}, H, W\). weight (Tensor): Convolution filters of shape
+    \(C_{out}, C_{in} / \text{groups}, kH, kW\). bias (Tensor, optional): Bias tensor of shape \(C_{out}\).
+    Default is None. stride (int or tuple, optional): Stride of the convolution. Default: 1 padding (int,
+    t'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- normalization
+- elementwise
+- reduction
+- convolution
+- dropout
+source:
+  channel: T
+  file: dropout_relu_batch_norm_conv2d.py
+  name: dropout_relu_batch_norm_conv2d
+  difficulty: '3'
+  params_cnt: 9
+  torch_cnt: 4
+gold_kernel: data/TritonBench_T_v1/dropout_relu_batch_norm_conv2d.py

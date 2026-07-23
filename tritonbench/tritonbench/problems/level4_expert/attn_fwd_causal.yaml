@@ -1,0 +1,64 @@
+id: attn_fwd_causal
+level: 4
+category: kernel_generation
+title: Attn Fwd Causal
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `attn_fwd_causal.py` (repo: thu-ml/SageAttention).\n\nTask description:\nThe Triton-based kernel\
+  \ performs a forward pass of a blockwise attention mechanism, specifically designed to handle the query\
+  \ (Q), key (K), and value (V) matrices in blocks for efficient computation on GPUs.\n\n            -\
+  \ Function `_attn_fwd_inner(acc, l_i, m_i, q, q_scale, K_ptrs, K_scale_ptr, V_ptrs, start_m, BLOCK_M,\
+  \ HEAD_DIM, BLOCK_N, STAGE, offs_m, offs_n, N_CTX)`:\n              This function executes the core\
+  \ attention mechanism in two main stages depending on the STAGE parameter. In STAGE 1, it initializes\
+  \ by loading key vectors (k) and their scaling factors (k_scale). It computes the dot product of Q and\
+  \ K, applies scaling, and manages masking for handling causal attention. In both stages, it uses exponential\
+  \ operations to perform the softmax calculation in a numerically stable manner by leveraging maximum\
+  \ value adjustment (m_ij). It accumulates the weighted value vectors to compute the attention output.\n\
+  \n            - Function `_attn_fwd(Q, K, V, Q_scale, K_scale, Out, stride_qz, stride_qh, stride_qm,\
+  \ stride_qk, stride_kz, stride_kh, stride_kn, stride_kk, stride_vz, stride_vh, stride_vk, stride_vn,\
+  \ stride_oz, stride_oh, stride_om, stride_on, Z, H, N_CTX, HEAD_DIM, BLOCK_M, BLOCK_N, STAGE)`:\n  \
+  \            This function sets up the parameters for block processing and handles the execution logic\
+  \ of the forward pass by allocating memory pointers, computing required indices, and setting up the\
+  \ grid for parallel execution using the Triton programming model. It computes linear indices for each\
+  \ block based on offsets calculated from tensor strides, invokes `_attn_fwd_inner` to perform blockwise\
+  \ computation of attention scores, and stores the results back into the output tensor.\n\n         \
+  \   - Function `forward(q, k, v, q_scale, k_scale)`:\n              This acts as a wrapper function\
+  \ to manage inputs and invoke the Triton kernel `_attn_fwd`. It determines the dimensions of the input\
+  \ tensors, configures the grid for kernel launch, and calls `_attn_fwd` with the appropriate settings.\
+  \ It ensures that inputs are appropriately batched and shaped to match the expected dimensions, manages\
+  \ output allocation, and performs assertions to guarantee consistency across input feature dimensions.\n\
+  \n            The kernel is optimized for parallel execution by leveraging Triton’s capabilities to\
+  \ handle complex memory access patterns and perform efficient tensor computations in a blockwise manner.\
+  \ Key parameters such as BLOCK_M and BLOCK_N determine the block size, while HEAD_DIM specifies the\
+  \ feature dimensionality in attention computation. The entire setup enables efficient processing of\
+  \ sequences within attention mechanisms typically used in transformer models.\n\nRequirements (SparkDistill\
+  \ / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer\
+  \ tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct\
+  \ boundary masking\n- Include @triton.autotune with at least 3 configs when tile sizes matter\n- Provide\
+  \ a Python launcher + grid and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot\
+  \ reductions\n- Print a short note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- attention
+- matmul
+- softmax
+- elementwise
+- reduction
+source:
+  channel: G
+  file: attn_fwd_causal.py
+  repo: thu-ml/SageAttention
+  difficulty: '4'
+  star: 600
+  simp_instru_len: 353
+  comp_instru_len: 669
+  output_triton_len: 2328
+gold_kernel: data/TritonBench_G_v1/attn_fwd_causal.py

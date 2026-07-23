@@ -1,0 +1,61 @@
+id: combined_activation
+level: 2
+category: kernel_translation
+title: Combined Activation
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `combined_activation`.\n\
+  \nOperator description:\nPerforms a sequence of operations combining matrix multiplication, sigmoid,\
+  \ tanh, element-wise multiplication, and addition. It supports batches of inputs, where any leading\
+  \ batch dimensions in `input` will be preserved in the output. The function's operations are differentiable\
+  \ and support autograd. The function ensures the dimensions of `input` and `weight1` are compatible\
+  \ for matrix multiplication, and that `weight2` and `bias` are broadcastable to the shape of the output\
+  \ tensor.\n\nTarget Python signature / call pattern:\ncombined_activation(input, weight1, weight2, bias,\
+  \ *, out=None) -> Tensor; input (Tensor): Input tensor of shape (*, N, D_{in}), where * denotes any\
+  \ number of batch dimensions.; weight1 (Tensor): Weight matrix of shape (D_{in}, D_{out}).; weight2\
+  \ (Tensor): Weight tensor for element-wise multiplication, must be broadcastable to the shape of the\
+  \ intermediate activation.; bias (Tensor): Bias tensor, must be broadcastable to the shape of the output.;\
+  \ out (Tensor, optional): Output tensor. Ignored if `None`. Default: `None`.\n\nMathematical definition:\n\
+  Given an input tensor X, weight matrices W_1 and W_2, and a bias b, the function computes: Y = (tanh(sigmoid(X\
+  \ W_1)) ⊙ W_2) + b\n\n- σ(z) = 1 / (1 + exp(-z)) is the sigmoid function applied element-wise.\n- tanh(z)\
+  \ = (exp(z) - exp(-z)) / (exp(z) + exp(-z)) is the hyperbolic tangent function applied element-wise.\n\
+  - ⊙ denotes element-wise multiplication.\n\nPyTorch reference snippet:\n```python\ntorch.mm, torch.sigmoid,\
+  \ torch.tanh, torch.mul, torch.add\n```\n\nExample / usage notes:\n```python\nimport torch\nimport torch.nn.functional\
+  \ as F\n\ndef combined_activation(input, weight1, weight2, bias, *, out=None):\n    z = torch.mm(input,\
+  \ weight1)\n    s = torch.sigmoid(z)\n    t = torch.tanh(s)\n    m = t * weight2\n    y = m + bias\n\
+  \    if out is not None:\n        out.copy_(y)\n        return out\n    return y\n\n# Example usage\n\
+  N, D_in, D_out = 5, 10, 3\ninput = torch.randn(N, D_in)\nweight1 = torch.randn(D_in, D_out)\nweight2\
+  \ = torch.randn(D_out)        # Must be broadcastable to (N, D_out)\nbias = torch.randn(D_out)     \
+  \      # Must be broadcastable to (N, D_out)\n\noutput = combined_activation(input, weight1, weight2,\
+  \ bias)\nprint(\"Output shape:\", output.shape)\n# Output shape: torch.Size([5, 3])\n```\n\nAdditional\
+  \ constraints:\nThe function supports differentiable operations and autograd. It requires compatibility\
+  \ in dimensions for matrix multiplication and broadcasting for element-wise operations.\n\nRequirements\
+  \ (SparkDistill / TritonBench harness):\n- Translate the PyTorch reference into Triton 3.7.1 kernels\
+  \ for Blackwell SM120\n- Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate\
+  \ for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n\
+  - Add @triton.autotune when there are meaningful tile/block choices\n- Provide a launcher and a small\
+  \ self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 5
+  torch_cnt: 5
+  func_inputs: 'combined_activation(input, weight1, weight2, bias, *, out=None) -> Tensor; input (Tensor):
+    Input tensor of shape (*, N, D_{in}), where * denotes any number of batch dimensions.; weight1 (Tensor):
+    Weight matrix of shape (D_{in}, D_{out}).; weight2 (Tensor): Weight tensor for element-wise multiplication,
+    must be broadcastable to the shape of the intermediate activation.; bias (Tensor): Bias tensor, must
+    be broadcastable to the shape of the output.; out (Tensor, optional): Output tensor. Ignored if'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+source:
+  channel: T
+  file: combined_activation.py
+  name: combined_activation
+  difficulty: '3'
+  params_cnt: 5
+  torch_cnt: 5
+gold_kernel: data/TritonBench_T_v1/combined_activation.py

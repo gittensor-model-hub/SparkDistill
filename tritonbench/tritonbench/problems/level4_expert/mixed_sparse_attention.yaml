@@ -1,0 +1,65 @@
+id: mixed_sparse_attention
+level: 4
+category: kernel_generation
+title: Mixed Sparse Attention
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `mixed_sparse_attention.py` (repo: microsoft/MInference).
+
+
+  Task description:
+
+  This Triton operator implements a mixed sparse attention mechanism. The primary kernel function, `_triton_mixed_sparse_attn_fwd_kernel`,
+  processes query (Q), key (K), and value (V) tensors, generating an output tensor (Out) by applying block-wise
+  sparse attention computations. It uses block indices and counts specified by `block_count`, `block_offset`,
+  `column_count`, and `column_index` tensors to selectively attend to certain regions of the inputs. The
+  inputs also include `seqlens` for sequence lengths and `sm_scale` for scaling dot products. Within the
+  kernel, the algorithm computes scaled dot-products, applies a causal mask to prevent attending to future
+  tokens, and accumulates weighted sums to produce the output. Blocks of the input tensors are processed
+  iteratively, using a maximum block and column count approach to manage computations. The `qk_scale`
+  factor is applied to scale the query tensor before computing attention scores. The wrapper function
+  `_triton_mixed_sparse_attention` prepares the input tensors and dimensions, manages the execution grid
+  configuration, and invokes the Triton kernel.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- attention
+- matmul
+- elementwise
+- reduction
+- sparse
+source:
+  channel: G
+  file: mixed_sparse_attention.py
+  repo: microsoft/MInference
+  difficulty: '4'
+  star: 813
+  simp_instru_len: 159
+  comp_instru_len: 260
+  output_triton_len: 2618
+gold_kernel: data/TritonBench_G_v1/mixed_sparse_attention.py

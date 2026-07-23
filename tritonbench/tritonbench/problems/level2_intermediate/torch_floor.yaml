@@ -1,0 +1,41 @@
+id: torch_floor
+level: 2
+category: kernel_translation
+title: Torch Floor
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.floor`.\n\
+  \nOperator description:\nReturns a new tensor with the floor of the elements of the input, the largest\
+  \ integer less than or equal to each element. For integer inputs, follows the array-api convention of\
+  \ returning a copy of the input tensor.\n\nTarget Python signature / call pattern:\nfloor(input, *,\
+  \ out=None) -> Tensor\nArgs:\n    input (Tensor): the input tensor.\n\nKeyword args:\n    out (Tensor,\
+  \ optional): the output tensor.\n\nMathematical definition:\n\\text{out}_{i} = \\left\\lfloor \\text{input}_{i}\
+  \ \\right\\rfloor\n\nPyTorch reference snippet:\n```python\ntorch.floor(a)\n```\n\nExample / usage notes:\n\
+  >>> a = torch.randn(4)\n>>> a\ntensor([-0.8166,  1.5308, -0.2530, -0.2091])\n>>> torch.floor(a)\ntensor([-1.,\
+  \  1., -1., -1.])\n\nAdditional constraints:\nFor integer inputs, the function returns a copy of the\
+  \ input tensor.\n\nRequirements (SparkDistill / TritonBench harness):\n- Translate the PyTorch reference\
+  \ into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics: include torch.allclose vs the\
+  \ reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor\
+  \ over tl.make_block_ptr\n- Add @triton.autotune when there are meaningful tile/block choices\n- Provide\
+  \ a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 2
+  torch_cnt: 1
+  func_inputs: "floor(input, *, out=None) -> Tensor\nArgs:\n    input (Tensor): the input tensor.\n\n\
+    Keyword args:\n    out (Tensor, optional): the output tensor."
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- convolution
+source:
+  channel: T
+  file: floor.py
+  name: torch.floor
+  difficulty: '2'
+  params_cnt: 2
+  torch_cnt: 1
+gold_kernel: data/TritonBench_T_v1/floor.py

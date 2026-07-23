@@ -1,0 +1,47 @@
+id: diag_ssm_triton
+level: 2
+category: kernel_generation
+title: Diag Ssm Triton
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `diag_ssm_triton.py` (repo: HorizonRobotics/alf).\n\nTask description:\nThe Triton SSM kernel\
+  \ functions define efficient GPU computations for state-space models by iterating through sequence data.\
+  \ \n\n    `diag_ssm_forward_kernel` handles the forward pass for real-valued inputs, applying the transformation\
+  \ `s = s * Lambda + x` across a sequence of data stored in `x_ptr`. It reads initial states from `s_ptr`\
+  \ and writes outputs to `y_ptr`. The transformation is iteratively applied for each timestep `t` in\
+  \ the sequence `length`, over dimensions defined by `batch_size` and `dim`, using a grid that spans\
+  \ `(batch_size * dim)` divided into blocks of `BLOCK_SIZE`.\n\n    `diag_ssm_forward_kernel_complex`\
+  \ extends this to complex numbers, handling real and imaginary parts separately, and performing complex\
+  \ multiplication and addition.\n\n    For the backward pass, `diag_ssm_backward_kernel` and its complex\
+  \ counterpart compute gradients needed for learning, propagating them backwards from `grad_y_ptr` through\
+  \ the sequence, updating `grad_s_ptr`, `grad_x_ptr`, and `grad_lambda_ptr`. Gradients respect the chain\
+  \ rule, ensuring consistency with the complex autograd requirements in PyTorch.\n\n    The enclosing\
+  \ class `_ssm_forward` uses these kernels within PyTorch's autograd framework, handling input validation\
+  \ and complex data type checks. It initiates GPU kernel execution by defining a grid configuration function\
+  \ to optimize computation.\n\nRequirements (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1\
+  \ on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated\
+  \ tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include @triton.autotune\
+  \ with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose\
+  \ correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally\
+  \ skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: G
+  file: diag_ssm_triton.py
+  repo: HorizonRobotics/alf
+  difficulty: '3'
+  star: 305
+  simp_instru_len: 219
+  comp_instru_len: 330
+  output_triton_len: 4004
+gold_kernel: data/TritonBench_G_v1/diag_ssm_triton.py

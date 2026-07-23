@@ -1,0 +1,23 @@
+id: wrong_axis_reduce
+level: bugfix
+category: kernel_debugging
+title: Reduction on Wrong Axis
+prompt: Softmax-style reduce uses axis=1 on a 1D tile and fails to compile or runs wrong. Fix axes.
+input_code: "@triton.jit\ndef row_max_kernel(x_ptr, out_ptr, n_cols, BLOCK: tl.constexpr):\n    row =\
+  \ tl.program_id(0)\n    cols = tl.arange(0, BLOCK)\n    mask = cols < n_cols\n    x = tl.load(x_ptr\
+  \ + row * n_cols + cols, mask=mask, other=float(\"-inf\"))\n    m = tl.max(x, axis=1)\n    tl.store(out_ptr\
+  \ + row, m)\n"
+expected_fix: Reduce along axis=0 for 1D tile vectors
+required_patterns:
+- '@triton.jit'
+tags:
+- debugging
+- reduction
+- softmax
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+source:
+  channel: synthetic
+  file: wrong_axis_reduce.py
+  difficulty: bugfix

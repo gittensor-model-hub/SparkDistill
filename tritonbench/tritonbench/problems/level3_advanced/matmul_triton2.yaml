@@ -1,0 +1,50 @@
+id: matmul_triton2
+level: 3
+category: kernel_generation
+title: Matmul Triton2
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `matmul_triton2.py` (repo: Carinaqyy/FX_Plus).\n\nTask description:\nThe Triton matrix multiplication\
+  \ code is organized around the `matmul_kernel` function, designed for GPU execution. \n        This\
+  \ function is auto-tuned for efficiency, adapting to different matrix shapes with several block configurations\
+  \ specified via the `@triton.autotune` decorator. Each configuration varies in block sizes, stages,\
+  \ and warps, optimizing for a given MxNxK problem size. \n        The kernel itself operates as follows:\n\
+  \        - `pid` determines the unique program ID within the grid, dividing the workload among GPU units.\n\
+  \        - The grid's structure is defined such that the matrix is divided into tiles of size BLOCK_SIZE_M\
+  \ x BLOCK_SIZE_N.\n        - `num_pid_m` and `num_pid_n` calculate how many blocks fit in each matrix\
+  \ dimension.\n        - Each program computes part of the result matrix C for a given (M, N) tile by\
+  \ iterating over the K dimension in blocks of BLOCK_SIZE_K.\n        - Pointers `a_ptrs` and `b_ptrs`\
+  \ are established to access relevant submatrices.\n        - The kernel loops over `K` in chunks of\
+  \ BLOCK_SIZE_K, loading submatrices from A and B, performing a dot product, and accumulating the result.\n\
+  \        - Finally, results are stored into matrix C with appropriate masking to handle edge cases.\
+  \ \n        The `triton_matmul` function provides a Pythonic interface for calling the kernel, performing\
+  \ dimension checks, setting up the output matrix, and configuring the execution grid based on input\
+  \ dimensions and kernel metadata.\n\nRequirements (SparkDistill / TritonBench harness):\n- Target Triton\
+  \ 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated\
+  \ tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include @triton.autotune\
+  \ with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose\
+  \ correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally\
+  \ skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+source:
+  channel: G
+  file: matmul_triton2.py
+  repo: Carinaqyy/FX_Plus
+  difficulty: '3'
+  star: 0
+  simp_instru_len: 232
+  comp_instru_len: 358
+  output_triton_len: 1488
+gold_kernel: data/TritonBench_G_v1/matmul_triton2.py

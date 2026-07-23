@@ -1,0 +1,64 @@
+id: swiglu_backward
+level: 3
+category: kernel_generation
+title: Swiglu Backward
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `swiglu_backward.py` (repo: MzeroMiko/VMamba).
+
+
+  Task description:
+
+  The Triton kernel `_swiglu_bwd_kernel` is an efficient implementation of the backward pass for Swish-Gated
+  Linear Units (Swiglu). It operates on input tensors `X` and `Y`, their respective gradients `DX` and
+  `DY`, a derivative tensor `DOUT`, and optionally the output tensor `OUT` for recomputation. The kernel
+  maps program IDs to row indices and calculates column indices for block processing, defined by the `BLOCK_N`
+  parameter. It loads slices of the input tensors using masks to handle boundary conditions. Core computations
+  use the sigmoid function to derive the gradients, applying the Swish derivative formula for `dx` and
+  straightforward multiplication for `dy`. These results are stored back to the gradients'' memory locations.
+  The kernel utilizes `RECOMPUTE_OUTPUT` to optionally recompute and store the output tensor. The wrapper
+  function `_swiglu_bwd` is responsible for input preprocessing, ensuring tensors are contiguous, reshaping
+  for batch dimensions, splitting `xy` into `x` and `y`, and setting up the execution grid that determines
+  the number of Triton programs launched. It manages the lifecycle of intermediate tensors and adapts
+  outputs based on the `recompute_output` flag.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+source:
+  channel: G
+  file: swiglu_backward.py
+  repo: MzeroMiko/VMamba
+  difficulty: '3'
+  star: 2235
+  simp_instru_len: 182
+  comp_instru_len: 284
+  output_triton_len: 1283
+gold_kernel: data/TritonBench_G_v1/swiglu_backward.py

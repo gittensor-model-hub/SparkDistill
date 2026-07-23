@@ -1,0 +1,55 @@
+id: fused_tile_exp
+level: 3
+category: kernel_translation
+title: Fused Tile Exp
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `fused_tile_exp`.\n\
+  \nOperator description:\nPerforms a fused operation combining tiling (repeating elements) and the exponential\
+  \ function. The input tensor is first repeated along each dimension according to the specified `dims`\
+  \ using the tiling operation, then the exponential function is applied element-wise to the resulting\
+  \ tensor.\n\nTarget Python signature / call pattern:\nfused_tile_exp(input, dims, *, out=None) -> Tensor;\
+  \ input (Tensor): The input tensor X whose elements are to be repeated and exponentiated.; dims (tuple\
+  \ of int): The number of repetitions for each dimension. If `dims` has fewer dimensions than `input`,\
+  \ ones are prepended to `dims` until all dimensions are specified.; out (Tensor, optional): Output tensor.\
+  \ Ignored if `None`. Default: `None`.\n\nMathematical definition:\nGiven an input tensor X and a tuple\
+  \ of dimensions \text{dims}, the function computes:\n1. **Tiling:**\nThe input tensor is repeated along\
+  \ each dimension according to the specified number of times in `dims`:\nY = tile(X, dims)\n2. **Exponential\
+  \ Function:**\nThe exponential function is applied element-wise to the tiled tensor:\nZ = exp(Y)\n\n\
+  PyTorch reference snippet:\n```python\ntiled = torch.tile(input, dims)\noutput = torch.exp(tiled)\n\
+  if out is not None:\n    out.copy_(output)\n    return out\nreturn output\n```\n\nExample / usage notes:\n\
+  import torch\n\nx = torch.tensor([1.0, 2.0, 3.0])\ndims = (2,)\noutput = fused_tile_exp(x, dims)\nprint('Output:')\n\
+  print(output)\n# Output:\n# tensor([  2.7183,   7.3891,  20.0855,   2.7183,   7.3891,  20.0855])\n\n\
+  Additional constraints:\nThe `dims` parameter controls how many times the input tensor is repeated along\
+  \ each dimension.\nIf `dims` specifies fewer dimensions than `input`, ones are prepended to `dims` until\
+  \ all dimensions are specified.\nThe function supports autograd for gradient computation.\nAll operations\
+  \ are differentiable and support backpropagation.\n\nRequirements (SparkDistill / TritonBench harness):\n\
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics:\
+  \ include torch.allclose vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary\
+  \ masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n- Add @triton.autotune when there\
+  \ are meaningful tile/block choices\n- Provide a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 3
+  torch_cnt: 2
+  func_inputs: 'fused_tile_exp(input, dims, *, out=None) -> Tensor; input (Tensor): The input tensor X
+    whose elements are to be repeated and exponentiated.; dims (tuple of int): The number of repetitions
+    for each dimension. If `dims` has fewer dimensions than `input`, ones are prepended to `dims` until
+    all dimensions are specified.; out (Tensor, optional): Output tensor. Ignored if `None`. Default:
+    `None`.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+- fused
+source:
+  channel: T
+  file: fused_tile_exp.py
+  name: fused_tile_exp
+  difficulty: '3'
+  params_cnt: 3
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/fused_tile_exp.py

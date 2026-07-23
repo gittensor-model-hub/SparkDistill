@@ -1,0 +1,56 @@
+id: chunk_gate_recurrence
+level: 3
+category: kernel_generation
+title: Chunk Gate Recurrence
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `chunk_gate_recurrence.py` (repo: microsoft/unilm).\n\nTask description:\nThis Triton kernel\
+  \ module is focused on enabling efficient recurrent computation with chunked gate processing. The module\
+  \ consists of two main kernels, `_fwd_recurrence` for forward propagation and `_bwd_recurrence` for\
+  \ backward propagation, and a high-level interface class, `ChunkGateRecurrent`.\n\n        `_fwd_recurrence`:\n\
+  \        - Purpose: Executes forward pass with recurrent updates across multiple blocks of input data.\n\
+  \        - Parameters:\n            - `S` and `d`: Input data and decay factors for each block.\n  \
+  \          - `O`: Output tensor for storing results.\n            - `NUM_HEAD`, `NUM_BLOCK`: Define\
+  \ the number of heads and blocks.\n            - `D_MODEL_K`, `D_MODEL_V`: Overall dimensions of key\
+  \ and value models.\n            - `BLOCK_MODEL_K`, `BLOCK_MODEL_V`: Dimensions of each block.\n   \
+  \         - `last_kv`: Tensor storing the previous iteration's key/value state, if applicable.\n   \
+  \     - Execution: Initializes accumulators, optionally using `last_kv`, then iterates over blocks to\
+  \ apply recurrent transformation and store results in `O`.\n\n        `_bwd_recurrence`:\n        -\
+  \ Purpose: Computes gradients by reversing the operations performed in the forward pass.\n        -\
+  \ Parameters:\n            - `S`, `d`: Similar roles as in the forward pass.\n            - `DI`, `DG`,\
+  \ `DL`, `DS`: Tensors for storing computed gradients.\n            - `NUM_HEAD`, `NUM_BLOCK`, `D_MODEL_K`,\
+  \ `D_MODEL_V`, `BLOCK_MODEL_K`, `BLOCK_MODEL_V`: Dimensional parameters matching those in the forward\
+  \ pass.\n        - Execution: Iteratively computes gradients by reversing block operations, accumulating\
+  \ results into gradient tensors `DI`, `DG`, and `DL`.\n\n        `ChunkGateRecurrent`:\n        - A\
+  \ custom autograd function that manages data layout and execution of forward and backward kernels on\
+  \ GPUs.\n        - `forward(ctx, kv, cross_decay, last_kv=None)`: Prepares and launches the forward\
+  \ kernel with given inputs. Saves output for backward pass.\n        - `backward(ctx, DO)`: Prepares\
+  \ and launches the backward kernel, calculates gradients using previously saved outputs.\n        -\
+  \ Uses blocks of size `BLOCK_MODEL_K` and `BLOCK_MODEL_V` to divide work efficiently across the GPU,\
+  \ ensuring proper tiling and parallelism.\n\nRequirements (SparkDistill / TritonBench harness):\n- Target\
+  \ Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over\
+  \ deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include @triton.autotune\
+  \ with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose\
+  \ correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally\
+  \ skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- rope
+- elementwise
+source:
+  channel: G
+  file: chunk_gate_recurrence.py
+  repo: microsoft/unilm
+  difficulty: '4'
+  star: 20291
+  simp_instru_len: 414
+  comp_instru_len: 594
+  output_triton_len: 2746
+gold_kernel: data/TritonBench_G_v1/chunk_gate_recurrence.py

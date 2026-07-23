@@ -1,0 +1,61 @@
+id: fifth_order_sph_harmonics
+level: 3
+category: kernel_generation
+title: Fifth Order Sph Harmonics
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `fifth_order_sph_harmonics.py` (repo: IntelLabs/EquiTriton).
+
+
+  Task description:
+
+  This code defines Triton kernels and a PyTorch autograd function for computing fifth-order spherical
+  harmonics. The `fifth_order_fwd` kernel computes the spherical harmonics projections using x, y, z coordinates,
+  defined with various constants for the harmonic orders. Inputs include a coordinate tensor, output buffer,
+  block size, number of elements, and other configuration parameters. The output consists of harmonics
+  in different orders computed using mathematical operations on x, y, z. The `fifth_order_bwd` kernel
+  calculates gradients for these harmonics, using pre-calculated derivatives and loading gradients from
+  the output space. Each kernel handles blocks of work determined by block size, calculated via a helper
+  function. The `FifthOrderSphericalHarmonic` class is a PyTorch function managing these kernels'' forward
+  and backward execution. It initializes outputs, saves context for backpropagation, and allocates memory
+  as needed. The code applies Triton''s parallel capabilities to process tensor computations efficiently,
+  aimed at GPU utilization.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: G
+  file: fifth_order_sph_harmonics.py
+  repo: IntelLabs/EquiTriton
+  difficulty: '4'
+  star: 40
+  simp_instru_len: 164
+  comp_instru_len: 226
+  output_triton_len: 6515
+gold_kernel: data/TritonBench_G_v1/fifth_order_sph_harmonics.py

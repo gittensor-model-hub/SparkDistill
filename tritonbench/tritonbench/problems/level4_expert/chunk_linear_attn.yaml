@@ -1,0 +1,69 @@
+id: chunk_linear_attn
+level: 4
+category: kernel_generation
+title: Chunk Linear Attn
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `chunk_linear_attn.py` (repo: sustcsonglin/flash-linear-attention).
+
+
+  Task description:
+
+  The Triton implementation facilitates efficient linear attention computation by organizing calculations
+  into specialized kernels. The `chunk_linear_attn_fwd_kernel_h` kernel initializes an intermediate tensor
+  `h`, iteratively updating it by loading and computing the dot product of block pointers derived from
+  key (`k`) and value (`v`) tensors across multiple time steps, incorporating an initial state if provided.
+  The `chunk_linear_attn_fwd_kernel_o` kernel calculates the output tensor `o` by iterating over dimensions
+  of the query (`q`), `k`, and `h` tensors, performing dot products to compute weighted sums and handling
+  the softmax attention scoring with masked elements set to zero. The backward pass is divided into `chunk_linear_attn_bwd_kernel_dh`,
+  which computes the gradient for `h` by propagating gradients from output to input space, and `chunk_linear_attn_bwd_kernel_dqkv`,
+  which calculates the gradients for `q`, `k`, and `v` by reusing the intermediate computations in the
+  forward pass. These kernels employ Triton''s block pointer feature, boundary checks, and arithmetic
+  capabilities to perform operations efficiently on GPUs. The `ChunkLinearAttentionFunction` class integrates
+  these Triton kernels into PyTorch''s autograd framework, allowing the forward and backward computations
+  to be seamlessly included in PyTorch models. The function uses input dimensions (`T`, `K`, `V`), threading
+  model parameters (`BT`, `BK`, `BV`), and Triton''s grid and warp management to adaptively optimize for
+  performance and accuracy.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- attention
+- matmul
+- softmax
+- elementwise
+- reduction
+source:
+  channel: G
+  file: chunk_linear_attn.py
+  repo: sustcsonglin/flash-linear-attention
+  difficulty: '4'
+  star: 1382
+  simp_instru_len: 258
+  comp_instru_len: 368
+  output_triton_len: 5406
+gold_kernel: data/TritonBench_G_v1/chunk_linear_attn.py

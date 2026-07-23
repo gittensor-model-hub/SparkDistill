@@ -1,0 +1,81 @@
+id: torch_special_erf
+level: 3
+category: kernel_translation
+title: Torch Special Erf
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.special.erf`.
+
+
+  Operator description:
+
+  Computes the error function of the input tensor. The error function is used in probability, statistics,
+  and partial differential equations describing diffusion.
+
+
+  Target Python signature / call pattern:
+
+  erf(input, *, out=None) -> Tensor; Args: input (Tensor): the input tensor. Keyword args: out (Tensor,
+  optional): the output tensor.
+
+
+  Mathematical definition:
+
+  \mathrm{erf}(x) = \frac{2}{\sqrt{\pi}} \int_{0}^{x} e^{-t^2} dt
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  torch.special.erf(torch.tensor([0, -1., 10.]))
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> torch.special.erf(torch.tensor([0, -1., 10.]))
+
+  tensor([ 0.0000, -0.8427,  1.0000])
+
+
+  Additional constraints:
+
+  The function outputs a tensor with values representing the error function of each element in the input
+  tensor.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 2
+  torch_cnt: 1
+  func_inputs: 'erf(input, *, out=None) -> Tensor; Args: input (Tensor): the input tensor. Keyword args:
+    out (Tensor, optional): the output tensor.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+- fused
+source:
+  channel: T
+  file: erf.py
+  name: torch.special.erf
+  difficulty: '3'
+  params_cnt: 2
+  torch_cnt: 1
+gold_kernel: data/TritonBench_T_v1/erf.py

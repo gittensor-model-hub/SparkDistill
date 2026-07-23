@@ -1,0 +1,53 @@
+id: flash_decode2_phi
+level: 2
+category: kernel_generation
+title: Flash Decode2 Phi
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `flash_decode2_phi.py` (repo: ModelTC/lightllm).\n\nTask description:\nThe `_fwd_kernel_flash_decode_stage2`\
+  \ Triton kernel is a parallel computation designed for processing sequences in a neural network context,\
+  \ specifically dealing with batches, heads, and sequence blocks. This kernel receives several inputs:\
+  \ `B_Seqlen`, `Mid_O`, `Mid_O_LogExpSum`, and `Out`, along with strides for indexing. `B_Seqlen` contains\
+  \ sequence lengths per batch, `Mid_O` contains intermediate outputs, `Mid_O_LogExpSum` holds log-exp\
+  \ sum values, and `Out` will store the final output. The kernel operates over a 2D grid defined by batch\
+  \ size and head count (`grid = (batch, head_num)`), with constants `BLOCK_SEQ` and `BLOCK_DMODEL` indicating\
+  \ sequence block size and dimension alignment respectively.\n\n            The kernel function operates\
+  \ as follows:\n            - Identifies the current batch and head using `tl.program_id`.\n        \
+  \    - Initializes accumulators: `sum_exp`, `max_logic`, and `acc` to accumulate exponential logic and\
+  \ values.\n            - Loads the current sequence length and calculates the number of sequence blocks\
+  \ (`block_n_size`).\n            - Iterates over each block, where:\n                - It loads values\
+  \ (`tv`) from `Mid_O` and logic sums (`tlogic`) from `Mid_O_LogExpSum`.\n                - Computes\
+  \ the maximum logic value across blocks and scales previous accumulations.\n                - Updates\
+  \ the accumulators by computing the exponential of adjusted logic values and scaling/accumulating.\n\
+  \            - Stores the final normalized result into `Out`, scaling accumulated values by the sum\
+  \ of exponentials.\n\n            The `flash_decode_stage2` function sets up and invokes this kernel,\
+  \ determining dimensions and grid setup based on input tensor shapes. It ensures efficient computation\
+  \ by using Triton's parallel execution framework, specifying warp and stage numbers.\n\nRequirements\
+  \ (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x\
+  \ / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use @triton.jit\
+  \ kernels with correct boundary masking\n- Include @triton.autotune with at least 3 configs when tile\
+  \ sizes matter\n- Provide a Python launcher + grid and a torch.allclose correctness test\n- Use fp32\
+  \ accumulators for tl.dot reductions\n- Print a short note if you intentionally skip autotune for a\
+  \ tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- attention
+- elementwise
+- reduction
+source:
+  channel: G
+  file: flash_decode2_phi.py
+  repo: ModelTC/lightllm
+  difficulty: '2'
+  star: 2647
+  simp_instru_len: 159
+  comp_instru_len: 435
+  output_triton_len: 1076
+gold_kernel: data/TritonBench_G_v1/flash_decode2_phi.py

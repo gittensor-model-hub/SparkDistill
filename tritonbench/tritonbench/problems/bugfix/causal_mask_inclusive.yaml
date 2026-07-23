@@ -1,0 +1,24 @@
+id: causal_mask_inclusive
+level: bugfix
+category: kernel_debugging
+title: Inclusive vs Exclusive Causal Mask Off-by-One
+prompt: Causal attention mask is off-by-one vs PyTorch tril. Fix the comparison.
+input_code: "@triton.jit\ndef causal_scores_kernel(q_ptr, k_ptr, out_ptr, seq, BLOCK: tl.constexpr):\n\
+  \    q_idx = tl.program_id(0)\n    k_offs = tl.arange(0, BLOCK)\n    mask = k_offs < seq\n    q = tl.load(q_ptr\
+  \ + q_idx)\n    k = tl.load(k_ptr + k_offs, mask=mask, other=0.0)\n    scores = q * k\n    # BUG: exclusive\
+  \ where reference is inclusive\n    scores = tl.where(q_idx > k_offs, scores, float(\"-inf\"))\n   \
+  \ tl.store(out_ptr + q_idx * seq + k_offs, scores, mask=mask)\n"
+expected_fix: Use q_idx >= k_idx or > consistently with the reference
+required_patterns:
+- '@triton.jit'
+- mask
+tags:
+- debugging
+- attention
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+source:
+  channel: synthetic
+  file: causal_mask_inclusive.py
+  difficulty: bugfix

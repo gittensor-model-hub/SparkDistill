@@ -1,0 +1,111 @@
+id: add_mean
+level: 3
+category: kernel_translation
+title: Add Mean
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `add_mean`.
+
+
+  Operator description:
+
+  Adds the `other` tensor, scaled by `alpha`, to the `input` tensor and computes the mean value along
+  the specified dimension. If no dimension is specified, it computes the mean over all elements. Supports
+  broadcasting, type promotion, and works with integer, float, and complex inputs.
+
+
+  Target Python signature / call pattern:
+
+  def add_mean(input, other, dim=None, alpha=1, keepdim=False, dtype=None, out=None) -> Tensor: input
+  (Tensor): The input tensor. other (Tensor or Number): The tensor or number to add to input. dim (int
+  or tuple of ints, optional): The dimension(s) to reduce. Default: None. alpha (Number, optional): The
+  multiplier for other. Default: 1. keepdim (bool, optional): Whether the output tensor has dim retained
+  or not. Default: False. dtype (torch.dtype, optional): The desired data type of returned tensor. If
+  specified, the input tensor is casted to dtype before the operation. This is useful for preventing data
+  type overflows. Default: None. out (Tensor, optional): The output tensor.
+
+
+  Mathematical definition:
+
+  \text{out}_i = \text{mean}(\text{input}_i + \text{alpha} \times \text{other}_i)
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  add_result = torch.add(input, other, alpha=alpha)
+
+  return torch.mean(add_result, dim=dim, keepdim=keepdim, dtype=dtype, out=out)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> import torch
+
+  >>> a = torch.tensor([[1.0, 2.0], [3.0, 4.0]])
+
+  >>> b = torch.tensor([[0.5, 0.5], [0.5, 0.5]])
+
+  >>> # Add b to a, then compute the mean of the result across all elements
+
+  >>> result = add_mean(a, b)
+
+  >>> result
+
+  tensor(2.5)
+
+
+  >>> # Add b to a, then compute the mean along dimension 1
+
+  >>> result = add_mean(a, b, dim=1)
+
+  >>> result
+
+  tensor([1.75, 3.75])
+
+
+  Additional constraints:
+
+  Supports broadcasting to a common shape, type promotion, and integer, float, and complex inputs.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 7
+  torch_cnt: 2
+  func_inputs: 'def add_mean(input, other, dim=None, alpha=1, keepdim=False, dtype=None, out=None) ->
+    Tensor: input (Tensor): The input tensor. other (Tensor or Number): The tensor or number to add to
+    input. dim (int or tuple of ints, optional): The dimension(s) to reduce. Default: None. alpha (Number,
+    optional): The multiplier for other. Default: 1. keepdim (bool, optional): Whether the output tensor
+    has dim retained or not. Default: False. dtype (torch.dtype, optional): The desired data type of returned
+    tenso'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: T
+  file: add_mean.py
+  name: add_mean
+  difficulty: '4'
+  params_cnt: 7
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/add_mean.py

@@ -1,0 +1,61 @@
+id: quant_transpose_kernel
+level: 4
+category: kernel_generation
+title: Quant Transpose Kernel
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `quant_transpose_kernel.py` (repo: bitsandbytes-foundation/bitsandbytes).
+
+
+  Task description:
+
+  The Triton function `_quantize_global_transpose` performs a global quantization and transposition of
+  a matrix `A`. It operates on a block of size `BLOCK_M` by `BLOCK_N` and partitions the matrix into groups
+  as determined by `GROUP_M`. The kernel computes the grid dimensions needed to cover the matrix based
+  on `M` and `N`, which represent the dimensions of `A`. The `program_id` is split into group indices
+  `pid_m` and `pid_n` to navigate over blocks. `A` is accessed using pointers adjusted with `stride_am`
+  and `stride_an`, and the quantization is achieved by multiplying each element by `absmax_inv` and scaling
+  to int8 range. The result is stored in matrix `B`, transposing the indices using `stride_bm` and `stride_bn`.
+  The `quantize_global_transpose` function facilitates the kernel launch, preparing the input by calculating
+  `absmax` and its reciprocal, then initializes the output matrix. It defines a lambda to configure the
+  launch grid based on the matrix dimensions and block sizes.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- quantization
+- elementwise
+- reduction
+source:
+  channel: G
+  file: quant_transpose_kernel.py
+  repo: bitsandbytes-foundation/bitsandbytes
+  difficulty: '4'
+  star: 6354
+  simp_instru_len: 204
+  comp_instru_len: 252
+  output_triton_len: 946
+gold_kernel: data/TritonBench_G_v1/quant_transpose_kernel.py

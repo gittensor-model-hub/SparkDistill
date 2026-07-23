@@ -1,0 +1,85 @@
+id: fused_svd_reconstruct
+level: 4
+category: kernel_translation
+title: Fused Svd Reconstruct
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `fused_svd_reconstruct`.
+
+
+  Operator description:
+
+  Reconstructs the input matrix `A` using its Singular Value Decomposition (SVD). This function combines
+  the Singular Value Decomposition (SVD) with matrix reconstruction. Given a matrix `A`, it performs the
+  following operations: 1. Compute the SVD of `A`: A = U Σ V^H, where `U` and `Vh` are unitary matrices
+  and `S` contains the singular values of `A`. 2. Reconstruct `A` as A_reconstructed = U Σ V^H.
+
+
+  Target Python signature / call pattern:
+
+  fused_svd_reconstruct(A: Tensor) -> Tensor: The input matrix `A` of shape `(m, n)`.
+
+
+  Mathematical definition:
+
+  A = U Σ V^H
+
+  A_reconstructed = U diag(S) V^H
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  U, S, Vh = torch.linalg.svd(A, full_matrices=False)
+
+  A_reconstructed = U @ torch.diag(S) @ Vh
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> A = torch.tensor([[3.0, 2.0, 2.0], [2.0, 3.0, -2.0]])
+
+  >>> A_reconstructed = fused_svd_reconstruct(A)
+
+  >>> print(A_reconstructed)
+
+
+  Additional constraints:
+
+  The function returns the reconstructed matrix `A` of shape `(m, n)`, approximating the original matrix.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 1
+  torch_cnt: 2
+  func_inputs: 'fused_svd_reconstruct(A: Tensor) -> Tensor: The input matrix `A` of shape `(m, n)`.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- fused
+source:
+  channel: T
+  file: fused_svd_reconstruct.py
+  name: fused_svd_reconstruct
+  difficulty: '5'
+  params_cnt: 1
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/fused_svd_reconstruct.py

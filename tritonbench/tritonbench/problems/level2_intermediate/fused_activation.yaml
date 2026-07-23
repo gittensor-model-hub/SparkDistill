@@ -1,0 +1,61 @@
+id: fused_activation
+level: 2
+category: kernel_generation
+title: Fused Activation
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `fused_activation.py` (repo: gpu-mode/lectures).
+
+
+  Task description:
+
+  This code provides a detailed example of a Triton kernel ''fused_add_mul_activation_kernel'' and its
+  corresponding PyTorch wrapper function ''fused_add_mul_activation_torch''. The kernel performs a fused
+  operation of addition, multiplication, and activation on tensors. It operates on the input tensor ''x_ptr''
+  by adding elements from ''bias_ptr'' and a scaled version of ''in_ptr'', then applies an activation
+  function (''sigmoid'' or ''relu''). Inputs are accessed in blocks, controlled by ''BLOCK_SIZE'', which
+  allows efficient memory handling and parallel execution. The function ''fused_add_mul_activation_torch''
+  configures the grid for executing the Triton kernel based on the size of ''in_out_tensor'' and invokes
+  the kernel. The kernel processes data in chunks using block-wise indexing, applies the specified mathematical
+  transformations, and stores the results back. It also manages memory through specific eviction policies
+  to optimize cache usage. The wrapper sets a default multiplier and activation type, executes the kernel
+  with these parameters, and returns the processed tensor.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- elementwise
+- fused
+source:
+  channel: G
+  file: fused_activation.py
+  repo: gpu-mode/lectures
+  difficulty: '2'
+  star: 3106
+  simp_instru_len: 149
+  comp_instru_len: 247
+  output_triton_len: 626
+gold_kernel: data/TritonBench_G_v1/fused_activation.py

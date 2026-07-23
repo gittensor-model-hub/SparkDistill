@@ -1,0 +1,46 @@
+id: torch_mul
+level: 2
+category: kernel_translation
+title: Torch Mul
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.mul`.\n\
+  \nOperator description:\nMultiplies the input tensor by another tensor or a number, supporting broadcasting\
+  \ to a common shape, type promotion, and integer, float, and complex inputs.\n\nTarget Python signature\
+  \ / call pattern:\nmul(input, other, *, out=None) -> Tensor\n    input (Tensor): the input tensor.\n\
+  \    other (Tensor or Number) - the tensor or number to multiply input by.\n    out (Tensor, optional):\
+  \ the output tensor.\n\nMathematical definition:\n\\text{out}_i = \\text{input}_i \\times \\text{other}_i\n\
+  \nPyTorch reference snippet:\n```python\ntorch.mul(a, 100); torch.mul(b, c)\n```\n\nExample / usage\
+  \ notes:\n>>> a = torch.randn(3)\n>>> a\ntensor([ 0.2015, -0.4255,  2.6087])\n>>> torch.mul(a, 100)\n\
+  tensor([  20.1494,  -42.5491,  260.8663])\n\n>>> b = torch.randn(4, 1)\n>>> b\ntensor([[ 1.1207],\n\
+  \        [-0.3137],\n        [ 0.0700],\n        [ 0.8378]])\n>>> c = torch.randn(1, 4)\n>>> c\ntensor([[\
+  \ 0.5146,  0.1216, -0.5244,  2.2382]])\n>>> torch.mul(b, c)\ntensor([[ 0.5767,  0.1363, -0.5877,  2.5083],\n\
+  \        [-0.1614, -0.0382,  0.1645, -0.7021],\n        [ 0.0360,  0.0085, -0.0367,  0.1567],\n    \
+  \    [ 0.4312,  0.1019, -0.4394,  1.8753]])\n\nAdditional constraints:\nSupports broadcasting and type\
+  \ promotion.\n\nRequirements (SparkDistill / TritonBench harness):\n- Translate the PyTorch reference\
+  \ into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics: include torch.allclose vs the\
+  \ reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor\
+  \ over tl.make_block_ptr\n- Add @triton.autotune when there are meaningful tile/block choices\n- Provide\
+  \ a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 3
+  torch_cnt: 2
+  func_inputs: "mul(input, other, *, out=None) -> Tensor\n    input (Tensor): the input tensor.\n    other\
+    \ (Tensor or Number) - the tensor or number to multiply input by.\n    out (Tensor, optional): the\
+    \ output tensor."
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+source:
+  channel: T
+  file: mul.py
+  name: torch.mul
+  difficulty: '3'
+  params_cnt: 3
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/mul.py

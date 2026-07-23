@@ -1,0 +1,62 @@
+id: rmsnorm_implementation
+level: 2
+category: kernel_generation
+title: Rmsnorm Implementation
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `rmsnorm_implementation.py` (repo: alipay/PainlessInferenceAcceleration).
+
+
+  Task description:
+
+  The Triton kernel `rmsnorm_triton` is designed to perform RMS normalization on a 3D tensor `x` with
+  dimensions `[batch, M, K]`. The input pointers `x_ptr`, `rms_w_ptr`, and `out_ptr` correspond to the
+  input tensor, the RMS weights, and the output tensor, respectively. The function is parallelized across
+  the `batch` and `M` dimensions using Triton''s `program_id`. Inside the kernel, the RMS value is computed
+  by summing the squares of each element along the `K` dimension, normalized by `N_SIZE` (size of `K`),
+  and then adjusted with a small constant `eps` to prevent division by zero. The computed RMS is then
+  used to normalize the elements, which are subsequently scaled by `rms_weights`. The `rmsnorm_wrapper`
+  function facilitates the execution of this kernel by organizing the input, output, strides, and block
+  sizes before invoking the kernel with specified grid dimensions (`batch, M`). The kernel utilizes a
+  `BLOCK_N_SIZE` to process chunks of the `K` dimension at a time, enhancing parallel execution, and uses
+  `num_warps` to control the level of parallelism within a Triton block.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- normalization
+- elementwise
+- reduction
+source:
+  channel: G
+  file: rmsnorm_implementation.py
+  repo: alipay/PainlessInferenceAcceleration
+  difficulty: '3'
+  star: 290
+  simp_instru_len: 131
+  comp_instru_len: 285
+  output_triton_len: 791
+gold_kernel: data/TritonBench_G_v1/rmsnorm_implementation.py

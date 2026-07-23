@@ -1,0 +1,20 @@
+id: constexpr_runtime_mix
+level: bugfix
+category: kernel_debugging
+title: Using Runtime Value as tl.constexpr Shape
+prompt: Kernel fails to compile because a runtime argument is used as a tensor shape. Fix it.
+input_code: "@triton.jit\ndef fill_kernel(out_ptr, n, value):\n    # BUG: n is runtime but used like constexpr\
+  \ shape\n    offs = tl.arange(0, n)\n    tl.store(out_ptr + offs, value)\n"
+expected_fix: Keep BLOCK sizes constexpr; pass runtime n only for masks
+required_patterns:
+- '@triton.jit'
+tags:
+- debugging
+- compile
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+source:
+  channel: synthetic
+  file: constexpr_runtime_mix.py
+  difficulty: bugfix

@@ -1,0 +1,49 @@
+id: layer_norm_ops
+level: 3
+category: kernel_generation
+title: Layer Norm Ops
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `layer_norm_ops.py` (repo: HazyResearch/ThunderKittens).\n\nTask description:\nThe forward function\
+  \ `_layer_norm_fwd_1pass_kernel` in Triton performs layer normalization on a row of a matrix with configurable\
+  \ settings for using residual connections, storing residual outputs, RMS normalization, and applying\
+  \ a bias. Inputs include tensors for data, weights, and optionally biases and residuals. Each row computes\
+  \ the mean and variance, normalizes the data, applies weights and biases, and stores the result. The\
+  \ kernel utilizes Triton's `autotune` to optimize for various configurations by selecting the number\
+  \ of warps. \n\n        The backward function `_layer_norm_bwd_kernel` computes the gradients of input\
+  \ data, weights, and biases, considering residuals if used. It can also recompute the forward pass output\
+  \ when necessary for gradient accuracy. The function supports different configurations, such as whether\
+  \ to store additional residual gradients or use RMS normalization, and optimizes execution over multiple\
+  \ streaming multiprocessors (SMs) by distributing rows evenly. The gradients are accumulated across\
+  \ SMs and returned for use in parameter updates. \n\n        Both functions rely on a BLOCK_N size determined\
+  \ by input dimensions and memory constraints, ensuring the features do not exceed a set threshold. The\
+  \ forward and backward functions handle edge cases like differing data types for outputs and residuals.\
+  \ Additionally, the functions use autotuning to find the best execution configuration for different\
+  \ input sizes and feature settings.\n\nRequirements (SparkDistill / TritonBench harness):\n- Target\
+  \ Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over\
+  \ deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include @triton.autotune\
+  \ with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose\
+  \ correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally\
+  \ skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- normalization
+- elementwise
+- reduction
+source:
+  channel: G
+  file: layer_norm_ops.py
+  repo: HazyResearch/ThunderKittens
+  difficulty: '5'
+  star: 1710
+  simp_instru_len: 135
+  comp_instru_len: 305
+  output_triton_len: 3707
+gold_kernel: data/TritonBench_G_v1/layer_norm_ops.py

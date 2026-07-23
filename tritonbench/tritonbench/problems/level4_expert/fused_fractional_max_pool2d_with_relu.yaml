@@ -1,0 +1,93 @@
+id: fused_fractional_max_pool2d_with_relu
+level: 4
+category: kernel_translation
+title: Fused Fractional Max Pool2D With Relu
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `fused_fractional_max_pool2d_with_relu`.
+
+
+  Operator description:
+
+  Applies a ReLU activation followed by 2D fractional max pooling over an input signal composed of multiple
+  planes. The input is first rectified (non-negative) and then pooled using fractional max pooling.
+
+
+  Target Python signature / call pattern:
+
+  def fused_fractional_max_pool2d_with_relu(input: torch.Tensor, kernel_size, output_size=None, output_ratio=None,
+  return_indices=False) -> torch.Tensor: Input (Tensor): Input tensor. kernel_size (int or Tuple[int,
+  int]): Size of the pooling window. output_size (Tuple[int, int], optional): Target output size (height,
+  width). output_ratio (Tuple[float, float], optional): If set, output size is scaled as a ratio of the
+  input size. return_indices (bool, optional): If `True`, return the max pooling indices along with the
+  output.
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  torch.nn.functional.relu(input)
+
+  torch.nn.functional.fractional_max_pool2d(relu_output, kernel_size=kernel_size, output_size=output_size,
+  output_ratio=output_ratio, return_indices=return_indices)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> x = torch.randn(1, 3, 8, 8)  # Example input with shape (batch, channels, height, width)
+
+  >>> # Apply ReLU followed by fractional max pooling with kernel size 3 and output size (2, 2)
+
+  >>> output = fused_fractional_max_pool2d_with_relu(x, kernel_size=3, output_size=(2, 2))
+
+  >>> print(output.shape)  # Expected output shape: (1, 3, 2, 2)
+
+
+  Additional constraints:
+
+  The function combines ReLU activation with fractional max pooling, allowing for optional output size
+  or ratio specification and the option to return pooling indices.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 5
+  torch_cnt: 2
+  func_inputs: 'def fused_fractional_max_pool2d_with_relu(input: torch.Tensor, kernel_size, output_size=None,
+    output_ratio=None, return_indices=False) -> torch.Tensor: Input (Tensor): Input tensor. kernel_size
+    (int or Tuple[int, int]): Size of the pooling window. output_size (Tuple[int, int], optional): Target
+    output size (height, width). output_ratio (Tuple[float, float], optional): If set, output size is
+    scaled as a ratio of the input size. return_indices (bool, optional): If `True`, return the max pooling
+    in'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+- convolution
+- fused
+source:
+  channel: T
+  file: fused_fractional_max_pool2d_with_relu.py
+  name: fused_fractional_max_pool2d_with_relu
+  difficulty: '4'
+  params_cnt: 5
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/fused_fractional_max_pool2d_with_relu.py

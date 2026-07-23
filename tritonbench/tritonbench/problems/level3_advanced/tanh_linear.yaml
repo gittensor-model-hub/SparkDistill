@@ -1,0 +1,53 @@
+id: tanh_linear
+level: 3
+category: kernel_translation
+title: Tanh Linear
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `tanh_linear`.\n\
+  \nOperator description:\nApplies a linear transformation to the input tensor followed by a Tanh activation\
+  \ function. This combined operation is useful for introducing non-linearity after a linear transformation,\
+  \ helping to capture complex relationships in the data.\n\nTarget Python signature / call pattern:\n\
+  def tanh_linear(input, weight, bias=None) -> Tensor: input (Tensor): The input tensor of shape `(*,\
+  \ in_features)`, where `*` represents any number of additional dimensions. weight (Tensor): The weight\
+  \ matrix of shape `(out_features, in_features)`. bias (Tensor, optional): The optional bias tensor of\
+  \ shape `(out_features)`. Default: None.\n\nMathematical definition:\nThe combined operation is defined\
+  \ as: out = tanh(linear(input, weight, bias)) where the linear transformation is applied as y = xA^T\
+  \ + b and Tanh activation is applied element-wise as: Tanh(x) = (exp(x) - exp(-x)) / (exp(x) + exp(-x))\n\
+  \nPyTorch reference snippet:\n```python\ntorch.nn.functional.linear(input, weight, bias)\ntorch.tanh(linear_result)\n\
+  ```\n\nExample / usage notes:\nExample::\n\n    >>> import torch\n    >>> # Define input tensor, weights,\
+  \ and bias\n    >>> input = torch.randn(5, 3)       # (batch_size, in_features)\n    >>> weight = torch.randn(4,\
+  \ 3)      # (out_features, in_features)\n    >>> bias = torch.randn(4)           # (out_features)\n\
+  \    >>> # Apply tanh_linear transformation\n    >>> result = tanh_linear(input, weight, bias)\n   \
+  \ >>> result.shape\n    torch.Size([5, 4])\n\n    >>> # Apply tanh_linear transformation without bias\n\
+  \    >>> result = tanh_linear(input, weight)\n    >>> result.shape\n    torch.Size([5, 4])\n\nAdditional\
+  \ constraints:\nA linear transformation followed by a Tanh activation helps capture complex relationships\
+  \ by introducing non-linearity.\n\nRequirements (SparkDistill / TritonBench harness):\n- Translate the\
+  \ PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics: include torch.allclose\
+  \ vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor\
+  \ over tl.make_block_ptr\n- Add @triton.autotune when there are meaningful tile/block choices\n- Provide\
+  \ a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 3
+  torch_cnt: 2
+  func_inputs: 'def tanh_linear(input, weight, bias=None) -> Tensor: input (Tensor): The input tensor
+    of shape `(*, in_features)`, where `*` represents any number of additional dimensions. weight (Tensor):
+    The weight matrix of shape `(out_features, in_features)`. bias (Tensor, optional): The optional bias
+    tensor of shape `(out_features)`. Default: None.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+source:
+  channel: T
+  file: tanh_linear.py
+  name: tanh_linear
+  difficulty: '3'
+  params_cnt: 3
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/tanh_linear.py

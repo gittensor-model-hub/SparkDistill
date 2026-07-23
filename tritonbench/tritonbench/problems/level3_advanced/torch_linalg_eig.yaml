@@ -1,0 +1,58 @@
+id: torch_linalg_eig
+level: 3
+category: kernel_translation
+title: Torch Linalg Eig
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.linalg.eig`.\n\
+  \nOperator description:\nComputes the eigenvalue decomposition of a square matrix if it exists. Supports\
+  \ input of float, double, cfloat and cdouble dtypes. Also supports batches of matrices, and if A is\
+  \ a batch of matrices then the output has the same batch dimensions. The returned eigenvalues are not\
+  \ guaranteed to be in any specific order. The eigenvalues and eigenvectors of a real matrix may be complex.\
+  \ When inputs are on a CUDA device, this function synchronizes that device with the CPU. Assumes that\
+  \ A is diagonalizable. The returned eigenvectors are normalized to have norm 1. The eigenvectors of\
+  \ a matrix are not unique, nor are they continuous with respect to A. Gradients computed using the eigenvectors\
+  \ tensor will only be finite when A has distinct eigenvalues.\n\nTarget Python signature / call pattern:\n\
+  def linalg.eig(A, *, out=None) -> (Tensor, Tensor) Args: A (Tensor): tensor of shape `(*, n, n)` where\
+  \ `*` is zero or more batch dimensions consisting of diagonalizable matrices. Keyword args: out (tuple,\
+  \ optional): output tuple of two tensors. Ignored if `None`. Default: `None`.\n\nMathematical definition:\n\
+  A = V \\operatorname{diag}(\\Lambda) V^{-1}\\mathrlap{\\qquad V \\in \\mathbb{C}^{n \\times n}, \\Lambda\
+  \ \\in \\mathbb{C}^n}\n\nPyTorch reference snippet:\n```python\ntorch.linalg.eig(A)\n```\n\nExample\
+  \ / usage notes:\n>>> A = torch.randn(2, 2, dtype=torch.complex128)\n>>> A\ntensor([[ 0.9828+0.3889j,\
+  \ -0.4617+0.3010j],\n        [ 0.1662-0.7435j, -0.6139+0.0562j]], dtype=torch.complex128)\n>>> L, V\
+  \ = torch.linalg.eig(A)\n>>> L\ntensor([ 1.1226+0.5738j, -0.7537-0.1286j], dtype=torch.complex128)\n\
+  >>> V\ntensor([[ 0.9218+0.0000j,  0.1882-0.2220j],\n        [-0.0270-0.3867j,  0.9567+0.0000j]], dtype=torch.complex128)\n\
+  >>> torch.dist(V @ torch.diag(L) @ torch.linalg.inv(V), A)\ntensor(7.7119e-16, dtype=torch.float64)\n\
+  \n>>> A = torch.randn(3, 2, 2, dtype=torch.float64)\n>>> L, V = torch.linalg.eig(A)\n>>> torch.dist(V\
+  \ @ torch.diag_embed(L) @ torch.linalg.inv(V), A)\ntensor(3.2841e-16, dtype=torch.float64)\n\nAdditional\
+  \ constraints:\nThe eigenvalues and eigenvectors of a real matrix may be complex. When inputs are on\
+  \ a CUDA device, this function synchronizes that device with the CPU. Assumes that A is diagonalizable.\
+  \ The returned eigenvectors are normalized to have norm 1. The eigenvectors of a matrix are not unique,\
+  \ nor are they continuous with respect to A. Gradients computed using the eigenvectors tensor will only\
+  \ be finite when A has distinct eigenvalues.\n\nRequirements (SparkDistill / TritonBench harness):\n\
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics:\
+  \ include torch.allclose vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary\
+  \ masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n- Add @triton.autotune when there\
+  \ are meaningful tile/block choices\n- Provide a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 2
+  torch_cnt: 5
+  func_inputs: 'def linalg.eig(A, *, out=None) -> (Tensor, Tensor) Args: A (Tensor): tensor of shape `(*,
+    n, n)` where `*` is zero or more batch dimensions consisting of diagonalizable matrices. Keyword args:
+    out (tuple, optional): output tuple of two tensors. Ignored if `None`. Default: `None`.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- reduction
+source:
+  channel: T
+  file: eig.py
+  name: torch.linalg.eig
+  difficulty: '3'
+  params_cnt: 2
+  torch_cnt: 5
+gold_kernel: data/TritonBench_T_v1/eig.py

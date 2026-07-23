@@ -1,0 +1,117 @@
+id: sigmoid_conv2d
+level: 3
+category: kernel_translation
+title: Sigmoid Conv2D
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `sigmoid_conv2d`.
+
+
+  Operator description:
+
+  Applies a 2D convolution over an input tensor with specified filters, followed by applying the sigmoid
+  activation function element-wise to the result. This ensures that the convolutional output values are
+  scaled between 0 and 1.
+
+
+  Target Python signature / call pattern:
+
+  sigmoid_conv2d(input, weight, bias=None, stride=1, padding=0, dilation=1, groups=1, out=None) -> Tensor
+
+  Args:
+
+  input (Tensor): The input tensor of shape `(minibatch, in_channels, iH, iW)`.
+
+  weight (Tensor): The convolution filters of shape `(out_channels, in_channels / groups, kH, kW)`.
+
+  bias (Tensor, optional): Optional bias tensor of shape `(out_channels)`. Default: None.
+
+  stride (int or tuple, optional): The stride of the convolution kernel. Can be a single number or a tuple
+  `(sH, sW)`. Default: 1.
+
+  padding (int, tuple, or string, optional): Padding on both sides of the input. Can be ''valid'', ''same'',
+  single number, or tuple `(padH, padW)`. Default: 0.
+
+  dilation (int or tuple, optional): The spacing between kernel elements. Default: 1.
+
+  groups (int, optional): Number of groups to split the input into. Default: 1.
+
+  out (Tensor, optional): The output tensor.
+
+
+  Mathematical definition:
+
+  \text{out} = \sigma(\text{conv2d}(\text{input}, \text{weight})) where \sigma(x) = \frac{1}{1 + e^{-x}}
+  is the sigmoid function.
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  torch.nn.functional.conv2d(input, weight, bias=bias, stride=stride, padding=padding, dilation=dilation,
+  groups=groups); torch.sigmoid(conv_result, out=out)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> import torch >>> import torch.nn.functional as F >>> # Define inputs and filters >>> inputs = torch.randn(1,
+  3, 5, 5) >>> filters = torch.randn(2, 3, 3, 3) >>> bias = torch.randn(2) >>> # Apply convolution with
+  bias, then sigmoid >>> result = sigmoid_conv2d(inputs, filters, bias=bias, padding=1) >>> result.shape
+  torch.Size([1, 2, 5, 5]) >>> # Applying convolution without bias >>> result = sigmoid_conv2d(inputs,
+  filters, padding=1) >>> result.shape torch.Size([1, 2, 5, 5])
+
+
+  Additional constraints:
+
+  The function combines 2D convolution and sigmoid activation, ensuring output values are between 0 and
+  1.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 8
+  torch_cnt: 2
+  func_inputs: 'sigmoid_conv2d(input, weight, bias=None, stride=1, padding=0, dilation=1, groups=1, out=None)
+    -> Tensor
+
+    Args:
+
+    input (Tensor): The input tensor of shape `(minibatch, in_channels, iH, iW)`.
+
+    weight (Tensor): The convolution filters of shape `(out_channels, in_channels / groups, kH, kW)`.
+
+    bias (Tensor, optional): Optional bias tensor of shape `(out_channels)`. Default: None.
+
+    stride (int or tuple, optional): The stride of the convolution kernel. Can be a single number or a
+    tuple `(sH, sW)`. Default: '
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+- convolution
+source:
+  channel: T
+  file: sigmoid_conv2d.py
+  name: sigmoid_conv2d
+  difficulty: '4'
+  params_cnt: 8
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/sigmoid_conv2d.py

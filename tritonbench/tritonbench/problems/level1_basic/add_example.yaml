@@ -1,0 +1,49 @@
+id: add_example
+level: 1
+category: kernel_generation
+title: Add Example
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `add_example.py` (repo: intel/intel-xpu-backend-for-triton).\n\nTask description:\nThe Triton\
+  \ code provides an element-wise addition kernel named `add_kernel` and a corresponding wrapper function\
+  \ `add_wrapper`. The `add_kernel` is a decorated function with `@triton.jit`, enabling Just-In-Time\
+  \ compilation for optimized GPU execution. It receives pointers to two input tensors (`in_ptr0`, `in_ptr1`),\
+  \ an output tensor (`out_ptr`), the number of elements to process (`n_elements`), and a `BLOCK_SIZE`.\
+  \ Within the kernel, `pid` identifies the program's ID for the block dimension. The computation starts\
+  \ by calculating `block_start` as the base index for each block using `pid * BLOCK_SIZE`, and `offsets`\
+  \ as a range from `block_start` up to `BLOCK_SIZE`. A mask is applied using `offsets < n_elements` to\
+  \ prevent out-of-bound memory access, loading tensor values with `tl.load` for both input pointers.\
+  \ The values are summed and stored back in `out_ptr` using `tl.store`, still respecting the mask.\n\n\
+  \            The `add_wrapper` function orchestrates the setup and execution of the kernel. It initializes\
+  \ the output tensor `out` using `torch.zeros_like(x)` for similar shape and dtype. The function determines\
+  \ the total number of elements using `x.numel()` and computes the number of blocks needed with `num_blocks\
+  \ = (n_elements + BLOCK_SIZE - 1) // BLOCK_SIZE`. Finally, `add_kernel[(num_blocks,)](x, y, out, n_elements,\
+  \ BLOCK_SIZE)` launches the kernel, passing the input and output pointers, number of elements, and block\
+  \ size. The final result is returned in `out`.\n\nRequirements (SparkDistill / TritonBench harness):\n\
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor\
+  \ over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include\
+  \ @triton.autotune with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid\
+  \ and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short\
+  \ note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: G
+  file: add_example.py
+  repo: intel/intel-xpu-backend-for-triton
+  difficulty: '2'
+  star: 144
+  simp_instru_len: 122
+  comp_instru_len: 403
+  output_triton_len: 318
+gold_kernel: data/TritonBench_G_v1/add_example.py

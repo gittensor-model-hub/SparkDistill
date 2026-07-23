@@ -1,0 +1,45 @@
+id: triton_conv2d_fwd
+level: 3
+category: kernel_generation
+title: Triton Conv2D Fwd
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `triton_conv2d_fwd.py` (repo: BobMcDear/attorch).\n\nTask description:\nThe Triton function\
+  \ `conv2d_forward_kernel` executes a 2D convolution, computing an output feature map by sliding a filter\
+  \ across the input data.\n            The kernel uses parallel processing to divide the workload over\
+  \ multiple threads, facilitated by Triton's block-based computation.\n            The kernel requires\
+  \ pointers to input, weight, and output arrays, along with dimensions and strides for these arrays.\
+  \ \n            Additional parameters include the kernel size, stride, padding, groups, and flags for\
+  \ computation precision like FP16 and TF32.\n            The block size constants for batch, input features,\
+  \ and output features control how the computation is partitioned among threads.\n            The `conv2d_forward`\
+  \ function wraps this kernel, preparing the input and output tensors and calculating dimensions and\
+  \ strides.\n            The function computes the output height and width using the convolution formula\
+  \ and initializes an empty output tensor.\n            It then computes the necessary block and grid\
+  \ sizes for launching the Triton kernel, which performs the main computation.\n            After execution,\
+  \ the function returns the computed output tensor.\n\nRequirements (SparkDistill / TritonBench harness):\n\
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor\
+  \ over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include\
+  \ @triton.autotune with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid\
+  \ and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short\
+  \ note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- elementwise
+- convolution
+source:
+  channel: G
+  file: triton_conv2d_fwd.py
+  repo: BobMcDear/attorch
+  difficulty: '4'
+  star: 486
+  simp_instru_len: 202
+  comp_instru_len: 235
+  output_triton_len: 2916
+gold_kernel: data/TritonBench_G_v1/triton_conv2d_fwd.py

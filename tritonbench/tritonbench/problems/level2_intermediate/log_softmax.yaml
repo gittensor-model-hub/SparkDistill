@@ -1,0 +1,56 @@
+id: log_softmax
+level: 2
+category: kernel_generation
+title: Log Softmax
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `log_softmax.py` (repo: FlagOpen/FlagGems).\n\nTask description:\nThe provided code implements\
+  \ a custom log softmax operation using Triton, an efficient parallel programming library for GPUs, and\
+  \ integrates it as a PyTorch autograd function. The code comprises two main Triton kernels and a Python\
+  \ class to wrap them.\n\n        The 'log_softmax_kernel' Triton kernel computes the log softmax along\
+  \ a specified dimension of a tensor. It does so by first calculating the row-wise maximum to stabilize\
+  \ the softmax computation, subtracting this maximum from each element, and then computing the exponentials.\
+  \ The sum of these exponentials for each row is used to normalize the outputs. The kernel uses triton.autotune\
+  \ and triton.heuristics for performance optimization based on input size, leveraging BLOCK_M and BLOCK_N\
+  \ constants to define block sizes and num_warps to optimize parallel execution.\n\n        The 'log_softmax_backward_kernel'\
+  \ is the backward pass for the log softmax operation. It calculates the gradient of the input tensor\
+  \ by using the chain rule, considering the output and the gradient of the output from the forward pass.\
+  \ This involves subtracting the weighted exponentiated output from the gradient, scaled by the sum of\
+  \ the gradients along the specified dimension.\n\n        The 'LogSoftmax' class serves as a PyTorch\
+  \ custom autograd function, which integrates the Triton kernels into PyTorch's autograd system. In the\
+  \ 'forward' method, it calculates necessary dimensions (M and N) and the grid size for kernel invocation,\
+  \ invoking 'log_softmax_kernel' to compute the result. The result is saved for backward computation.\
+  \ The 'backward' method retrieves the saved output and uses 'log_softmax_backward_kernel' to calculate\
+  \ the input gradient, correctly considering dimensionality for both forward and backward passes.\n\n\
+  \        Finally, the 'log_softmax' function acts as a convenient wrapper for users, accepting a tensor\
+  \ and a dimension along which to apply the log softmax, while handling contiguous memory and optional\
+  \ dtype specification. It applies the 'LogSoftmax' function, returning the result tensor with the same\
+  \ shape as the input.\n\nRequirements (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1 on\
+  \ workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n\
+  - Use @triton.jit kernels with correct boundary masking\n- Include @triton.autotune with at least 3\
+  \ configs when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose correctness\
+  \ test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally skip\
+  \ autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- softmax
+- elementwise
+- reduction
+- convolution
+source:
+  channel: G
+  file: log_softmax.py
+  repo: FlagOpen/FlagGems
+  difficulty: '3'
+  star: 347
+  simp_instru_len: 310
+  comp_instru_len: 462
+  output_triton_len: 1729
+gold_kernel: data/TritonBench_G_v1/log_softmax.py

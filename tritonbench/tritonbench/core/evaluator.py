@@ -2,13 +2,24 @@
 
 from __future__ import annotations
 
-import re
 from typing import Any
+
+from tritonbench.core.numerical import NumericalResult, score_numerical
+from tritonbench.core.performance import PerfResult, score_performance
+from tritonbench.core.reference_oracle import score_against_oracle
 
 
 class TritonEvaluator:
-    def __init__(self, gpu_target: str = "Blackwell-SM120"):
+    def __init__(self, gpu_target: str = "Blackwell-SM120", *, gpu_peak_tflops: float | None = None):
         self.gpu = gpu_target
+        self.gpu_peak_tflops = gpu_peak_tflops
+        self.weights = {
+            "correctness": 0.35,
+            "api_modernity": 0.20,
+            "perf_awareness": 0.20,
+            "completeness": 0.15,
+            "code_quality": 0.10,
+        }
 
     def score(
         self,
@@ -17,39 +28,51 @@ class TritonEvaluator:
         exec_pass: bool,
         exec_output: str,
     ) -> dict[str, float]:
-        scores = {
-            "correctness": self._score_correctness(exec_pass, generated_code),
+        detailed = self.score_detailed(problem, generated_code, exec_pass, exec_output)
+        return {
+            "correctness": detailed["correctness"],
+            "api_modernity": detailed["api_modernity"],
+            "perf_awareness": detailed["perf_awareness"],
+            "completeness": detailed["completeness"],
+            "code_quality": detailed["code_quality"],
+            "composite_score": detailed["composite_score"],
+        }
+
+    def score_detailed(
+        self,
+        problem: dict,
+        generated_code: str,
+        exec_pass: bool,
+        exec_output: str,
+    ) -> dict[str, Any]:
+        correctness, numerical = score_numerical(exec_pass, exec_output, generated_code)
+        perf_score, perf = score_performance(
+            generated_code,
+            exec_output,
+            gpu_peak_tflops=self.gpu_peak_tflops,
+        )
+        scores: dict[str, Any] = {
+            "correctness": correctness,
             "api_modernity": self._score_api_modernity(generated_code),
-            "perf_awareness": self._score_performance(generated_code),
+            "perf_awareness": perf_score,
             "completeness": self._score_completeness(problem, generated_code),
             "code_quality": self._score_quality(generated_code),
+            "numerical": numerical.to_dict() if isinstance(numerical, NumericalResult) else numerical,
+            "performance": perf.to_dict() if isinstance(perf, PerfResult) else perf,
         }
-        weights = {
-            "correctness": 0.35,
-            "api_modernity": 0.20,
-            "perf_awareness": 0.20,
-            "completeness": 0.15,
-            "code_quality": 0.10,
-        }
-        scores["composite_score"] = sum(scores[k] * weights[k] for k in weights)
+        oracle = score_against_oracle(problem, generated_code)
+        if oracle is not None:
+            scores["oracle_similarity"] = oracle
+            # Light blend into code_quality without breaking weight sum semantics.
+            scores["code_quality"] = min(1.0, 0.7 * scores["code_quality"] + 0.3 * oracle)
+
+        scores["composite_score"] = sum(scores[k] * self.weights[k] for k in self.weights)
         return scores
 
     def _score_correctness(self, exec_pass: bool, code: str) -> float:
-        """Score numerical correctness of an executed kernel.
-
-        exec_pass only proves the script ran without raising. Full credit requires
-        the generated code to contain a reference comparison — an executed script
-        whose torch.allclose/assert_close check did not raise means the kernel's
-        output actually matched the reference. Merely running, with nothing
-        checked, is not evidence of a correct kernel.
-        """
-        if not exec_pass:
-            return 0.0
-        if "torch.allclose" in code or "torch.testing.assert_close" in code:
-            return 1.0
-        if re.search(r"^\s*assert\b", code, re.MULTILINE):
-            return 0.8
-        return 0.5
+        """Legacy helper retained for compatibility with older call sites/tests."""
+        score, _ = score_numerical(exec_pass, "", code)
+        return score
 
     def _score_api_modernity(self, code: str) -> float:
         score = 0.5
@@ -68,15 +91,8 @@ class TritonEvaluator:
         return max(0.0, min(1.0, score))
 
     def _score_performance(self, code: str) -> float:
-        checks = [
-            "@triton.autotune" in code,
-            bool(re.search(r"BLOCK_[MNK]\s*[=:]\s*\d+", code)),
-            "num_stages" in code,
-            "num_warps" in code,
-            "tl.dot(" in code,
-            any(h in code.lower() for h in ("blackwell", "sm_120", "sm_121", "rtx 50", "sm120")),
-        ]
-        return sum(1.0 for c in checks if c) / len(checks)
+        score, _ = score_performance(code, "")
+        return score
 
     def _score_completeness(self, problem: dict, code: str) -> float:
         score = 0.0
@@ -88,8 +104,6 @@ class TritonEvaluator:
         ]:
             if check:
                 score += weight
-        # Problems can pin required patterns (masking, tl.load/tl.store, ...);
-        # a solution missing them is incomplete no matter how well it runs.
         required = problem.get("required_patterns") or []
         if required:
             present = sum(1 for pattern in required if pattern in code)

@@ -1,0 +1,55 @@
+id: invert_matrix_lu
+level: 3
+category: kernel_translation
+title: Invert Matrix Lu
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `invert_matrix_lu`.\n\
+  \nOperator description:\nComputes the inverse of a square matrix using LU decomposition. Given a square\
+  \ invertible matrix A, it computes the inverse A^{-1} by performing LU decomposition and solving linear\
+  \ systems involving triangular matrices. Supports inputs of 'float', 'double', 'cfloat', and 'cdouble'\
+  \ dtypes, as well as batches of matrices.\n\nTarget Python signature / call pattern:\ninvert_matrix_lu(A,\
+  \ *, pivot=True, out=None) -> Tensor\n\nMathematical definition:\nA = P L U\nA^{-1} = U^{-1} L^{-1}\
+  \ P\nY = L^{-1} P\nA^{-1} = U^{-1} Y\n\nPyTorch reference snippet:\n```python\nP, L, U = torch.linalg.lu(A,\
+  \ pivot=pivot)\nP_eye = torch.eye(n, device=A.device, dtype=A.dtype).expand_as(A)\nP_mat = P @ P_eye\n\
+  Y = torch.linalg.solve(L, P_mat)\nA_inv = torch.linalg.solve(U, Y)\nout.copy_(A_inv)\n```\n\nExample\
+  \ / usage notes:\n>>> import torch\n>>> def invert_matrix_lu(A, *, pivot=True, out=None):\n...     P,\
+  \ L, U = torch.linalg.lu(A, pivot=pivot)\n...     n = A.size(-1)\n...     if pivot:\n...         P_eye\
+  \ = torch.eye(n, device=A.device, dtype=A.dtype).expand_as(A)\n...         P_mat = P @ P_eye\n...  \
+  \   else:\n...         P_mat = torch.eye(n, device=A.device, dtype=A.dtype)\n...     Y = torch.linalg.solve(L,\
+  \ P_mat)\n...     A_inv = torch.linalg.solve(U, Y)\n...     if out is not None:\n...         out.copy_(A_inv)\n\
+  ...         return out\n...     return A_inv\n>>> A = torch.tensor([[3., 0., 2.],\n...             \
+  \      [2., 0., -2.],\n...                   [0., 1., 1.]])\n>>> A_inv = invert_matrix_lu(A)\n>>> A_inv\n\
+  tensor([[ 0.2000,  0.2000,  0.0000],\n        [-0.2000,  0.3000,  1.0000],\n        [ 0.2000, -0.3000,\
+  \ -0.0000]])\n>>> torch.allclose(A @ A_inv, torch.eye(3))\nTrue\n>>> A_batch = torch.randn(2, 3, 3)\n\
+  >>> A_inv_batch = invert_matrix_lu(A_batch)\n>>> A_inv_batch.shape\ntorch.Size([2, 3, 3])\n>>> torch.allclose(A_batch\
+  \ @ A_inv_batch, torch.eye(3).expand(2, 3, 3))\nTrue\n\nAdditional constraints:\nThe function allows\
+  \ computing the inverse with or without pivoting (partial pivoting by default). It can handle batches\
+  \ of matrices, and an output tensor can be specified which will be ignored if set to None.\n\nRequirements\
+  \ (SparkDistill / TritonBench harness):\n- Translate the PyTorch reference into Triton 3.7.1 kernels\
+  \ for Blackwell SM120\n- Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate\
+  \ for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n\
+  - Add @triton.autotune when there are meaningful tile/block choices\n- Provide a launcher and a small\
+  \ self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 3
+  torch_cnt: 5
+  func_inputs: invert_matrix_lu(A, *, pivot=True, out=None) -> Tensor
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+source:
+  channel: T
+  file: invert_matrix_lu.py
+  name: invert_matrix_lu
+  difficulty: '3'
+  params_cnt: 3
+  torch_cnt: 5
+gold_kernel: data/TritonBench_T_v1/invert_matrix_lu.py

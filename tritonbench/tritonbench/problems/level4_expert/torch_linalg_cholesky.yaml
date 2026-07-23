@@ -1,0 +1,57 @@
+id: torch_linalg_cholesky
+level: 4
+category: kernel_translation
+title: Torch Linalg Cholesky
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.linalg.cholesky`.\n\
+  \nOperator description:\nComputes the Cholesky decomposition of a complex Hermitian or real symmetric\
+  \ positive-definite matrix. Supports input of float, double, cfloat and cdouble dtypes. Also supports\
+  \ batches of matrices, and if A is a batch of matrices then the output has the same batch dimensions.\n\
+  \nTarget Python signature / call pattern:\ndef linalg.cholesky(A, *, upper=False, out=None) -> Tensor\n\
+  \nArgs:\n    A (Tensor): tensor of shape `(*, n, n)` where `*` is zero or more batch dimensions\n  \
+  \              consisting of symmetric or Hermitian positive-definite matrices.\n\nKeyword args:\n \
+  \   upper (bool, optional): whether to return an upper triangular matrix.\n        The tensor returned\
+  \ with upper=True is the conjugate transpose of the tensor\n        returned with upper=False.\n   \
+  \ out (Tensor, optional): output tensor. Ignored if `None`. Default: `None`.\n\nMathematical definition:\n\
+  A = LL^{\\text{H}} where L is a lower triangular matrix with real positive diagonal and L^{\\text{H}}\
+  \ is the conjugate transpose when L is complex, and the transpose when L is real-valued.\n\nPyTorch\
+  \ reference snippet:\n```python\ntorch.linalg.cholesky(A)\n```\n\nExample / usage notes:\n>>> A = torch.randn(2,\
+  \ 2, dtype=torch.complex128)\n>>> A = A @ A.T.conj() + torch.eye(2)\n>>> A\ntensor([[2.5266+0.0000j,\
+  \ 1.9586-2.0626j],\n        [1.9586+2.0626j, 9.4160+0.0000j]], dtype=torch.complex128)\n>>> L = torch.linalg.cholesky(A)\n\
+  >>> L\ntensor([[1.5895+0.0000j, 0.0000+0.0000j],\n        [1.2322+1.2976j, 2.4928+0.0000j]], dtype=torch.complex128)\n\
+  >>> torch.dist(L @ L.T.conj(), A)\ntensor(4.4692e-16, dtype=torch.float64)\n\n>>> A = torch.randn(3,\
+  \ 2, 2, dtype=torch.float64)\n>>> A = A @ A.mT + torch.eye(2)\n>>> L = torch.linalg.cholesky(A)\n>>>\
+  \ torch.dist(L @ L.mT, A)\ntensor(5.8747e-16, dtype=torch.float64)\n\nAdditional constraints:\nWhen\
+  \ inputs are on a CUDA device, this function synchronizes that device with the CPU. For a version of\
+  \ this function that does not synchronize, see torch.linalg.cholesky_ex. Raises RuntimeError if the\
+  \ A matrix or any matrix in a batched A is not Hermitian (resp. symmetric) positive-definite.\n\nRequirements\
+  \ (SparkDistill / TritonBench harness):\n- Translate the PyTorch reference into Triton 3.7.1 kernels\
+  \ for Blackwell SM120\n- Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate\
+  \ for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n\
+  - Add @triton.autotune when there are meaningful tile/block choices\n- Provide a launcher and a small\
+  \ self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 3
+  torch_cnt: 1
+  func_inputs: "def linalg.cholesky(A, *, upper=False, out=None) -> Tensor\n\nArgs:\n    A (Tensor): tensor\
+    \ of shape `(*, n, n)` where `*` is zero or more batch dimensions\n                consisting of symmetric\
+    \ or Hermitian positive-definite matrices.\n\nKeyword args:\n    upper (bool, optional): whether to\
+    \ return an upper triangular matrix.\n        The tensor returned with upper=True is the conjugate\
+    \ transpose of the tensor\n        returned with upper=False.\n    out (Tensor, optional): output\
+    \ tensor. Ignored if `No"
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags: []
+source:
+  channel: T
+  file: cholesky.py
+  name: torch.linalg.cholesky
+  difficulty: '4'
+  params_cnt: 3
+  torch_cnt: 1
+gold_kernel: data/TritonBench_T_v1/cholesky.py

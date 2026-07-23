@@ -1,0 +1,63 @@
+id: int8_dequant_matmul
+level: 4
+category: kernel_generation
+title: Int8 Dequant Matmul
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `int8_dequant_matmul.py` (repo: bitsandbytes-foundation/bitsandbytes).
+
+
+  Task description:
+
+  The `_int8_matmul_rowwise_dequantize` kernel in Triton performs matrix multiplication with int8 inputs,
+  applying row-wise dequantization, and supports optional bias addition. The kernel uses a block-wise
+  computation strategy defined by the parameters BLOCK_M, BLOCK_N, and BLOCK_K. SPLIT_K enables further
+  parallelization across the K dimension by dividing the work into segments. The grid size for launching
+  the kernel is determined by the lambda function `grid`, which calculates the number of blocks required
+  based on input dimensions and block sizes. The kernel first computes a per-block matrix product using
+  the `tl.dot` operation. It accumulates results in an `acc` tensor of type tl.int32, which is then scaled
+  by factors loaded from `state_x_ptr` and `state_w_ptr`. If bias is present, it''s added post-dequantization.
+  The final result is stored or atomically added to matrix C based on the SPLIT_K value. The outer function
+  `int8_matmul_rowwise_dequantize` sets up the parameters and input tensors, handling strides and data
+  contiguity, and invokes the Triton kernel with optimized configurations.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- matmul
+- quantization
+- elementwise
+- reduction
+source:
+  channel: G
+  file: int8_dequant_matmul.py
+  repo: bitsandbytes-foundation/bitsandbytes
+  difficulty: '3'
+  star: 6354
+  simp_instru_len: 175
+  comp_instru_len: 271
+  output_triton_len: 2989
+gold_kernel: data/TritonBench_G_v1/int8_dequant_matmul.py

@@ -1,0 +1,50 @@
+id: torch_max
+level: 1
+category: kernel_translation
+title: Torch Max
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.max`.\n\
+  \nOperator description:\nReturns a namedtuple (values, indices) where values is the maximum value of\
+  \ each row of the input tensor in the given dimension dim. Indices is the index location of each maximum\
+  \ value found (argmax). If keepdim is True, the output tensors are of the same size as input except\
+  \ in the dimension dim where they are of size 1. Otherwise, dim is squeezed, resulting in the output\
+  \ tensors having 1 fewer dimension than input. If there are multiple maximal values in a reduced row,\
+  \ the indices of the first maximal value are returned.\n\nTarget Python signature / call pattern:\n\
+  max(input, dim, keepdim=False, *, out=None) -> (Tensor, LongTensor) input (Tensor): the input tensor.\
+  \ dim (int): the dimension to reduce. keepdim (bool): whether the output tensor has :attr:`dim` retained\
+  \ or not. Default: ``False``. out (tuple, optional): the result tuple of two output tensors (max, max_indices).\n\
+  \nPyTorch reference snippet:\n```python\ntorch.max(a, 1)\n```\n\nExample / usage notes:\n>>> a = torch.randn(4,\
+  \ 4)\n>>> a\ntensor([[-1.2360, -0.2942, -0.1222,  0.8475],\n        [ 1.1949, -1.1127, -2.2379, -0.6702],\n\
+  \        [ 1.5717, -0.9207,  0.1297, -1.8768],\n        [-0.6172,  1.0036, -0.6060, -0.2432]])\n>>>\
+  \ torch.max(a, 1)\ntorch.return_types.max(values=tensor([0.8475, 1.1949, 1.5717, 1.0036]), indices=tensor([3,\
+  \ 0, 0, 1]))\n\nAdditional constraints:\nIf there are multiple maximal values in a reduced row then\
+  \ the indices of the first maximal value are returned.\n\nRequirements (SparkDistill / TritonBench harness):\n\
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics:\
+  \ include torch.allclose vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary\
+  \ masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n- Add @triton.autotune when there\
+  \ are meaningful tile/block choices\n- Provide a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 4
+  torch_cnt: 1
+  func_inputs: 'max(input, dim, keepdim=False, *, out=None) -> (Tensor, LongTensor) input (Tensor): the
+    input tensor. dim (int): the dimension to reduce. keepdim (bool): whether the output tensor has :attr:`dim`
+    retained or not. Default: ``False``. out (tuple, optional): the result tuple of two output tensors
+    (max, max_indices).'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: T
+  file: max.py
+  name: torch.max
+  difficulty: '1'
+  params_cnt: 4
+  torch_cnt: 1
+gold_kernel: data/TritonBench_T_v1/max.py

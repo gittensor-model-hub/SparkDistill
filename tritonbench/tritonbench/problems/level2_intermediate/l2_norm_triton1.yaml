@@ -1,0 +1,48 @@
+id: l2_norm_triton1
+level: 2
+category: kernel_generation
+title: L2 Norm Triton1
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `l2_norm_triton1.py` (repo: ridgerchu/matmulfreellm).\n\nTask description:\nThe Triton kernel\
+  \ `_l2_norm_fwd_1pass_kernel` aims to perform L2 normalization on a 2D input tensor `X`. It processes\
+  \ each row separately using Triton's parallel execution model. The kernel expects pointers to `X` and\
+  \ `Y` along with the stride for rows (`stride_x_row`), number of columns in `X` (`N`), a small constant\
+  \ `eps` to prevent division by zero, and a compile-time constant `BLOCK_N`. The kernel computes L2 normalization\
+  \ by first loading a block of data from `X`, calculating the sum of squares for variance, and computing\
+  \ the reciprocal of the square root of the variance plus `eps` to get `rstd`. It then multiplies the\
+  \ input block by `rstd` to produce the normalized values, which are stored in `Y`.\n\n            The\
+  \ Python function `_l2_norm_fwd` handles the setup and execution of the kernel. It first reshapes and\
+  \ possibly makes the input tensor `x` contiguous. It initializes an empty tensor `y` to store the output.\
+  \ The function calculates `BLOCK_N` based on `x`'s element size and ensures it doesn't exceed 64KB.\
+  \ If the feature dimension `N` is larger than `BLOCK_N`, it raises an error. The kernel is then launched\
+  \ with the total number of rows `M`, pointers to `x` and `y`, stride, number of columns, `eps`, and\
+  \ `BLOCK_N`. Finally, the function returns the normalized tensor reshaped to its original dimensions.\n\
+  \nRequirements (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell\
+  \ (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use\
+  \ @triton.jit kernels with correct boundary masking\n- Include @triton.autotune with at least 3 configs\
+  \ when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose correctness test\n\
+  - Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally skip autotune\
+  \ for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+source:
+  channel: G
+  file: l2_norm_triton1.py
+  repo: ridgerchu/matmulfreellm
+  difficulty: '2'
+  star: 2927
+  simp_instru_len: 251
+  comp_instru_len: 350
+  output_triton_len: 581
+gold_kernel: data/TritonBench_G_v1/l2_norm_triton1.py

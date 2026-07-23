@@ -1,0 +1,66 @@
+id: torch_linalg_svd
+level: 3
+category: kernel_translation
+title: Torch Linalg Svd
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.linalg.svd`.\n\
+  \nOperator description:\nComputes the singular value decomposition (SVD) of a matrix. Supports input\
+  \ of float, double, cfloat and cdouble dtypes. Also supports batches of matrices, and if A is a batch\
+  \ of matrices then the output has the same batch dimensions. The returned decomposition is a named tuple\
+  \ (U, S, Vh) which corresponds to U, S, V^{H} above. The singular values are returned in descending\
+  \ order. The parameter full_matrices chooses between the full (default) and reduced SVD. The driver\
+  \ kwarg may be used in CUDA with a cuSOLVER backend to choose the algorithm used to compute the SVD.\
+  \ The choice of a driver is a trade-off between accuracy and speed.\n\nTarget Python signature / call\
+  \ pattern:\ndef linalg.svd(A, full_matrices=True, *, driver=None, out=None) -> (Tensor, Tensor, Tensor)\n\
+  \nArgs:\n    A (Tensor): tensor of shape `(*, m, n)` where `*` is zero or more batch dimensions.\n \
+  \   full_matrices (bool, optional): controls whether to compute the full or reduced SVD, and consequently,\
+  \ the shape of the returned tensors `U` and `Vh`. Default: `True`.\n\nKeyword args:\n    driver (str,\
+  \ optional): name of the cuSOLVER method to be used. This keyword argument only works on CUDA inputs.\
+  \ Available options are: `None`, `gesvd`, `gesvdj`, and `gesvda`. Default: `None`.\n    out (tuple,\
+  \ optional): output tuple of three tensors. Ignored if `None`.\n\nMathematical definition:\nA = U \\\
+  operatorname{diag}(S) V^{\\text{H}} \\mathrlap{\\qquad U \\in \\mathbb{K}^{m \\times m}, S \\in \\mathbb{R}^k,\
+  \ V \\in \\mathbb{K}^{n \\times n}}\n\nPyTorch reference snippet:\n```python\ntorch.linalg.svd(A, full_matrices=True,\
+  \ driver=None, out=None)\n```\n\nExample / usage notes:\n>>> A = torch.randn(5, 3)\n>>> U, S, Vh = torch.linalg.svd(A,\
+  \ full_matrices=False)\n>>> U.shape, S.shape, Vh.shape\n(torch.Size([5, 3]), torch.Size([3]), torch.Size([3,\
+  \ 3]))\n>>> torch.dist(A, U @ torch.diag(S) @ Vh)\ntensor(1.0486e-06)\n\n>>> U, S, Vh = torch.linalg.svd(A)\n\
+  >>> U.shape, S.shape, Vh.shape\n(torch.Size([5, 5]), torch.Size([3]), torch.Size([3, 3]))\n>>> torch.dist(A,\
+  \ U[:, :3] @ torch.diag(S) @ Vh)\ntensor(1.0486e-06)\n\n>>> A = torch.randn(7, 5, 3)\n>>> U, S, Vh =\
+  \ torch.linalg.svd(A, full_matrices=False)\n>>> torch.dist(A, U @ torch.diag_embed(S) @ Vh)\ntensor(3.0957e-06)\n\
+  \nAdditional constraints:\nDifferences with numpy.linalg.svd: Unlike numpy.linalg.svd, this function\
+  \ always returns a tuple of three tensors and it doesn't support compute_uv argument. Please use torch.linalg.svdvals,\
+  \ which computes only the singular values, instead of compute_uv=False. When full_matrices=True, the\
+  \ gradients with respect to U[..., :, min(m, n):] and Vh[..., min(m, n):, :] will be ignored, as those\
+  \ vectors can be arbitrary bases of the corresponding subspaces. The returned tensors U and V are not\
+  \ unique, nor are they continuous with respect to A. Gradients computed using U or Vh will only be finite\
+  \ when A does not have repeated singular values.\n\nRequirements (SparkDistill / TritonBench harness):\n\
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics:\
+  \ include torch.allclose vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary\
+  \ masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n- Add @triton.autotune when there\
+  \ are meaningful tile/block choices\n- Provide a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 4
+  torch_cnt: 1
+  func_inputs: "def linalg.svd(A, full_matrices=True, *, driver=None, out=None) -> (Tensor, Tensor, Tensor)\n\
+    \nArgs:\n    A (Tensor): tensor of shape `(*, m, n)` where `*` is zero or more batch dimensions.\n\
+    \    full_matrices (bool, optional): controls whether to compute the full or reduced SVD, and consequently,\
+    \ the shape of the returned tensors `U` and `Vh`. Default: `True`.\n\nKeyword args:\n    driver (str,\
+    \ optional): name of the cuSOLVER method to be used. This keyword argument only works on CUDA inputs.\
+    \ Available"
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: T
+  file: svd.py
+  name: torch.linalg.svd
+  difficulty: '4'
+  params_cnt: 4
+  torch_cnt: 1
+gold_kernel: data/TritonBench_T_v1/svd.py

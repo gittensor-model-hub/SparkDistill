@@ -1,0 +1,59 @@
+id: gelu_std
+level: 3
+category: kernel_translation
+title: Gelu Std
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `gelu_std`.\n\
+  \nOperator description:\nApplies the Gaussian Error Linear Units (GELU) activation function to the elements\
+  \ of input, then computes the standard deviation along the specified dimension(s). The GELU function\
+  \ is applied element-wise to the input tensor, with an option to use an approximation method. After\
+  \ activation, the standard deviation of the result is calculated over specified dimensions, with options\
+  \ to keep reduced dimensions and apply a correction factor.\n\nTarget Python signature / call pattern:\n\
+  def gelu_std(input, dim=None, keepdim=False, correction=1, approximate='none', out=None) -> Tensor:\
+  \ input (Tensor): The input tensor. dim (int or tuple of ints, optional): The dimension or dimensions\
+  \ to reduce. If None, computes over all dimensions. keepdim (bool, optional): Whether to retain the\
+  \ dimension(s) with size 1 after reduction. Default is False. correction (int, optional): The correction\
+  \ factor for standard deviation. Default is 1. approximate (str, optional): The approximation method\
+  \ for GELU. Default is 'none'. out (Tensor, optional): The output tensor.\n\nMathematical definition:\n\
+  GELU(x) = x * Φ(x) (when approximate is 'none')\nGELU(x) = 0.5 * x * (1 + Tanh(√(2/π) * (x + 0.044715\
+  \ * x^3))) (when approximate is 'tanh')\nσ = √(1/(max(0, N - δN)) * Σ(x_i - x̄)^2)\n\nPyTorch reference\
+  \ snippet:\n```python\ngelu_result = torch.nn.functional.gelu(input, approximate=approximate)\nreturn\
+  \ torch.std(gelu_result, dim=dim, keepdim=keepdim, correction=correction, out=out)\n```\n\nExample /\
+  \ usage notes:\n>>> import torch\n>>> a = torch.tensor([[0.2035, 1.2959, 1.8101, -0.4644], [1.5027,\
+  \ -0.3270, 0.5905, 0.6538]])\n>>> result = gelu_std(a, dim=1, keepdim=True)\n>>> result\ntensor([[0.6067],\n\
+  \        [0.6553]])\n\n>>> result = gelu_std(a, dim=1, keepdim=True, approximate='tanh')\n>>> result\n\
+  tensor([[0.6065],\n        [0.6550]])\n\nAdditional constraints:\nThe function allows the use of a correction\
+  \ factor in the standard deviation calculation. It supports two methods for computing GELU: exact using\
+  \ CDF or approximate using a tanh-based formula.\n\nRequirements (SparkDistill / TritonBench harness):\n\
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics:\
+  \ include torch.allclose vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary\
+  \ masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n- Add @triton.autotune when there\
+  \ are meaningful tile/block choices\n- Provide a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 6
+  torch_cnt: 2
+  func_inputs: 'def gelu_std(input, dim=None, keepdim=False, correction=1, approximate=''none'', out=None)
+    -> Tensor: input (Tensor): The input tensor. dim (int or tuple of ints, optional): The dimension or
+    dimensions to reduce. If None, computes over all dimensions. keepdim (bool, optional): Whether to
+    retain the dimension(s) with size 1 after reduction. Default is False. correction (int, optional):
+    The correction factor for standard deviation. Default is 1. approximate (str, optional): The approximation
+    method '
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+source:
+  channel: T
+  file: gelu_std.py
+  name: gelu_std
+  difficulty: '3'
+  params_cnt: 6
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/gelu_std.py

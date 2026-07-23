@@ -1,0 +1,55 @@
+id: max_reduction
+level: 2
+category: kernel_generation
+title: Max Reduction
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `max_reduction.py` (repo: FlagOpen/FlagGems).\n\nTask description:\nThe code comprises multiple\
+  \ GPU-accelerated kernels using Triton, facilitating efficient max value computation in tensors.\n \
+  \           - `max_kernel_1`: This Triton JIT-compiled kernel computes the maximum values within a large\
+  \ 1D input tensor across predefined blocks (BLOCK_SIZE). The program index (pid) determines the starting\
+  \ offset for each block, and values are conditionally loaded using a mask to handle out-of-bound reads.\
+  \ The maximum value in each block is calculated using `tl.max()` and stored in the `mid` intermediate\
+  \ tensor at the corresponding position.\n            - `max_kernel_2`: A second kernel that consolidates\
+  \ results from `max_kernel_1`. It calculates the overall maximum from the intermediate results stored\
+  \ in `mid` and writes the final maximum value to the `out` tensor.\n            - `max_kernel`: An advanced\
+  \ kernel for multi-dimensional max computation, which calculates the maximum values along a specified\
+  \ dimension. It employs a dual-program index strategy: `pid_m` for blocks along the selected dimension\
+  \ and `pid_k` for other dimensions. The `tl.load` function pulls data with masking to ensure correct\
+  \ indexing, and `tl.max` derives the maximum value and corresponding index across dimensions.\n    \
+  \        - `max`: A wrapper function that executes the sequential execution of `max_kernel_1` and `max_kernel_2`.\
+  \ It prepares necessary intermediate tensors (`mid` and `out`) and determines optimal block sizes (BLOCK_SIZE)\
+  \ through Triton's utility functions.\n            - `max_dim`: Extends max computation to operate on\
+  \ any dimension specified by `dim`, which is checked for validity against the tensor's rank. It reshapes\
+  \ outputs accordingly and executes `max_kernel` using calculated grid dimensions, determined by tensor\
+  \ dimensions M (product of all sizes before `dim`) and K (sizes after `dim`).\n            Each function\
+  \ is meticulously annotated for Triton's JIT compilation, facilitating optimal resource allocation for\
+  \ various GPU architectures. This design aims at reducing computational time by maximizing parallel\
+  \ execution potential of Triton kernels.\n\nRequirements (SparkDistill / TritonBench harness):\n- Target\
+  \ Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over\
+  \ deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include @triton.autotune\
+  \ with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose\
+  \ correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally\
+  \ skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: G
+  file: max_reduction.py
+  repo: FlagOpen/FlagGems
+  difficulty: '3'
+  star: 347
+  simp_instru_len: 318
+  comp_instru_len: 468
+  output_triton_len: 1471
+gold_kernel: data/TritonBench_G_v1/max_reduction.py

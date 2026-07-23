@@ -1,0 +1,68 @@
+id: fast_rms_layernorm
+level: 4
+category: kernel_generation
+title: Fast Rms Layernorm
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `fast_rms_layernorm.py` (repo: unslothai/unsloth).
+
+
+  Task description:
+
+  The code defines a fast RMS Layernorm operation using the Triton language for GPU acceleration. It contains
+  three main kernels: `_rms_layernorm_forward`, `_rms_layernorm_backward`, and `_gemma_rms_layernorm_forward`.
+  The `_rms_layernorm_forward` kernel computes the row-wise variance, calculates the inverse square root
+  of the variance, and normalizes the input data using this inverse variance. The result is scaled by
+  a weight vector to produce the output. The `_rms_layernorm_backward` kernel computes gradients with
+  respect to the input and the weight based on the chain rule. The `_gemma_rms_layernorm_forward` kernel
+  is similar to `_rms_layernorm_forward` but includes an additional constant `1.0` added to the weight
+  during the scaling operation. These kernels are used within the `Fast_RMS_Layernorm` PyTorch autograd
+  function. The forward method calculates the output of the layer normalization and saves the relevant
+  variables for the backward pass, while the backward method computes the gradients with respect to the
+  inputs. Common variables include `BLOCK_SIZE`, which determines the computational block size, and `num_warps`,
+  indicating the number of GPU warps used for parallel computation. The function `calculate_settings`
+  decides these values based on input dimensions. The `fast_rms_layernorm` function is a helper that applies
+  the `Fast_RMS_Layernorm` on the given input and layernorm configuration. This setup allows for efficient
+  layer normalization computation on GPUs using custom Triton kernels, aimed at providing significant
+  speedup over standard implementations.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- matmul
+- normalization
+- elementwise
+- reduction
+source:
+  channel: G
+  file: fast_rms_layernorm.py
+  repo: unslothai/unsloth
+  difficulty: '4'
+  star: 18751
+  simp_instru_len: 140
+  comp_instru_len: 382
+  output_triton_len: 2386
+gold_kernel: data/TritonBench_G_v1/fast_rms_layernorm.py

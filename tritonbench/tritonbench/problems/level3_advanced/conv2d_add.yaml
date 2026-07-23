@@ -1,0 +1,124 @@
+id: conv2d_add
+level: 3
+category: kernel_translation
+title: Conv2D Add
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `conv2d_add`.
+
+
+  Operator description:
+
+  Applies a 2D convolution over an input image using specified filters and an optional bias, then adds
+  another tensor or scalar to the convolution result, scaled by alpha. The input tensor shape is (minibatch,
+  in_channels, iH, iW), and the weight tensor shape is (out_channels, in_channels / groups, kH, kW). The
+  function also allows for setting the stride, padding, dilation, groups, and an optional output tensor.
+
+
+  Target Python signature / call pattern:
+
+  conv2d_add(input, weight, bias=None, other=None, stride=1, padding=0, dilation=1, groups=1, alpha=1,
+  out=None) -> Tensor: input (Tensor): The input tensor of shape (minibatch, in_channels, iH, iW). weight
+  (Tensor): The convolution filters of shape (out_channels, in_channels / groups, kH, kW). bias (Tensor,
+  optional): Optional bias tensor of shape (out_channels). Default: None. other (Tensor or Number, optional):
+  The tensor or number to add to the convolution result. Default: None. stride (int or tuple, optional):
+  The stride of the convolution kernel. Can be a single number or a tuple (sH, sW). Default: 1. padding
+  (int, tuple, or string, optional): Padding on both sides of the input. Can be ''valid'', ''same'', single
+  number, or tuple (padH, padW). Default: 0. dilation (int or tuple, optional): The spacing between kernel
+  elements. Default: 1. groups (int, optional): Number of groups to split the input into, must divide
+  in_channels and out_channels. Default: 1. alpha (Number, optional): The multiplier for other. Default:
+  1. out (Tensor, optional): The output tensor.
+
+
+  Mathematical definition:
+
+  \text{out} = \text{conv2d}(\text{input}, \text{weight}) + \alpha \times \text{other}
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  torch.nn.functional.conv2d; torch.add
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> import torch
+
+  >>> import torch.nn.functional as F
+
+  >>> # Define inputs and filters
+
+  >>> inputs = torch.randn(1, 3, 5, 5)
+
+  >>> filters = torch.randn(2, 3, 3, 3)
+
+  >>> bias = torch.randn(2)
+
+  >>> add_tensor = torch.randn(1, 2, 5, 5)
+
+  >>> # Apply convolution with bias, then add another tensor
+
+  >>> result = conv2d_add(inputs, filters, bias=bias, other=add_tensor, padding=1, alpha=0.5)
+
+  >>> result.shape
+
+  torch.Size([1, 2, 5, 5])
+
+
+  >>> # Using a scalar instead of a tensor for addition
+
+  >>> result = conv2d_add(inputs, filters, bias=bias, other=3, padding=1)
+
+  >>> result.shape
+
+  torch.Size([1, 2, 5, 5])
+
+
+  Additional constraints:
+
+  The ''groups'' argument must divide both in_channels and out_channels. Padding can be specified as ''valid'',
+  ''same'', a single number, or a tuple. The output tensor shape depends on convolution parameters.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 9
+  torch_cnt: 2
+  func_inputs: 'conv2d_add(input, weight, bias=None, other=None, stride=1, padding=0, dilation=1, groups=1,
+    alpha=1, out=None) -> Tensor: input (Tensor): The input tensor of shape (minibatch, in_channels, iH,
+    iW). weight (Tensor): The convolution filters of shape (out_channels, in_channels / groups, kH, kW).
+    bias (Tensor, optional): Optional bias tensor of shape (out_channels). Default: None. other (Tensor
+    or Number, optional): The tensor or number to add to the convolution result. Default: None. stride
+    (int or'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+- convolution
+source:
+  channel: T
+  file: conv2d_add.py
+  name: conv2d_add
+  difficulty: '4'
+  params_cnt: 9
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/conv2d_add.py

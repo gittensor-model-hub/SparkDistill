@@ -1,0 +1,53 @@
+id: triton_matmul
+level: 3
+category: kernel_generation
+title: Triton Matmul
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `triton_matmul.py` (repo: triton-lang/triton).\n\nTask description:\nThe provided Triton kernel,\
+  \ `matmul_kernel`, is a specialized GPU matrix multiplication operation. \n        It employs a blocked\
+  \ tiling strategy for efficient computation of the result matrix `c` from input matrices `a` and `b`.\
+  \ \n        Within this kernel, operations are parallelized across blocks defined by BLOCK_SIZE_M, BLOCK_SIZE_N,\
+  \ and BLOCK_SIZE_K. \n        These blocks allow the kernel to load sub-matrices, perform computations,\
+  \ and manage memory more efficiently.\n\n        The kernel begins by computing indices for thread execution,\
+  \ segmenting the operation across various program IDs derived from the grid dimensions. \n        For\
+  \ each thread block, it computes offsets `offs_am`, `offs_bn`, and `offs_k` to read data from the input\
+  \ matrices.\n\n        In a loop iterating over slices of the K dimension, sub-matrices are loaded using\
+  \ `tl.load` with masks to handle boundary conditions. \n        These matrices are then multiplied using\
+  \ `tl.dot`, accumulating results in a local accumulator. \n        Memory access patterns are optimized\
+  \ using `tl.max_contiguous` and `tl.multiple_of` to align data in cache-friendly ways.\n\n        The\
+  \ function finally writes the accumulated results to the output matrix `c`, with care taken to respect\
+  \ bounds and using conditional storage via `tl.store`.\n\n        The `matmul` function wraps this kernel,\
+  \ preparing inputs and meta-parameters based on the matrix data types and dimensions. \n        It enforces\
+  \ input compatibility, establishes execution grid dimensions, and sets device memory for output. \n\
+  \        Configuration parameters such as BLOCK_SIZE_M, num_stages, and num_warps are determined per\
+  \ data type, \n        ensuring optimal kernel execution tailored for either float16 or Triton's experimental\
+  \ float8 types.\n\nRequirements (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1 on workstation\
+  \ Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n\
+  - Use @triton.jit kernels with correct boundary masking\n- Include @triton.autotune with at least 3\
+  \ configs when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose correctness\
+  \ test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally skip\
+  \ autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+source:
+  channel: G
+  file: triton_matmul.py
+  repo: triton-lang/triton
+  difficulty: '3'
+  star: 13556
+  simp_instru_len: 298
+  comp_instru_len: 406
+  output_triton_len: 1824
+gold_kernel: data/TritonBench_G_v1/triton_matmul.py

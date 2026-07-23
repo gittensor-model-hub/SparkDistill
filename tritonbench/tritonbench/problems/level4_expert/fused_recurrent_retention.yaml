@@ -1,0 +1,49 @@
+id: fused_recurrent_retention
+level: 4
+category: kernel_generation
+title: Fused Recurrent Retention
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `fused_recurrent_retention.py` (repo: sustcsonglin/flash-linear-attention).\n\nTask description:\n\
+  The code implements a fused recurrent retention mechanism using Triton kernels for efficient computation.\
+  \ The primary function is 'fused_recurrent_retention', which takes query 'q', key 'k', value 'v', and\
+  \ an optional 'initial_state'. It performs a series of matrix operations across a temporal dimension\
+  \ 'T' to produce an output tensor 'o' and optionally a 'final_state' tensor.\n        The operation\
+  \ is carried out by two Triton kernels: 'fused_recurrent_retention_fwd_kernel' for the forward pass\
+  \ and 'fused_recurrent_retention_bwd_kernel' for the backward pass. The forward kernel loads and processes\
+  \ blocks of data from 'q', 'k', 'v', and iteratively updates an accumulator 'h' using a decay factor\
+  \ based on the current head index 'i_h'. If 'USE_INITIAL_STATE' is true, the kernel begins with a preloaded\
+  \ initial state. The result for each timestep is stored in 'o', and if 'STORE_FINAL_STATE' is set, the\
+  \ final state is stored. The backward kernel reverses the process, starting from 'do' to compute gradients\
+  \ for 'q', 'k', 'v' while handling the updates in a reverse order.\n        Important constants like\
+  \ 'BK', 'BV' define block sizes, while 'scale' scales the query tensors to normalize outputs. The computation\
+  \ grid is defined by dimensions related to input tensor shapes and Triton's efficient layout strategies.\n\
+  \nRequirements (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell\
+  \ (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use\
+  \ @triton.jit kernels with correct boundary masking\n- Include @triton.autotune with at least 3 configs\
+  \ when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose correctness test\n\
+  - Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally skip autotune\
+  \ for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- attention
+- matmul
+- elementwise
+- fused
+source:
+  channel: G
+  file: fused_recurrent_retention.py
+  repo: sustcsonglin/flash-linear-attention
+  difficulty: '4'
+  star: 1382
+  simp_instru_len: 203
+  comp_instru_len: 334
+  output_triton_len: 3732
+gold_kernel: data/TritonBench_G_v1/fused_recurrent_retention.py

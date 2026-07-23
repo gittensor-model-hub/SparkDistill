@@ -1,0 +1,57 @@
+id: chunk_retention_ops
+level: 4
+category: kernel_generation
+title: Chunk Retention Ops
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `chunk_retention_ops.py` (repo: sustcsonglin/flash-linear-attention).\n\nTask description:\n\
+  This code implements the forward and backward pass of a chunk retention operation using the Triton framework\
+  \ to optimize tensor computations. \n\n            It consists of multiple Triton kernel definitions\
+  \ and their Python wrappers for executing these kernels with specified parameters. \n\n            -\
+  \ `chunk_retention_fwd_kernel_h` is used in the forward pass to compute hidden states. It iteratively\
+  \ processes input tensors `k` and `v` across specified chunks (size `BT`) and updates the hidden state\
+  \ tensor `h`, optionally using an initial state and storing the final state. It takes into account block\
+  \ indices and handles boundaries with `boundary_check`.\n\n            - `chunk_retention_fwd_kernel_o`\
+  \ computes the final output tensor by combining `q`, `k`, and `v`, applying scaling, and handling chunk-wise\
+  \ processing with decay factors for block-wise computation.\n\n            - `chunk_retention_bwd_kernel_dh`\
+  \ calculates gradients for hidden states during the backward pass, processing `q`, `do`, and updating\
+  \ the gradient tensor `dh`.\n\n            - `chunk_retention_bwd_kernel_dqkv` computes gradients for\
+  \ the input tensors `q`, `k`, and `v` by processing `do`, `dh`, and hidden state `h`.\n\n          \
+  \  These kernels are executed by the Python functions:\n            - `chunk_fwd_h_fn`: Sets up and\
+  \ calls `chunk_retention_fwd_kernel_h`.\n            - `chunk_fwd_o_fn`: Sets up and calls `chunk_retention_fwd_kernel_o`.\n\
+  \            - `chunk_bwd_dh_fn`: Sets up and calls `chunk_retention_bwd_kernel_dh`.\n            -\
+  \ `chunk_bwd_dqkv_fn`: Sets up and calls `chunk_retention_bwd_kernel_dqkv`.\n\n            `ChunkRetentionFunction`\
+  \ is a custom PyTorch `autograd.Function` that utilizes these kernels for differentiable operations.\
+  \ It manages context saving and restores for gradient computations. The `forward` method initializes\
+  \ computations while the `backward` method orchestrates the gradient computations.\n\n            The\
+  \ `chunk_retention` function offers a user-friendly interface, allowing the operation to be performed\
+  \ on input tensors with options for initial and final states, scaling, and checkpointing, facilitating\
+  \ both forward and backward passes efficiently.\n\nRequirements (SparkDistill / TritonBench harness):\n\
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor\
+  \ over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include\
+  \ @triton.autotune with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid\
+  \ and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short\
+  \ note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- attention
+- matmul
+- elementwise
+source:
+  channel: G
+  file: chunk_retention_ops.py
+  repo: sustcsonglin/flash-linear-attention
+  difficulty: '4'
+  star: 1382
+  simp_instru_len: 437
+  comp_instru_len: 556
+  output_triton_len: 6878
+gold_kernel: data/TritonBench_G_v1/chunk_retention_ops.py

@@ -1,0 +1,48 @@
+id: lora_expand_gemv
+level: 3
+category: kernel_generation
+title: Lora Expand Gemv
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `lora_expand_gemv.py` (repo: vllm-project/vllm).\n\nTask description:\nThe Triton kernel `_bgmv_expand_kernel`\
+  \ is designed to perform a batched generalized matrix-vector multiplication (GEMV) using LoRA weights,\
+  \ with options to split the N dimension for performance optimization and conditionally add input values\
+  \ to the output. Key parameters include:\n    \n    - `input_ptr`: Pointer to the input matrix.\n  \
+  \  - `lora_ptr`: Pointer to the LoRA weights matrix.\n    - `out_ptr`: Pointer to the output matrix.\n\
+  \    - `N, K`: Dimensions of the matrices involved.\n    - `lora_indices`: Tensor indicating which LoRA\
+  \ weights to use for each batch.\n    - Various stride parameters for correct memory addressing.\n \
+  \   \n    The kernel checks the `lora_index` for each batch and skips computation if the index is -1.\
+  \ It then performs the matrix-vector multiplication in blocks, controlled by `BLOCK_N` and `BLOCK_K`\
+  \ constants, with potential type casting and input addition.\n    \n    The wrapper function `_bgmv_expand`\
+  \ sets up this kernel execution. It ensures that the input tensors are contiguous and have compatible\
+  \ dimensions. It selects the appropriate block sizes (`BLOCK_K`) and determines if type casting (`CAST_TYPE`)\
+  \ is needed based on the input and LoRA weights' data types. The function then launches the Triton kernel\
+  \ with a grid configuration based on the split N parameter, controlling how the work is distributed\
+  \ among kernel instances.\n\nRequirements (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1\
+  \ on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated\
+  \ tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include @triton.autotune\
+  \ with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose\
+  \ correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally\
+  \ skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+source:
+  channel: G
+  file: lora_expand_gemv.py
+  repo: vllm-project/vllm
+  difficulty: '3'
+  star: 31119
+  simp_instru_len: 220
+  comp_instru_len: 340
+  output_triton_len: 1838
+gold_kernel: data/TritonBench_G_v1/lora_expand_gemv.py

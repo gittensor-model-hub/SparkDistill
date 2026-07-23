@@ -1,0 +1,63 @@
+id: kcache_copy_triton
+level: 4
+category: kernel_generation
+title: Kcache Copy Triton
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `kcache_copy_triton.py` (repo: hpcaitech/ColossalAI).
+
+
+  Task description:
+
+  The provided Triton kernel ''_copy_to_kcache_seqlen_n_kernel'' and the function ''copy_k_to_blocked_cache''
+  work together to handle the copying of key or value vectors into a cached structure used in sequence
+  models, especially during the decoding stages. The kernel itself manages the computation of positions
+  within a blocked cache layout, supporting both traditional and new formats as specified by a parameter.
+  It determines current token and sequence indices, computes past sequence lengths, and figures out the
+  exact location in a cache where the token data should be stored. This involves calculating offsets and
+  leveraging Triton’s intrinsic memory operations such as ''tl.load'' and ''tl.store''. The kernel is
+  configured using grid dimensions based on batch size and head dimensions, while the function ''copy_k_to_blocked_cache''
+  converts the input tensor ''k'' to the appropriate shape and checks for compatibility between input
+  and cache dimensions. It computes necessary strides and calls the kernel with calculated strides and
+  block dimensions, passing constants like ''HEAD_DIM'' and ''KCACHE_X'' for memory layout control. This
+  kernel and function collectively enable efficient copying of sequence tokens into a block-structured
+  cache format, optimizing the process for various sequence lengths and layouts.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- reduction
+- convolution
+source:
+  channel: G
+  file: kcache_copy_triton.py
+  repo: hpcaitech/ColossalAI
+  difficulty: '4'
+  star: 38848
+  simp_instru_len: 225
+  comp_instru_len: 272
+  output_triton_len: 2057
+gold_kernel: data/TritonBench_G_v1/kcache_copy_triton.py

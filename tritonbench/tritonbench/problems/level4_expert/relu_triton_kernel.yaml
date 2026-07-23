@@ -1,0 +1,61 @@
+id: relu_triton_kernel
+level: 4
+category: kernel_generation
+title: Relu Triton Kernel
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `relu_triton_kernel.py` (repo: DaertML/fatkernels).
+
+
+  Task description:
+
+  The provided Triton kernel code defines a function, `relu_kernel`, which performs the Rectified Linear
+  Unit (ReLU) activation function on an input tensor. The function is compiled using the `triton.jit`
+  decorator, allowing it to run on a GPU. The kernel processes the input tensor in parallel using multiple
+  threads, each identified by `pid`, the program ID. The block of data each thread processes is determined
+  by `block_start` and `offsets`, where `block_size` specifies the number of elements each block handles.
+  The ReLU operation is executed by the `tl.where` function, setting negative values to zero and retaining
+  positive values. The result is conditionally stored back to global memory via `tl.store`, only writing
+  elements within the valid range of the input size `N`. The `relu` function, which serves as a wrapper,
+  prepares the output tensor, calculates the required number of blocks, and launches the Triton kernel
+  on a grid defined by these blocks. It ultimately returns the ReLU-activated tensor.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+source:
+  channel: G
+  file: relu_triton_kernel.py
+  repo: DaertML/fatkernels
+  difficulty: '4'
+  star: 2
+  simp_instru_len: 139
+  comp_instru_len: 229
+  output_triton_len: 350
+gold_kernel: data/TritonBench_G_v1/relu_triton_kernel.py

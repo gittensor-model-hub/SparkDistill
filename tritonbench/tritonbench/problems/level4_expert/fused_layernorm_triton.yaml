@@ -1,0 +1,65 @@
+id: fused_layernorm_triton
+level: 4
+category: kernel_generation
+title: Fused Layernorm Triton
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `fused_layernorm_triton.py` (repo: pytorch/benchmark).
+
+
+  Task description:
+
+  The Triton kernel `triton_red_fused_native_layer_norm_0` within `fused_native_layer_norm` performs layer
+  normalization on the input tensor `primals_3` (shape `(S, D)`). The process involves calculating the
+  mean and variance across the rows of the input tensor using a parallel reduction technique known as
+  the Welford algorithm, facilitated by Triton''s helper functions. Each thread block processes a segment
+  of the input (`RBLOCK` elements) and updates shared buffers for mean, variance, and count (`tmp3_mean`,
+  `tmp3_m2`, `tmp3_weight`). After the reduction, mean (`tmp3`), variance (`tmp4`), and count (`tmp5`)
+  are stored in buffer `out_ptr0` and used to compute the normalization factor. The main normalization
+  operation involves centering the input by subtracting the mean and scaling with the reciprocal of the
+  variance''s square root (`tmp10`). The kernel also applies optional affine transformations using `primals_1`
+  (scale) and `primals_2` (bias), storing the final normalized outputs in `out_ptr1`. The function sets
+  up the kernel execution using Triton''s grid and block configuration and manages CUDA streams for device
+  synchronization. The `fused_native_layer_norm` Python wrapper sets up these inputs and invokes the Triton
+  kernel, preparing auxiliary output tensors like `buf0`, `buf3`, and the main result in `buf4`.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- normalization
+- elementwise
+- reduction
+- fused
+source:
+  channel: G
+  file: fused_layernorm_triton.py
+  repo: pytorch/benchmark
+  difficulty: '4'
+  star: 879
+  simp_instru_len: 199
+  comp_instru_len: 341
+  output_triton_len: 1624
+gold_kernel: data/TritonBench_G_v1/fused_layernorm_triton.py

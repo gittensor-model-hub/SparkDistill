@@ -1,0 +1,53 @@
+id: fp4_to_bf16_conversion
+level: 3
+category: kernel_generation
+title: Fp4 To Bf16 Conversion
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `fp4_to_bf16_conversion.py` (repo: pytorch/ao).\n\nTask description:\nThe Triton kernel and\
+  \ function provided are designed to efficiently convert packed fp4 values to bf16 format while applying\
+  \ a scaling factor represented in e8m0 format. \n\nKernel `triton_f4_to_scaled_bf16_kernel`:\n- Function:\
+  \ Convert 4-bit floating-point numbers to bfloat16 with scaling.\n- Inputs: \n  - `x_ptr`: Pointer to\
+  \ packed 4-bit floats.\n  - `s_ptr`: Pointer to scaling factors in e8m0 format.\n  - `output_ptr`: Pointer\
+  \ where results are stored.\n  - `n_elements_in`: Number of packed elements to process.\n  - Constant\
+  \ expressions for masks and biases used in conversion logic (e.g., `SIGN_MASK_F4`).\n- Outputs: Scaled\
+  \ bf16 tensor.\n- Process: \n  - Decomposes each packed byte into two 4-bit numbers.\n  - Adjusts the\
+  \ sign and mantissa bits to convert to bf16, applying bitwise operations.\n  - Corrects for special\
+  \ cases like zero and denormals with masks.\n  - Uses Triton-specific constructs for parallel processing,\
+  \ calculating the correct output block and grid sizes.\n\nWrapper Function `triton_f4_to_scaled_bf16`:\n\
+  - Function: Setup and launch the Triton kernel with correct parameters.\n- Inputs:\n  - `x`: The tensor\
+  \ of packed 4-bit floats.\n  - `s_e8m0`: Scaling factor tensor.\n  - `mx_block_size`: Block size for\
+  \ processing.\n- Outputs: Tensor with bf16 values, scaled.\n- Implementation:\n  - Determines shape\
+  \ and size of output tensor.\n  - Ensures input tensor is contiguous and on the CUDA device.\n  - Computes\
+  \ grid configuration using the number of input elements.\n  - Launches `triton_f4_to_scaled_bf16_kernel`\
+  \ with the computed grid and configuration parameters, ensuring efficient conversion and scaling of\
+  \ input data.\n\nRequirements (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1 on workstation\
+  \ Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n\
+  - Use @triton.jit kernels with correct boundary masking\n- Include @triton.autotune with at least 3\
+  \ configs when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose correctness\
+  \ test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally skip\
+  \ autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- quantization
+- elementwise
+- reduction
+- convolution
+source:
+  channel: G
+  file: fp4_to_bf16_conversion.py
+  repo: pytorch/ao
+  difficulty: '3'
+  star: 1630
+  simp_instru_len: 420
+  comp_instru_len: 484
+  output_triton_len: 2877
+gold_kernel: data/TritonBench_G_v1/fp4_to_bf16_conversion.py

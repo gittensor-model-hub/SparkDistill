@@ -1,0 +1,52 @@
+id: l2_norm_triton2
+level: 2
+category: kernel_generation
+title: L2 Norm Triton2
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `l2_norm_triton2.py` (repo: josStorer/RWKV-Runner).\n\nTask description:\nThe provided code\
+  \ defines a Triton-accelerated L2 normalization routine, consisting of two parts: a forward pass `_l2_norm_fwd`\
+  \ and a backward pass `_l2_norm_bwd`. Both parts utilize their respective kernels `_l2_norm_fwd_1pass_kernel`\
+  \ and `_l2_norm_bwd_kernel` for GPU-accelerated computations.\n\n            - `_l2_norm_fwd_1pass_kernel`:\
+  \ This function is a Triton kernel that performs the forward L2 normalization on a per-row basis for\
+  \ a 2D input tensor `X`. The input tensor is expected to have its last dimension stride as 1. The kernel\
+  \ computes the L2 norm by:\n              * Loading a block of data from the current row specified by\
+  \ `row = tl.program_id(0)`.\n              * Calculating the sum of squares to obtain the variance.\n\
+  \              * Computing the reciprocal square root of the variance (rstd) to normalize `x`.\n   \
+  \           * Storing the normalized result into the output tensor `Y`.\n\n            - `_l2_norm_bwd_kernel`:\
+  \ This kernel performs the backward pass necessary for gradient computation during L2 normalization.\
+  \ It takes the input tensor `X`, its gradients `DY`, and outputs the gradient with respect to `X` in\
+  \ `DX`. The computations include:\n              * Loading the inputs and gradients for the row defined\
+  \ by `row = tl.program_id(0)`.\n              * Using the precomputed variance and rstd from the forward\
+  \ pass to determine gradients.\n              * Applying normalization logic to compute the gradient\
+  \ of the loss with respect to the input `X`.\n              * Storing the computed gradient into `DX`.\n\
+  \n            Both `_l2_norm_fwd` and `_l2_norm_bwd` handle tensor reshaping and preparation before\
+  \ kernel invocation. They also enforce a constraint on the feature dimension size, ensuring it remains\
+  \ below 64KB to fit Triton's kernel memory limits. These routines are designed to work in environments\
+  \ with PyTorch and Triton, aiming at efficient parallel execution on modern GPUs.\n\nRequirements (SparkDistill\
+  \ / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer\
+  \ tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct\
+  \ boundary masking\n- Include @triton.autotune with at least 3 configs when tile sizes matter\n- Provide\
+  \ a Python launcher + grid and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot\
+  \ reductions\n- Print a short note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: G
+  file: l2_norm_triton2.py
+  repo: josStorer/RWKV-Runner
+  difficulty: '3'
+  star: 5337
+  simp_instru_len: 270
+  comp_instru_len: 489
+  output_triton_len: 1445
+gold_kernel: data/TritonBench_G_v1/l2_norm_triton2.py

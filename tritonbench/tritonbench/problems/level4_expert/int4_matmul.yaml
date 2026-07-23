@@ -1,0 +1,50 @@
+id: int4_matmul
+level: 4
+category: kernel_generation
+title: Int4 Matmul
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `int4_matmul.py` (repo: ModelTC/lightllm).\n\nTask description:\nThe code defines a Triton-based\
+  \ kernel for matrix multiplication of INT4 quantized weights and provides Python functions to handle\
+  \ the quantization and dequantization processes. \n        The 'matmul_kernel' function is a Triton\
+  \ kernel using @triton.jit which performs matrix multiplication. It processes the input matrices in\
+  \ tiles defined by BLOCK_SIZE_M, BLOCK_SIZE_N, and BLOCK_SIZE_K, and uses a loop to iterate over the\
+  \ K dimension to accumulate results in fp32 precision, subsequently stored in the output buffer, potentially\
+  \ employing atomic add for SPLIT_K > 1.\n        The kernel is set up with a wide variety of configurations,\
+  \ allowing Triton's autotuning capabilities to select optimal parameters based on matrix dimensions\
+  \ M, N, and K. It utilizes quantized INT4 weights, reconstructing them using scales and zero points\
+  \ to compute matrix products accurately. \n        The Python function 'matmul_dequantize_int4_s2' serves\
+  \ as an interface to this kernel, preparing data and launching the computation on specified grid dimensions.\n\
+  \        The function 'quantize_int4' converts a floating-point weight matrix into INT4 format, organizing\
+  \ the data by packing 8 INT4 values into one INT32 and calculating scaling factors and zero points for\
+  \ each group of elements. \n        The helper function 'unpack_int4' is intended for testing; it unpacks\
+  \ the INT4 matrix back into a floating-point format to verify the quantization process.\n\nRequirements\
+  \ (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x\
+  \ / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use @triton.jit\
+  \ kernels with correct boundary masking\n- Include @triton.autotune with at least 3 configs when tile\
+  \ sizes matter\n- Provide a Python launcher + grid and a torch.allclose correctness test\n- Use fp32\
+  \ accumulators for tl.dot reductions\n- Print a short note if you intentionally skip autotune for a\
+  \ tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- matmul
+- quantization
+- elementwise
+- convolution
+source:
+  channel: G
+  file: int4_matmul.py
+  repo: ModelTC/lightllm
+  difficulty: '5'
+  star: 2647
+  simp_instru_len: 162
+  comp_instru_len: 327
+  output_triton_len: 5818
+gold_kernel: data/TritonBench_G_v1/int4_matmul.py

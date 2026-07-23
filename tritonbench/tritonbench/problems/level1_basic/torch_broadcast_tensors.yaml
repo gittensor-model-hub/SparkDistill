@@ -1,0 +1,47 @@
+id: torch_broadcast_tensors
+level: 1
+category: kernel_translation
+title: Torch Broadcast Tensors
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.broadcast_tensors`.\n\
+  \nOperator description:\nBroadcasts the given tensors according to broadcasting semantics. This function\
+  \ takes multiple tensors as input and broadcasts them to have the same shape. Broadcasting refers to\
+  \ expanding the dimensions of tensors as necessary to make them compatible for element-wise operations.\
+  \ The broadcasted tensors share the same memory location for their elements, leading to potential issues\
+  \ with in-place operations.\n\nTarget Python signature / call pattern:\nbroadcast_tensors(*tensors)\
+  \ -> List of Tensors: *tensors (Args: any number of tensors of the same type) -> Example: x = torch.arange(3).view(1,\
+  \ 3), y = torch.arange(2).view(2, 1), a, b = torch.broadcast_tensors(x, y), a.size() == torch.Size([2,\
+  \ 3]), a == tensor([[0, 1, 2],[0, 1, 2]])\n\nPyTorch reference snippet:\n```python\ntorch.broadcast_tensors(x,\
+  \ y)\n```\n\nExample / usage notes:\n>>> x = torch.arange(3).view(1, 3)\n>>> y = torch.arange(2).view(2,\
+  \ 1)\n>>> a, b = torch.broadcast_tensors(x, y)\n>>> a.size()\ntorch.Size([2, 3])\n>>> a\ntensor([[0,\
+  \ 1, 2],\n        [0, 1, 2]])\n\nAdditional constraints:\nMore than one element of a broadcasted tensor\
+  \ may refer to a single memory location. In-place operations may result in incorrect behavior. If writing\
+  \ to tensors is needed, clone them first.\n\nRequirements (SparkDistill / TritonBench harness):\n- Translate\
+  \ the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics: include\
+  \ torch.allclose vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary masks;\
+  \ prefer tl.make_tensor_descriptor over tl.make_block_ptr\n- Add @triton.autotune when there are meaningful\
+  \ tile/block choices\n- Provide a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 1
+  torch_cnt: 1
+  func_inputs: 'broadcast_tensors(*tensors) -> List of Tensors: *tensors (Args: any number of tensors
+    of the same type) -> Example: x = torch.arange(3).view(1, 3), y = torch.arange(2).view(2, 1), a, b
+    = torch.broadcast_tensors(x, y), a.size() == torch.Size([2, 3]), a == tensor([[0, 1, 2],[0, 1, 2]])'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+- debug
+source:
+  channel: T
+  file: broadcast_tensors.py
+  name: torch.broadcast_tensors
+  difficulty: '2'
+  params_cnt: 1
+  torch_cnt: 1
+gold_kernel: data/TritonBench_T_v1/broadcast_tensors.py

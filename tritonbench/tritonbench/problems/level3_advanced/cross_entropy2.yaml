@@ -1,0 +1,56 @@
+id: cross_entropy2
+level: 3
+category: kernel_debugging
+title: Cross Entropy2
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `cross_entropy2.py` (repo: josStorer/RWKV-Runner).\n\nTask description:\nThis Triton implementation\
+  \ provides a mechanism to calculate cross-entropy loss and its gradients efficiently using GPU parallelism.\
+  \ It involves two main kernels: `cross_entropy_fwd_kernel` for the forward pass and `cross_entropy_bwd_kernel`\
+  \ for the backward pass.\n\n    The `cross_entropy_fwd_kernel` is executed for each row (determined\
+  \ by `tl.program_id(0)`) and for each block of columns within that row (determined by `tl.program_id(1)`).\
+  \ The kernel computes the logits for each block, applies logit scaling, and calculates the log-sum-exp\
+  \ (lse). It also handles scenarios with label smoothing, optionally computes a scaled squared value\
+  \ of the lse (z_loss), and stores both the loss and z_loss in the provided pointers.\n\n    Specific\
+  \ checks are included for whether the label at the current index matches an `ignored_index`, which sets\
+  \ the loss and z_loss to zero if true. Moreover, conditional compilation flags like `HAS_SMOOTHING`\
+  \ and `SPLIT` enable or disable features such as smoothing and splitting the loss computation.\n\n \
+  \   The `cross_entropy_bwd_kernel` computes the gradient of the loss with respect to the logits (dlogits).\
+  \ It calculates probabilities from the logits and adjusts them based on the lse. Depending on whether\
+  \ label smoothing is enabled, it modifies the gradients accordingly and stores them. The grid configuration\
+  \ uses row index and block index to partition the computation efficiently.\n\n    The wrapper functions,\
+  \ `cross_entropy_fwd` and `cross_entropy_bwd`, prepare and dispatch these kernels with the specified\
+  \ grid dimensions based on the input tensor shapes. They also print intermediate results such as `loss`,\
+  \ `lse`, `z_loss`, and `dlogits` for debugging purposes.\n\n    Parameters:\n    - logits: Input tensor\
+  \ containing the logit values.\n    - labels: Tensor with the target class labels.\n    - smoothing,\
+  \ logit_scale, lse_square_scale: Scalars adjusting the loss computation.\n    - ignored_index: Specifies\
+  \ any label to ignore.\n    - total_classes, class_start_idx: Help manage subsetting classes in parallel\
+  \ scenarios.\n    - BLOCK_SIZE: Constant specifying the number of columns processed in parallel.\n \
+  \   - HAS_SMOOTHING, SPLIT: Boolean flags for feature toggling.\n\n    Outputs:\n    - Forward pass:\
+  \ Returns tensors for `loss`, `lse`, and `z_loss`.\n    - Backward pass: Returns tensor `dlogits` containing\
+  \ gradients of the logits.\n\nRequirements (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1\
+  \ on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated\
+  \ tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include @triton.autotune\
+  \ with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose\
+  \ correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally\
+  \ skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- mask
+tags:
+- elementwise
+- reduction
+- debug
+source:
+  channel: G
+  file: cross_entropy2.py
+  repo: josStorer/RWKV-Runner
+  difficulty: '4'
+  star: 5337
+  simp_instru_len: 341
+  comp_instru_len: 601
+  output_triton_len: 2298
+gold_kernel: data/TritonBench_G_v1/cross_entropy2.py

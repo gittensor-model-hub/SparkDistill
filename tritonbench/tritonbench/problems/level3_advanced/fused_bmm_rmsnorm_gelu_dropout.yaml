@@ -1,0 +1,78 @@
+id: fused_bmm_rmsnorm_gelu_dropout
+level: 3
+category: kernel_translation
+title: Fused Bmm Rmsnorm Gelu Dropout
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `fused_bmm_rmsnorm_gelu_dropout`.\n\
+  \nOperator description:\nPerforms a fused operation combining batch matrix multiplication, RMS normalization,\
+  \ GELU activation, and dropout.\n\nTarget Python signature / call pattern:\nfused_bmm_rmsnorm_gelu_dropout(input1,\
+  \ input2, normalized_shape, dropout_p=0.1, eps=1e-5, training=True, approximate='none', *, out=None)\
+  \ -> Tensor; input1 (Tensor): First input tensor for bmm, of shape (B, N, M), where B is the batch size;\
+  \ input2 (Tensor): Second input tensor for bmm, of shape (B, M, P); normalized_shape (int or list or\
+  \ torch.Size): Input shape from an expected input of size (B, N, P). This is the shape over which RMS\
+  \ normalization is applied; dropout_p (float, optional): Probability of an element to be zeroed in the\
+  \ dropout layer. Default: 0.1; eps (float, optional): A value added to the denominator for numerical\
+  \ stability in RMS normalization. Default: 1e-5; training (bool, optional): Apply dropout if True. Default:\
+  \ True; approximate (str, optional): Can be 'none' or 'tanh'. The approximation to use for GELU. Default:\
+  \ 'none'; out (Tensor, optional): Output tensor. Ignored if None. Default: None.\n\nMathematical definition:\n\
+  Given two input tensors X and Y, this function computes: \\[ \\begin{align*} Z_1 &= \\text{bmm}(X, Y)\
+  \ \\\\ Z_2 &= \\text{RMSNorm}(Z_1, \\epsilon) \\\\ Z_3 &= \\text{GELU}(Z_2) \\\\ Z &= \\text{Dropout}(Z_3,\
+  \ p) \\end{align*} \\] where: \\- \\text{bmm}(X, Y) performs batch matrix multiplication. \\- \\text{RMSNorm}(Z_1,\
+  \ \\epsilon) = \\frac{Z_1}{\\sqrt{\\text{mean}(Z_1^2, \\text{dim}=\\text{last}) + \\epsilon}} \\times\
+  \ \\gamma, where \\gamma is a learnable parameter (if `elementwise_affine=True`). \\- \\text{GELU}(Z_2)\
+  \ applies the Gaussian Error Linear Unit activation function element-wise. \\- \\text{Dropout}(Z_3,\
+  \ p) randomly zeroes elements of Z_3 with probability p.\n\nPyTorch reference snippet:\n```python\n\
+  z1 = torch.bmm(input1, input2)\nrms_norm = torch.nn.functional.rms_norm(z1, normalized_shape, eps=eps)\n\
+  gelu_out = torch.nn.functional.gelu(rms_norm, approximate=approximate)\noutput = torch.nn.functional.dropout(gelu_out,\
+  \ p=dropout_p, training=training)\nif out is not None:\n    out.copy_(output)\n    return out\nreturn\
+  \ output\n```\n\nExample / usage notes:\n```python\nimport torch\nimport torch.nn.functional as F\n\n\
+  def fused_bmm_rmsnorm_gelu_dropout(input1, input2, normalized_shape, dropout_p=0.1, eps=1e-5, training=True,\
+  \ approximate='none', *, out=None):\n    z1 = torch.bmm(input1, input2)\n    rms_norm = F.rms_norm(z1,\
+  \ normalized_shape, eps=eps)\n    gelu_out = F.gelu(rms_norm, approximate=approximate)\n    output =\
+  \ F.dropout(gelu_out, p=dropout_p, training=training)\n    if out is not None:\n        out.copy_(output)\n\
+  \        return out\n    return output\n\n# Example usage\nB, N, M, P = 2, 3, 4, 5\ninput1 = torch.randn(B,\
+  \ N, M)\ninput2 = torch.randn(B, M, P)\nnormalized_shape = P  # Since the output of bmm has shape (B,\
+  \ N, P)\n\noutput = fused_bmm_rmsnorm_gelu_dropout(input1, input2, normalized_shape)\nprint(\"Output\
+  \ shape:\", output.shape)\n# Output shape: torch.Size([2, 3, 5])\n```\n\nAdditional constraints:\n-\
+  \ The shapes of `input1` and `input2` must be compatible for batch matrix multiplication: `input1` of\
+  \ shape `(B, N, M)` and `input2` of shape `(B, M, P)` result in an output of shape `(B, N, P)`.\n- The\
+  \ `normalized_shape` argument for RMS normalization should match the shape of the last dimension(s)\
+  \ of the output tensor over which to compute the RMS.\n- The `GELU` activation is applied element-wise\
+  \ to the normalized output.\n- The `dropout` is applied during training when `training=True`. Set `training=False`\
+  \ to disable dropout during evaluation.\n- All operations are differentiable and support autograd.\n\
+  \nRequirements (SparkDistill / TritonBench harness):\n- Translate the PyTorch reference into Triton\
+  \ 3.7.1 kernels for Blackwell SM120\n- Preserve numerics: include torch.allclose vs the reference (atol/rtol\
+  \ appropriate for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over\
+  \ tl.make_block_ptr\n- Add @triton.autotune when there are meaningful tile/block choices\n- Provide\
+  \ a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 8
+  torch_cnt: 4
+  func_inputs: 'fused_bmm_rmsnorm_gelu_dropout(input1, input2, normalized_shape, dropout_p=0.1, eps=1e-5,
+    training=True, approximate=''none'', *, out=None) -> Tensor; input1 (Tensor): First input tensor for
+    bmm, of shape (B, N, M), where B is the batch size; input2 (Tensor): Second input tensor for bmm,
+    of shape (B, M, P); normalized_shape (int or list or torch.Size): Input shape from an expected input
+    of size (B, N, P). This is the shape over which RMS normalization is applied; dropout_p (float, optional):
+    Proba'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- normalization
+- elementwise
+- reduction
+- dropout
+- fused
+source:
+  channel: T
+  file: fused_bmm_rmsnorm_gelu_dropout.py
+  name: fused_bmm_rmsnorm_gelu_dropout
+  difficulty: '3'
+  params_cnt: 8
+  torch_cnt: 4
+gold_kernel: data/TritonBench_T_v1/fused_bmm_rmsnorm_gelu_dropout.py

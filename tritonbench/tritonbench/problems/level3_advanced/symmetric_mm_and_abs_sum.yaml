@@ -1,0 +1,51 @@
+id: symmetric_mm_and_abs_sum
+level: 3
+category: kernel_translation
+title: Symmetric Mm And Abs Sum
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `symmetric_mm_and_abs_sum`.\n\
+  \nOperator description:\nPerforms a symmetric matrix multiplication by multiplying matrix `A` with its\
+  \ transpose, scales the result by `alpha`, adds it to matrix `C` scaled by `beta`, and returns the sum\
+  \ of the absolute values of the resulting matrix.\n\nTarget Python signature / call pattern:\nsymmetric_mm_and_abs_sum(A:\
+  \ torch.Tensor, C: torch.Tensor, alpha: float, beta: float) -> torch.Tensor\nArgs:\n    A (Tensor):\
+  \ Input matrix of shape `(n, m)` for which the symmetric product with its transpose is calculated.\n\
+  \    C (Tensor): Matrix of the same shape as `alpha * torch.mm(A, A.T)` to accumulate the scaled result.\n\
+  \    alpha (float): Scaling factor for the matrix product.\n    beta (float): Scaling factor for matrix\
+  \ `C`.\nReturns:\n    Tensor: Scalar tensor representing the sum of absolute values of the resulting\
+  \ matrix `C`.\n\nMathematical definition:\n1. `C = alpha * torch.mm(A, A.T) + beta * C`; 2. `asum =\
+  \ torch.sum(torch.abs(C))`\n\nPyTorch reference snippet:\n```python\nalpha * torch.mm(A, A.T) + beta\
+  \ * C; torch.sum(torch.abs(C))\n```\n\nExample / usage notes:\n>>> A = torch.tensor([[1.0, 2.0], [3.0,\
+  \ 4.0]])\n>>> C = torch.zeros(2, 2)\n>>> alpha = 1.0\n>>> beta = 0.5\n>>> asum = symmetric_mm_and_abs_sum(A,\
+  \ C, alpha, beta)\n>>> print(asum)\n\nAdditional constraints:\nReturns a scalar tensor representing\
+  \ the sum of absolute values of the resulting matrix `C`.\n\nRequirements (SparkDistill / TritonBench\
+  \ harness):\n- Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve\
+  \ numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit\
+  \ + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n- Add @triton.autotune\
+  \ when there are meaningful tile/block choices\n- Provide a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 4
+  torch_cnt: 2
+  func_inputs: "symmetric_mm_and_abs_sum(A: torch.Tensor, C: torch.Tensor, alpha: float, beta: float)\
+    \ -> torch.Tensor\nArgs:\n    A (Tensor): Input matrix of shape `(n, m)` for which the symmetric product\
+    \ with its transpose is calculated.\n    C (Tensor): Matrix of the same shape as `alpha * torch.mm(A,\
+    \ A.T)` to accumulate the scaled result.\n    alpha (float): Scaling factor for the matrix product.\n\
+    \    beta (float): Scaling factor for matrix `C`.\nReturns:\n    Tensor: Scalar tensor representing\
+    \ the sum of absolute "
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: T
+  file: symmetric_mm_and_abs_sum.py
+  name: symmetric_mm_and_abs_sum
+  difficulty: '4'
+  params_cnt: 4
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/symmetric_mm_and_abs_sum.py

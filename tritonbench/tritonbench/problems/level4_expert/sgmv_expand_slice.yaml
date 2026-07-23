@@ -1,0 +1,47 @@
+id: sgmv_expand_slice
+level: 4
+category: kernel_generation
+title: Sgmv Expand Slice
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `sgmv_expand_slice.py` (repo: vllm-project/vllm).\n\nTask description:\nThe provided code consists\
+  \ of a Triton kernel, `_sgmv_expand_slice_kernel`, and a wrapper function, `_sgmv_expand_slice`. \n\
+  \            The kernel performs a specialized form of matrix multiplication involving sparse generalized\
+  \ matrix-vector multiplication (SGMV). \n            It operates on blocks of data defined by the parameters\
+  \ BLOCK_M, BLOCK_N, and BLOCK_K. \n            The kernel checks for boundary conditions and handles\
+  \ data casting between different precisions. \n            It processes sequences of a batch in parallel\
+  \ and uses lora_indices to access specific slices of LoRA weights for computations. \n            The\
+  \ wrapper function sets up the input parameters, ensuring contiguity and dimension correctness, and\
+  \ configures the Triton launch grid to execute the kernel. \n            It validates tensor shapes\
+  \ and data types, adjusts weights if needed, and launches the kernel with a grid configured to cover\
+  \ the input data based on the maximum sequence length and batch size.\n\nRequirements (SparkDistill\
+  \ / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer\
+  \ tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct\
+  \ boundary masking\n- Include @triton.autotune with at least 3 configs when tile sizes matter\n- Provide\
+  \ a Python launcher + grid and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot\
+  \ reductions\n- Print a short note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+- torch.allclose
+tags:
+- matmul
+- elementwise
+- reduction
+- sparse
+source:
+  channel: G
+  file: sgmv_expand_slice.py
+  repo: vllm-project/vllm
+  difficulty: '4'
+  star: 31119
+  simp_instru_len: 149
+  comp_instru_len: 220
+  output_triton_len: 2049
+gold_kernel: data/TritonBench_G_v1/sgmv_expand_slice.py

@@ -1,0 +1,70 @@
+id: gelu_conv2d
+level: 4
+category: kernel_translation
+title: Gelu Conv2D
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `gelu_conv2d`.\n\
+  \nOperator description:\nApplies a 2D convolution over an input tensor with specified filters, followed\
+  \ by applying the Gaussian Error Linear Units (GELU) activation function element-wise to the result.\
+  \ This helps introduce non-linearity after the convolution operation.\n\nTarget Python signature / call\
+  \ pattern:\ndef gelu_conv2d(input: Tensor, weight: Tensor, bias: Optional[Tensor] = None, stride: Union[int,\
+  \ Tuple[int, int]] = 1, padding: Union[int, Tuple[int, int], str] = 0, dilation: Union[int, Tuple[int,\
+  \ int]] = 1, groups: int = 1, approximate: str = 'none', out: Optional[Tensor] = None) -> Tensor\nArgs:\n\
+  \    input (Tensor): The input tensor of shape `(minibatch, in_channels, iH, iW)`.\n    weight (Tensor):\
+  \ The convolution filters of shape `(out_channels, in_channels / groups, kH, kW)`.\n    bias (Tensor,\
+  \ optional): Optional bias tensor of shape `(out_channels)`. Default: ``None``.\n    stride (int or\
+  \ tuple, optional): The stride of the convolution kernel. Can be a single number or a tuple `(sH, sW)`.\
+  \ Default: 1.\n    padding (int, tuple, or string, optional): Padding on both sides of the input. Can\
+  \ be 'valid', 'same', single number, or tuple `(padH, padW)`. Default: 0.\n    dilation (int or tuple,\
+  \ optional): The spacing between kernel elements. Default: 1.\n    groups (int, optional): Number of\
+  \ groups to split the input into. Default: 1.\n    approximate (str, optional): The approximation method\
+  \ for GELU. Default is 'none'.\n    out (Tensor, optional): The output tensor.\n\nMathematical definition:\n\
+  The combined operation is defined as:\n\n.. math::\n    \\text{out} = \\text{GELU}(\\text{conv2d}(\\\
+  text{input}, \\text{weight}))\n\nwhere GELU is computed as:\n\n- If :attr:`approximate` is 'none', GELU\
+  \ is computed as:\n\n  .. math::\n      \\text{GELU}(x) = x * \\Phi(x)\n\n  where :math:`\\Phi(x)` is\
+  \ the Cumulative Distribution Function for Gaussian Distribution.\n\n- If :attr:`approximate` is 'tanh',\
+  \ GELU is approximated as:\n\n  .. math::\n      \\text{GELU}(x) = 0.5 * x * (1 + \\text{Tanh}(\\sqrt{2\
+  \ / \\pi} * (x + 0.044715 * x^3)))\n\nPyTorch reference snippet:\n```python\nconv_result = torch.nn.functional.conv2d(input,\
+  \ weight, bias=bias, stride=stride, padding=padding, dilation=dilation, groups=groups)\nreturn torch.nn.functional.gelu(conv_result,\
+  \ approximate=approximate, out=out)\n```\n\nExample / usage notes:\nExample::\n\n    >>> import torch\n\
+  \    >>> import torch.nn.functional as F\n    >>> # Define inputs and filters\n    >>> inputs = torch.randn(1,\
+  \ 3, 5, 5)\n    >>> filters = torch.randn(2, 3, 3, 3)\n    >>> bias = torch.randn(2)\n    >>> # Apply\
+  \ convolution with bias, then GELU activation\n    >>> result = gelu_conv2d(inputs, filters, bias=bias,\
+  \ padding=1)\n    >>> result.shape\n    torch.Size([1, 2, 5, 5])\n\n    >>> # Applying convolution without\
+  \ bias and using GELU with 'tanh' approximation\n    >>> result = gelu_conv2d(inputs, filters, padding=1,\
+  \ approximate='tanh')\n    >>> result.shape\n    torch.Size([1, 2, 5, 5])\n\nAdditional constraints:\n\
+  The function combines 2D convolution and GELU activation, with options for approximation methods for\
+  \ GELU.\n\nRequirements (SparkDistill / TritonBench harness):\n- Translate the PyTorch reference into\
+  \ Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics: include torch.allclose vs the reference\
+  \ (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor\
+  \ over tl.make_block_ptr\n- Add @triton.autotune when there are meaningful tile/block choices\n- Provide\
+  \ a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 9
+  torch_cnt: 2
+  func_inputs: "def gelu_conv2d(input: Tensor, weight: Tensor, bias: Optional[Tensor] = None, stride:\
+    \ Union[int, Tuple[int, int]] = 1, padding: Union[int, Tuple[int, int], str] = 0, dilation: Union[int,\
+    \ Tuple[int, int]] = 1, groups: int = 1, approximate: str = 'none', out: Optional[Tensor] = None)\
+    \ -> Tensor\nArgs:\n    input (Tensor): The input tensor of shape `(minibatch, in_channels, iH, iW)`.\n\
+    \    weight (Tensor): The convolution filters of shape `(out_channels, in_channels / groups, kH, kW)`.\n\
+    \    bias (Tensor,"
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+- convolution
+source:
+  channel: T
+  file: gelu_conv2d.py
+  name: gelu_conv2d
+  difficulty: '4'
+  params_cnt: 9
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/gelu_conv2d.py

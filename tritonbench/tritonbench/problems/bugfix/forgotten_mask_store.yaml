@@ -1,0 +1,22 @@
+id: forgotten_mask_store
+level: bugfix
+category: kernel_debugging
+title: Load Masked but Store Unmasked
+prompt: Kernel loads with a mask but stores without one, writing OOB. Fix it.
+input_code: "@triton.jit\ndef relu_kernel(x_ptr, out_ptr, n, BLOCK: tl.constexpr):\n    pid = tl.program_id(0)\n\
+  \    offs = pid * BLOCK + tl.arange(0, BLOCK)\n    mask = offs < n\n    x = tl.load(x_ptr + offs, mask=mask,\
+  \ other=0.0)\n    y = tl.where(x > 0, x, 0.0)\n    tl.store(out_ptr + offs, y)\n"
+expected_fix: Pass the same mask to tl.store
+required_patterns:
+- '@triton.jit'
+- mask
+tags:
+- debugging
+- masking
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+source:
+  channel: synthetic
+  file: forgotten_mask_store.py
+  difficulty: bugfix

@@ -38,6 +38,8 @@ class BenchConfig:
     temperature: float = 0.2
     gpu_index: int = 0
     problems_dir: str = ""
+    enable_repair: bool = False
+    max_repair_turns: int = 3
 
 
 class TritonBench:
@@ -99,6 +101,32 @@ class TritonBench:
 
     def _evaluate_problem(self, problem: dict) -> dict:
         start = time.time()
+        if self.config.enable_repair:
+            from tritonbench.core.repair_agent import RepairAgent
+
+            agent = RepairAgent(
+                self.model,
+                self.validator,
+                self.evaluator,
+                max_turns=self.config.max_repair_turns,
+            )
+            episode = agent.run(problem)
+            last = episode.turns[-1] if episode.turns else None
+            api_check = self.validator.check_triton_api(last.code if last else "")
+            result = {
+                "id": problem["id"],
+                "level": problem["level"],
+                "syntax_ok": bool(last and last.syntax_ok),
+                "api_modern": api_check["modern"],
+                "api_issues": api_check.get("issues", []),
+                "exec_pass": episode.final_pass,
+                "exec_output": (last.exec_output if last else "")[:4000],
+                "gen_time_s": time.time() - start,
+                "repair": episode.to_dict(),
+                **(episode.final_scores or self.evaluator.score(problem, "", False, "")),
+            }
+            return result
+
         prompt = self._build_prompt(problem)
         response = self.model.generate(
             prompt=prompt,

@@ -1,0 +1,65 @@
+id: softmax_optimize
+level: 2
+category: kernel_generation
+title: Softmax Optimize
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `softmax_optimize.py` (repo: iclementine/optimize_softmax).
+
+
+  Task description:
+
+  The `softmax_kernel_online_v2` function is a Triton-optimized kernel designed to compute the softmax
+  function over a 2D input tensor. It uses tiling to manage computation over potentially large matrices
+  by splitting the data into manageable chunks, or tiles, of size `TILE_N`. This function accepts pointers
+  to the input and output data, dimensions of the input matrix (M by N), and the tile size `TILE_N`. The
+  computation occurs in two main phases: a reduction phase to compute necessary statistics (maximum value
+  and sum of exponentials for stable softmax) and a final output phase where the input data is exponentiated,
+  normalized by the sum, and stored in the output location. The kernel efficiently handles matrix boundaries
+  by leveraging the `prev_multiple_of` helper to compute the largest possible tile-aligned boundary within
+  matrix dimensions. This boundary is used to handle potential edge cases in matrix dimensions that are
+  not perfectly divisible by the tile size. The function''s design ensures numerical stability and efficiency
+  by computing softmax in a numerically stable manner using a two-pass algorithm. The wrapper `softmax`
+  function prepares the necessary parameters, invokes this kernel, and returns the softmax-normalized
+  output.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- softmax
+- elementwise
+- reduction
+source:
+  channel: G
+  file: softmax_optimize.py
+  repo: iclementine/optimize_softmax
+  difficulty: '3'
+  star: 10
+  simp_instru_len: 225
+  comp_instru_len: 263
+  output_triton_len: 1040
+gold_kernel: data/TritonBench_G_v1/softmax_optimize.py

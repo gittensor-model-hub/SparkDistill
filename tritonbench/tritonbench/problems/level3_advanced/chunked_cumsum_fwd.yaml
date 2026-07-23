@@ -1,0 +1,48 @@
+id: chunked_cumsum_fwd
+level: 3
+category: kernel_generation
+title: Chunked Cumsum Fwd
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `chunked_cumsum_fwd.py` (repo: MzeroMiko/VMamba).\n\nTask description:\nThe Triton kernel '_chunk_cumsum_fwd_kernel'\
+  \ performs a chunked cumulative sum on a 3D tensor 'dt' by iterating over batches, chunks, and heads.\
+  \ The data pointers are adjusted based on thread identifiers to load appropriate sections of the tensor.\
+  \ Optional bias and softplus transformations are applied to the data. The cumulative sum is computed\
+  \ for each chunk using the scaling factors 'A', and results are stored in 'dA_cumsum'. The output tensor\
+  \ 'dt_out' retains the modified values of 'dt' after transformation and clamping. The kernel uses block\
+  \ configurations to optimize performance for different problem sizes.\n        The '_chunk_cumsum_fwd'\
+  \ function initializes output tensors, computes grid dimensions, and invokes the Triton kernel on the\
+  \ GPU. It checks shapes of inputs and optionally includes biases in the computation. Key configurations\
+  \ are determined by input dimensions, and blocks are selected for efficient parallel computation.\n\
+  \        Inputs:\n        - dt: 3D tensor (batch, seqlen, nheads), source data.\n        - A: 1D tensor\
+  \ (nheads,), scaling factors for cumulative sum.\n        - chunk_size: Integer, size of data chunks.\n\
+  \        - dt_bias: Optional 1D tensor (nheads,), biases for dt.\n        - dt_softplus: Boolean, softplus\
+  \ transformation flag.\n        - dt_limit: Tuple, min and max clamping values for dt.\n        Outputs:\n\
+  \        - dA_cumsum: Tensor (batch, nheads, nchunks, chunk_size), cumulative sum result.\n        -\
+  \ dt_out: Tensor (batch, nheads, nchunks, chunk_size), transformed dt.\n\nRequirements (SparkDistill\
+  \ / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer\
+  \ tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct\
+  \ boundary masking\n- Include @triton.autotune with at least 3 configs when tile sizes matter\n- Provide\
+  \ a Python launcher + grid and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot\
+  \ reductions\n- Print a short note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: G
+  file: chunked_cumsum_fwd.py
+  repo: MzeroMiko/VMamba
+  difficulty: '4'
+  star: 2235
+  simp_instru_len: 242
+  comp_instru_len: 397
+  output_triton_len: 2102
+gold_kernel: data/TritonBench_G_v1/chunked_cumsum_fwd.py

@@ -1,0 +1,28 @@
+id: missing_fp32_accum
+level: bugfix
+category: kernel_debugging
+title: Missing FP32 Accumulator in Dot
+prompt: This matmul kernel loses precision on Blackwell because it accumulates in float16. Fix numerical
+  stability while keeping the same API.
+input_code: "@triton.jit\ndef matmul_kernel(a_ptr, b_ptr, c_ptr, M, N, K,\n                  stride_am,\
+  \ stride_ak, stride_bk, stride_bn, stride_cm, stride_cn,\n                  BLOCK_M: tl.constexpr, BLOCK_N:\
+  \ tl.constexpr, BLOCK_K: tl.constexpr):\n    pid_m = tl.program_id(0)\n    pid_n = tl.program_id(1)\n\
+  \    offs_m = pid_m * BLOCK_M + tl.arange(0, BLOCK_M)\n    offs_n = pid_n * BLOCK_N + tl.arange(0, BLOCK_N)\n\
+  \    offs_k = tl.arange(0, BLOCK_K)\n    a = tl.load(a_ptr + offs_m[:, None] * stride_am + offs_k[None,\
+  \ :] * stride_ak)\n    b = tl.load(b_ptr + offs_k[:, None] * stride_bk + offs_n[None, :] * stride_bn)\n\
+  \    acc = tl.dot(a, b)\n    tl.store(c_ptr + offs_m[:, None] * stride_cm + offs_n[None, :] * stride_cn,\
+  \ acc)\n"
+expected_fix: Accumulate tl.dot into tl.float32 acc then cast on store
+required_patterns:
+- '@triton.jit'
+tags:
+- debugging
+- matmul
+- precision
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+source:
+  channel: synthetic
+  file: missing_fp32_accum.py
+  difficulty: bugfix

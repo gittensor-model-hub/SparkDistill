@@ -1,0 +1,61 @@
+id: fused_gather_masked_fill
+level: 4
+category: kernel_translation
+title: Fused Gather Masked Fill
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `fused_gather_masked_fill`.\n\
+  \nOperator description:\nPerforms a fused operation combining torch.gather and torch.Tensor.masked_fill.\
+  \ It first gathers values from the input tensor along a specified dimension using provided indices,\
+  \ and then replaces the gathered elements with a specified value where the mask is True.\n\nTarget Python\
+  \ signature / call pattern:\nfused_gather_masked_fill(input, dim, index, mask, value, *, sparse_grad=False,\
+  \ out=None) -> Tensor; input (Tensor): The input tensor X.; dim (int): The dimension along which to\
+  \ index.; index (LongTensor): The indices of elements to gather, of the same dimensionality as `input`.;\
+  \ mask (BoolTensor): A boolean mask tensor, broadcastable to the shape of the output tensor Y.; value\
+  \ (float): The value to fill in where `mask` is True.; sparse_grad (bool, optional): If True, gradient\
+  \ w.r.t. `input` will be a sparse tensor. Default: `False`.; out (Tensor, optional): Output tensor.\
+  \ Ignored if `None`. Default: `None`.\n\nMathematical definition:\nY = \\text{gather}(X, \\text{dim},\
+  \ I)\nY[M] = \\text{value}\n\nPyTorch reference snippet:\n```python\ngathered = torch.gather(input,\
+  \ dim, index, sparse_grad=sparse_grad)\noutput = gathered.masked_fill(mask, value)\n```\n\nExample /\
+  \ usage notes:\nimport torch\n\ndef fused_gather_masked_fill(input, dim, index, mask, value, *, sparse_grad=False,\
+  \ out=None):\n    gathered = torch.gather(input, dim, index, sparse_grad=sparse_grad)\n    output =\
+  \ gathered.masked_fill(mask, value)\n    if out is not None:\n        out.copy_(output)\n        return\
+  \ out\n    return output\n\n# Example usage\ninput = torch.tensor([[1, 2], [3, 4]])\nindex = torch.tensor([[0,\
+  \ 0], [1, 0]])\nmask = torch.tensor([[True, False], [False, True]])\nvalue = -1\n\noutput = fused_gather_masked_fill(input,\
+  \ 1, index, mask, value)\nprint(\"Output:\")\nprint(output)\n# Output:\n# tensor([[-1,  1],\n#     \
+  \    [ 4, -1]])\n\nAdditional constraints:\n- The input and index tensors must have the same number\
+  \ of dimensions.\n- The size of index at each dimension d must not exceed the size of input at that\
+  \ dimension, except at dimension dim.\n- The mask tensor must be broadcastable to the shape of the gathered\
+  \ output.\n- The function supports autograd for gradient computation.\n- All operations are differentiable\
+  \ and support backpropagation.\n\nRequirements (SparkDistill / TritonBench harness):\n- Translate the\
+  \ PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics: include torch.allclose\
+  \ vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor\
+  \ over tl.make_block_ptr\n- Add @triton.autotune when there are meaningful tile/block choices\n- Provide\
+  \ a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 6
+  torch_cnt: 2
+  func_inputs: 'fused_gather_masked_fill(input, dim, index, mask, value, *, sparse_grad=False, out=None)
+    -> Tensor; input (Tensor): The input tensor X.; dim (int): The dimension along which to index.; index
+    (LongTensor): The indices of elements to gather, of the same dimensionality as `input`.; mask (BoolTensor):
+    A boolean mask tensor, broadcastable to the shape of the output tensor Y.; value (float): The value
+    to fill in where `mask` is True.; sparse_grad (bool, optional): If True, gradient w.r.t. `input` will'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- mask
+- '@triton.autotune'
+tags:
+- embedding
+- sparse
+- fused
+source:
+  channel: T
+  file: fused_gather_masked_fill.py
+  name: fused_gather_masked_fill
+  difficulty: '4'
+  params_cnt: 6
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/fused_gather_masked_fill.py

@@ -1,0 +1,48 @@
+id: softmax_triton2
+level: 2
+category: kernel_generation
+title: Softmax Triton2
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `softmax_triton2.py` (repo: microsoft/triton-shared).\n\nTask description:\nThe Triton-based\
+  \ softmax operator consists of two main functions: `softmax_kernel` and `softmax`.\n        The `softmax_kernel`\
+  \ is decorated with `@triton.jit`, indicating it is compiled for execution on Triton-compatible GPUs.\
+  \ It takes pointers to input and output data, stride information for row access, and a constant `BLOCK_SIZE`.\n\
+  \        The kernel function computes the softmax transformation for each row independently. It uses\
+  \ `tl.program_id(0)` to get the current row index for the 1D grid. It calculates the input pointers\
+  \ for the row, loads data into SRAM with `tl.load`, subtracts the maximum value to ensure numerical\
+  \ stability, and applies the exponential function to compute the numerator of the softmax.\n       \
+  \ The denominator is calculated by summing the exponentiated values. The output is computed as the element-wise\
+  \ division of the numerator by the denominator and stored back using `tl.store`.\n        The `softmax`\
+  \ function configures execution parameters such as grid size and block size based on input dimensions.\
+  \ It creates an empty output tensor and invokes the `softmax_kernel` using Triton’s grid execution syntax,\
+  \ where each row of the input tensor is processed by an individual Triton kernel instance.\n       \
+  \ It computes the `BLOCK_SIZE` as the next power of two of the number of columns to optimize for memory\
+  \ alignment and performance, adjusting the number of warps for larger blocks.\n\nRequirements (SparkDistill\
+  \ / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer\
+  \ tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct\
+  \ boundary masking\n- Include @triton.autotune with at least 3 configs when tile sizes matter\n- Provide\
+  \ a Python launcher + grid and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot\
+  \ reductions\n- Print a short note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- softmax
+- elementwise
+- reduction
+source:
+  channel: G
+  file: softmax_triton2.py
+  repo: microsoft/triton-shared
+  difficulty: '3'
+  star: 197
+  simp_instru_len: 135
+  comp_instru_len: 328
+  output_triton_len: 695
+gold_kernel: data/TritonBench_G_v1/softmax_triton2.py

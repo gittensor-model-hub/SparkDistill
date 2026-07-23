@@ -1,0 +1,54 @@
+id: cross_entropy_ops
+level: 3
+category: kernel_generation
+title: Cross Entropy Ops
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `cross_entropy_ops.py` (repo: HazyResearch/based).\n\nTask description:\nThis code defines a\
+  \ Triton-based cross-entropy loss function with optional label smoothing and scaled logits handling.\
+  \ The main components are two kernel functions: `cross_entropy_fwd_kernel` and `cross_entropy_bwd_kernel`,\
+  \ which are executed via Triton to perform computations efficiently on GPU.\n\n            The `cross_entropy_fwd_kernel`\
+  \ computes the forward pass of the cross-entropy loss. It processes each row of logits and calculates\
+  \ the log-sum-exp (lse) and loss for each label, considering smoothing, logit scaling, and specific\
+  \ class handling for distributed tensor parallelism. The kernel handles cases where labels are ignored\
+  \ and adjusts loss calculation if the label index does not match the current block of classes. It uses\
+  \ triton's utilities to manage block operations and loop unrolling efficiently.\n\n            The `cross_entropy_bwd_kernel`\
+  \ calculates the backward pass, deriving the gradient of the loss with respect to logits. It applies\
+  \ the chain rule considering the effect of label smoothing and optional scaling factors. The computed\
+  \ probabilities are adjusted based on whether smoothing is applied or not, and then used to compute\
+  \ the gradient contribution for each logit.\n\n            The `CrossEntropyLoss` class encapsulates\
+  \ the forward and backward pass logic. The `forward` method prepares data structures for loss and lse,\
+  \ manages distributed computation conditions, and executes the forward kernel. It adjusts results for\
+  \ cases where the workload is split across processes or blocks. The computed losses are also adjusted\
+  \ to zero out contributions from ignored labels.\n\n            The `backward` method in `CrossEntropyLoss`\
+  \ class computes gradients for the logits by calling the backward kernel. It supports an optional in-place\
+  \ backward for memory efficiency.\n\n            Finally, the `cross_entropy_loss` function is a high-level\
+  \ entry point that applies the `CrossEntropyLoss` operation. It takes parameters such as logits, labels,\
+  \ and smoothing factors, and returns the computed losses and z-losses. The function is designed to handle\
+  \ both single and multi-process scenarios seamlessly.\n\nRequirements (SparkDistill / TritonBench harness):\n\
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor\
+  \ over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include\
+  \ @triton.autotune with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid\
+  \ and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short\
+  \ note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: G
+  file: cross_entropy_ops.py
+  repo: HazyResearch/based
+  difficulty: '4'
+  star: 216
+  simp_instru_len: 178
+  comp_instru_len: 457
+  output_triton_len: 3393
+gold_kernel: data/TritonBench_G_v1/cross_entropy_ops.py

@@ -1,0 +1,59 @@
+id: rms_matmul_rbe
+level: 4
+category: kernel_generation
+title: Rms Matmul Rbe
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `rms_matmul_rbe.py` (repo: ELS-RD/kernl).\n\nTask description:\nThis implementation consists\
+  \ of Triton kernels designed to perform matrix multiplication enhanced by RMS normalization and optional\
+  \ rotary embeddings, serving particularly well in attention-based neural network layers. \n\n1. `rms_matmul_rbe`\
+  \ Kernel:\n   - Function: Computes the expression c = (rms(x) * rms_w) @ w with optional rotary embeddings\
+  \ applied in the epilogue.\n   - Inputs: \n     - x_ptr, w_ptr, rms_w_ptr, out_ptr: Pointers to the\
+  \ input matrix, weight matrix, rms of the weight matrix, and output matrix, respectively.\n     - M,\
+  \ N, K: Dimensions of the matrices involved.\n     - Strides: Strides for batch, M, N, K dimensions\
+  \ for each matrix.\n     - start_token_position, USE_FP8, RBE_EPILOGUE, THETA, EPS, BLOCK_SIZE_M, BLOCK_SIZE_N,\
+  \ BLOCK_SIZE_K: Constants and configuration flags for numerical precision, RMS normalization, and rotary\
+  \ embedding application.\n   - Logic: The kernel uses block-level computations to load, normalize using\
+  \ RMS, and multiply matrices. The rotary embeddings are optionally applied to output.\n\n2. `rms_matmul_rbe_qkv`\
+  \ Kernel:\n   - Function: Acts as a wrapper to perform matrix multiplications separately for Q, K, and\
+  \ V matrices. It calls `rms_matmul_rbe` thrice, once for each type of matrix.\n   - Inputs: Similar\
+  \ to `rms_matmul_rbe` but for Q, K, V matrices along with their respective weight matrices and strides.\n\
+  \n3. `rms_matmul_rbe_qkv_wrapper` Function:\n   - Purpose: This is a high-level PyTorch interface for\
+  \ initializing the Triton kernel launch. It sets up the input/output matrices, strides, and prepares\
+  \ the grid configuration for the kernel execution.\n   - Logic: It ensures type and shape checks for\
+  \ input matrices, manages data type transformations for kernel compatibility, and reshapes the output\
+  \ matrices (q, k, v) to expected dimensions for further processing in neural network models.\n\nThe\
+  \ kernels leverage Triton's ability to run optimized parallel computations on GPUs, allowing efficient\
+  \ implementation of operations common in Transformer architectures. The implementation checks data types\
+  \ and dimensions to support both FP16 and FP8, offering performance tuning via block size and grid configuration.\n\
+  \nRequirements (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell\
+  \ (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use\
+  \ @triton.jit kernels with correct boundary masking\n- Include @triton.autotune with at least 3 configs\
+  \ when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose correctness test\n\
+  - Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally skip autotune\
+  \ for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- attention
+- matmul
+- rope
+- quantization
+- elementwise
+- embedding
+source:
+  channel: G
+  file: rms_matmul_rbe.py
+  repo: ELS-RD/kernl
+  difficulty: '4'
+  star: 1537
+  simp_instru_len: 138
+  comp_instru_len: 576
+  output_triton_len: 3571
+gold_kernel: data/TritonBench_G_v1/rms_matmul_rbe.py

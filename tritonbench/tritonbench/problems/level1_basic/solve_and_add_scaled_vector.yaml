@@ -1,0 +1,50 @@
+id: solve_and_add_scaled_vector
+level: 1
+category: kernel_translation
+title: Solve And Add Scaled Vector
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `solve_and_add_scaled_vector`.\n\
+  \nOperator description:\nSolves the triangular system of linear equations Ax = b, where A is a triangular\
+  \ matrix. Then, adds a scaled version of the vector y to the solution x. The operations performed are:\
+  \ 1. Solve the triangular system Ax = b using torch.linalg.solve_triangular with A as an upper triangular\
+  \ matrix. 2. Add the scaled vector alpha * y to the solution x.\n\nTarget Python signature / call pattern:\n\
+  def solve_and_add_scaled_vector(A: torch.Tensor, b: torch.Tensor, y: torch.Tensor, alpha: float) ->\
+  \ torch.Tensor: A (Tensor): A triangular matrix of shape `(n, n)`. b (Tensor): Right-hand side vector\
+  \ or matrix of shape `(n,)` or `(n, k)`. y (Tensor): Vector to be scaled and added, must have shape\
+  \ `(n,)` or broadcastable to `(n,)`. alpha (float): Scaling factor for the vector y.\n\nMathematical\
+  \ definition:\nx = torch.linalg.solve_triangular(A, b, upper=True)\nx += alpha * y\n\nPyTorch reference\
+  \ snippet:\n```python\nx = torch.linalg.solve_triangular(A, b, upper=True)\nx += alpha * y\n```\n\n\
+  Example / usage notes:\nExample::\n    >>> A = torch.tensor([[2.0, 1.0], [0.0, 3.0]])\n    >>> b = torch.tensor([5.0,\
+  \ 6.0])\n    >>> y = torch.tensor([1.0, 2.0])\n    >>> alpha = 0.5\n    >>> result = solve_and_add_scaled_vector(A,\
+  \ b, y, alpha)\n    >>> print(result)\n\nAdditional constraints:\nThe function assumes A is an upper\
+  \ triangular matrix.\n\nRequirements (SparkDistill / TritonBench harness):\n- Translate the PyTorch\
+  \ reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics: include torch.allclose\
+  \ vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor\
+  \ over tl.make_block_ptr\n- Add @triton.autotune when there are meaningful tile/block choices\n- Provide\
+  \ a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 4
+  torch_cnt: 2
+  func_inputs: 'def solve_and_add_scaled_vector(A: torch.Tensor, b: torch.Tensor, y: torch.Tensor, alpha:
+    float) -> torch.Tensor: A (Tensor): A triangular matrix of shape `(n, n)`. b (Tensor): Right-hand
+    side vector or matrix of shape `(n,)` or `(n, k)`. y (Tensor): Vector to be scaled and added, must
+    have shape `(n,)` or broadcastable to `(n,)`. alpha (float): Scaling factor for the vector y.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+source:
+  channel: T
+  file: solve_and_add_scaled_vector.py
+  name: solve_and_add_scaled_vector
+  difficulty: '1'
+  params_cnt: 4
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/solve_and_add_scaled_vector.py

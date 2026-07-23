@@ -1,0 +1,51 @@
+id: torch_min
+level: 1
+category: kernel_translation
+title: Torch Min
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.min`.\n\
+  \nOperator description:\nReturns the minimum value of each row of the input tensor in the given dimension\
+  \ dim, along with the index location of each minimum value found. If keepdim is True, the output tensors\
+  \ retain the same size as input except in the dimension dim where they are of size 1. Otherwise, dim\
+  \ is squeezed, resulting in the output tensors having 1 fewer dimension than input. If there are multiple\
+  \ minimal values in a reduced row, the indices of the first minimal value are returned. The function\
+  \ can also compare two tensors element-wise and return a tensor with the minimum values.\n\nTarget Python\
+  \ signature / call pattern:\nmin(input, dim, keepdim=False, *, out=None) -> (Tensor, LongTensor) Args:\
+  \ input (Tensor): the input tensor. dim (int): the dimension to reduce. keepdim (bool): whether the\
+  \ output tensor has :attr:`dim` retained or not. Keyword args: out (tuple, optional): the tuple of two\
+  \ output tensors (min, min_indices)\n\nPyTorch reference snippet:\n```python\ntorch.min(a, 1)\n```\n\
+  \nExample / usage notes:\n>>> a = torch.randn(4, 4)\n>>> a\ntensor([[-0.6248,  1.1334, -1.1899, -0.2803],\n\
+  \        [-1.4644, -0.2635, -0.3651,  0.6134],\n        [ 0.2457,  0.0384,  1.0128,  0.7015],\n    \
+  \    [-0.1153,  2.9849,  2.1458,  0.5788]])\n>>> torch.min(a, 1)\ntorch.return_types.min(values=tensor([-1.1899,\
+  \ -1.4644,  0.0384, -0.1153]), indices=tensor([2, 0, 1, 0]))\n\nAdditional constraints:\nIf there are\
+  \ multiple minimal values in a reduced row, the indices of the first minimal value are returned.\n\n\
+  Requirements (SparkDistill / TritonBench harness):\n- Translate the PyTorch reference into Triton 3.7.1\
+  \ kernels for Blackwell SM120\n- Preserve numerics: include torch.allclose vs the reference (atol/rtol\
+  \ appropriate for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over\
+  \ tl.make_block_ptr\n- Add @triton.autotune when there are meaningful tile/block choices\n- Provide\
+  \ a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 4
+  torch_cnt: 1
+  func_inputs: 'min(input, dim, keepdim=False, *, out=None) -> (Tensor, LongTensor) Args: input (Tensor):
+    the input tensor. dim (int): the dimension to reduce. keepdim (bool): whether the output tensor has
+    :attr:`dim` retained or not. Keyword args: out (tuple, optional): the tuple of two output tensors
+    (min, min_indices)'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: T
+  file: min.py
+  name: torch.min
+  difficulty: '2'
+  params_cnt: 4
+  torch_cnt: 1
+gold_kernel: data/TritonBench_T_v1/min.py

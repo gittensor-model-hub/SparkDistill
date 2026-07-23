@@ -1,0 +1,63 @@
+id: rbe_triton_transform
+level: 3
+category: kernel_generation
+title: Rbe Triton Transform
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `rbe_triton_transform.py` (repo: ELS-RD/kernl).
+
+
+  Task description:
+
+  The `rbe_triton` kernel applies a position-dependent transformation to a 3D input tensor `x` of shape
+  [batch, M, K], performing operations on real and imaginary parts separately. Each thread block processes
+  a rectangular section of the tensor determined by the block size, `BLOCK_SIZE_M` (2) for the M dimension
+  and `BLOCK_SIZE_K` (1024) for the K dimension. The kernel uses `program_id` to compute the offsets `offs_m`
+  and `offs_n` for each block, loading data from `x` into local variables `real` and `imag`, considering
+  only even-numbered indices for real components. Sine and cosine values for position-dependent transformations
+  are precomputed via `get_freq_multi_tokens`, with `theta=10000`. These frequency values are used to
+  transform `real` and `imag` into `out_real` and `out_imag`, which are then written back to the output
+  tensor `out` using calculated offsets and appropriate masks. The `rbe_triton_wrapper` function prepares
+  the parameters, defines the execution grid based on input dimensions, and launches the kernel, managing
+  data flow and maintaining tensor consistency.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- rope
+- elementwise
+- reduction
+source:
+  channel: G
+  file: rbe_triton_transform.py
+  repo: ELS-RD/kernl
+  difficulty: '4'
+  star: 1537
+  simp_instru_len: 196
+  comp_instru_len: 270
+  output_triton_len: 1149
+gold_kernel: data/TritonBench_G_v1/rbe_triton_transform.py

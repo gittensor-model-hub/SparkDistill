@@ -1,0 +1,49 @@
+id: token_attn_reducev
+level: 3
+category: kernel_generation
+title: Token Attn Reducev
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `token_attn_reduceV.py` (repo: ModelTC/lightllm).\n\nTask description:\nThe Triton kernel function\
+  \ `_fwd_kernel_token_att2` is designed for performing forward attention operations, similar to those\
+  \ found in Transformer models. It processes input tensors `Prob`, `V`, and `Req_to_tokens`, and computes\
+  \ an output tensor `Out`. \n\n- `Prob` represents the attention probabilities for each token.\n- `V`\
+  \ is the tensor of value vectors.\n- `Out` is the resulting tensor where the weighted sum of `V` is\
+  \ stored.\n- `Req_to_tokens` maps requests to token indices.\n- `B_req_idx`, `B_Start_Loc`, and `B_Seqlen`\
+  \ are batch-specific indices and sequence length data.\n\nThe kernel operates on blocks of data specified\
+  \ by `BLOCK_DMODEL` and `BLOCK_N`, which define the block size for model dimensions and tokens, respectively.\
+  \ Within the kernel:\n\n1. The `cur_batch` and `cur_head` are determined by the program's grid ID.\n\
+  2. It calculates offsets for accessing portions of the `Prob`, `V`, and `Req_to_tokens` tensors.\n3.\
+  \ For each block of tokens, it fetches the corresponding probabilities and values, computes their weighted\
+  \ sum, and accumulates it in `acc`.\n4. Finally, `acc` is stored back into the `Out` tensor at the appropriate\
+  \ location.\n\nThe function `token_att_fwd2` sets up the grid size based on batch and head dimensions\
+  \ and computes the `kv_group_num` which defines the number of key-value groups. It then launches the\
+  \ `_fwd_kernel_token_att2` with all the necessary tensor strides and configurations, such as `num_warps`\
+  \ and `num_stages`, to control the parallel execution environment.\n\nRequirements (SparkDistill / TritonBench\
+  \ harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor\
+  \ over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include\
+  \ @triton.autotune with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid\
+  \ and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short\
+  \ note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- attention
+- elementwise
+- reduction
+source:
+  channel: G
+  file: token_attn_reduceV.py
+  repo: ModelTC/lightllm
+  difficulty: '3'
+  star: 2647
+  simp_instru_len: 120
+  comp_instru_len: 422
+  output_triton_len: 1234
+gold_kernel: data/TritonBench_G_v1/token_attn_reduceV.py

@@ -1,0 +1,56 @@
+id: vector_addition_custom
+level: 1
+category: kernel_generation
+title: Vector Addition Custom
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `vector_addition_custom.py` (repo: InternLM/lmdeploy).\n\nTask description:\nThe code involves\
+  \ a custom addition operation utilizing the Triton programming model to perform element-wise addition\
+  \ on two input PyTorch tensors, `a` and `b`. The key components are the Triton kernel `_add_kernel`\
+  \ and its wrapper function `custom_add`.\n\nFunction `_add_kernel(A, B, C, size, BLOCK)`:\n- This Triton\
+  \ kernel function, decorated with `@triton.jit`, signifies its use of just-in-time compilation.\n- Parameters:\n\
+  \  - `A`, `B`: Pointers to input tensors containing the data to be added.\n  - `C`: Pointer to the output\
+  \ tensor where the result will be stored.\n  - `size`: Scalar specifying the number of elements in the\
+  \ tensors.\n  - `BLOCK`: A compile-time constant defining the number of elements each program instance\
+  \ processes concurrently.\n- The kernel computes the addition of `A` and `B` and stores the result in\
+  \ `C`.\n- Program index for parallel execution is fetched via `tl.program_id(0)`.\n- `offs` calculates\
+  \ the offsets for block-wise data processing, determined by `prog_id * BLOCK + tl.arange(0, BLOCK)`.\n\
+  - Loads data from `A` and `B` using `tl.load` with masks to prevent out-of-bound access using `offs\
+  \ < size`.\n- The resulting sum is stored in `C` with `tl.store` under the same mask condition to handle\
+  \ edge cases.\n\nFunction `custom_add(a, b)`:\n- Acts as a wrapper to invoke `_add_kernel` and handle\
+  \ tensor operations within the PyTorch framework.\n- Initializes `c`, an empty tensor with the same\
+  \ shape as `a`, to store the result of the addition.\n- Computes `size` of input tensors which dictates\
+  \ the operation range.\n- Sets `BLOCK` size to 16, defining the granularity of each program instance's\
+  \ data processing.\n- Calculates `grid` using `triton.cdiv(size, BLOCK)` to determine the number of\
+  \ program instances required, ensuring complete coverage of the tensor.\n- Launches `_add_kernel` with\
+  \ calculated `grid`, and provides tensor pointers and necessary arguments for execution.\n- The resultant\
+  \ tensor `c` is returned after kernel execution.\n\nThis implementation splits the workload into blocks,\
+  \ processed in parallel, handling edge cases with masks. The consistent BLOCK size ensures efficient\
+  \ memory access patterns.\n\nRequirements (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1\
+  \ on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated\
+  \ tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include @triton.autotune\
+  \ with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid and a torch.allclose\
+  \ correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short note if you intentionally\
+  \ skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: G
+  file: vector_addition_custom.py
+  repo: InternLM/lmdeploy
+  difficulty: '2'
+  star: 4740
+  simp_instru_len: 431
+  comp_instru_len: 568
+  output_triton_len: 250
+gold_kernel: data/TritonBench_G_v1/vector_addition_custom.py

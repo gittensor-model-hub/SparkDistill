@@ -1,0 +1,48 @@
+id: exp_mean
+level: 2
+category: kernel_translation
+title: Exp Mean
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `exp_mean`.\n\
+  \nOperator description:\nApplies the exponential function to each element in the input tensor and then\
+  \ computes the mean value of the result along the specified dimension or over all elements if no dimension\
+  \ is specified.\n\nTarget Python signature / call pattern:\ndef exp_mean(input, dim=None, keepdim=False,\
+  \ dtype=None, out=None) -> Tensor\n\nMathematical definition:\nThe combined operation is defined as:\
+  \ out = mean(e^{input}) where the exponential function is defined as: y_{i} = e^{x_{i}}\n\nPyTorch reference\
+  \ snippet:\n```python\nexp_result = torch.exp(input)\nreturn torch.mean(exp_result, dim=dim, keepdim=keepdim,\
+  \ dtype=dtype, out=out)\n```\n\nExample / usage notes:\n>>> import torch\n>>> a = torch.tensor([[1.0,\
+  \ 2.0, 3.0], [4.0, 5.0, 6.0]])\n>>> # Compute the exponential of each element, then calculate the mean\
+  \ of all elements\n>>> result = exp_mean(a)\n>>> result\ntensor(90.2574)\n\n>>> # Compute the exponential\
+  \ of each element, then calculate the mean along dimension 1\n>>> result = exp_mean(a, dim=1)\n>>> result\n\
+  tensor([ 9.0797, 445.2395])\n\n>>> # Compute the exponential of each element, then calculate the mean\
+  \ along dimension 1 with keepdim=True\n>>> result = exp_mean(a, dim=1, keepdim=True)\n>>> result\ntensor([[\
+  \  9.0797],\n        [445.2395]])\n\nAdditional constraints:\nThe function first applies the exponential\
+  \ function to each element of the input tensor and then computes the mean of these exponential values.\
+  \ The function allows specifying dimensions to reduce, whether to keep dimensions, and the data type\
+  \ of the output.\n\nRequirements (SparkDistill / TritonBench harness):\n- Translate the PyTorch reference\
+  \ into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics: include torch.allclose vs the\
+  \ reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor\
+  \ over tl.make_block_ptr\n- Add @triton.autotune when there are meaningful tile/block choices\n- Provide\
+  \ a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 5
+  torch_cnt: 2
+  func_inputs: def exp_mean(input, dim=None, keepdim=False, dtype=None, out=None) -> Tensor
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: T
+  file: exp_mean.py
+  name: exp_mean
+  difficulty: '3'
+  params_cnt: 5
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/exp_mean.py

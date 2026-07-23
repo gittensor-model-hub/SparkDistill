@@ -1,0 +1,72 @@
+id: fused_add_mul_groupnorm
+level: 3
+category: kernel_translation
+title: Fused Add Mul Groupnorm
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `fused_add_mul_groupnorm`.\n\
+  \nOperator description:\nPerforms a fused operation combining element-wise addition, element-wise multiplication,\
+  \ and group normalization. It takes two input tensors, adds them element-wise, multiplies the result\
+  \ with the second tensor, and then applies group normalization using learnable parameters for scaling\
+  \ and shifting. The function supports autograd for gradient computation and all operations are differentiable.\n\
+  \nTarget Python signature / call pattern:\nfused_add_mul_groupnorm(input1, input2, weight, bias, num_groups,\
+  \ eps=1e-5, *, out=None) -> Tensor; input1 (Tensor): The first input tensor X; input2 (Tensor): The\
+  \ second input tensor Y, must be broadcastable to the shape of X; weight (Tensor): Learnable weight\
+  \ parameter \\gamma of shape (C,), where C is the number of channels; bias (Tensor): Learnable bias\
+  \ parameter \\beta of shape (C,); num_groups (int): Number of groups to separate the channels into for\
+  \ group normalization; eps (float, optional): A value added to the denominator for numerical stability\
+  \ in group normalization. Default: `1e-5`; out (Tensor, optional): Output tensor. Ignored if `None`.\
+  \ Default: `None`\n\nMathematical definition:\nGiven two input tensors X and Y, and learnable parameters\
+  \ \\gamma and \\beta for group normalization, the function computes:\n\n\\[\n\\begin{align*}\nZ &= X\
+  \ + Y \\\\\nM &= Z \\odot Y \\\\\nO &= \\text{GroupNorm}(M, \\gamma, \\beta, \\text{num\\_groups}, \\\
+  epsilon)\n\\end{align*}\n\\]\n\nwhere:\n- X and Y are input tensors.\n- \\odot denotes element-wise\
+  \ multiplication.\n- \\text{GroupNorm}(M, \\gamma, \\beta, \\text{num\\_groups}, \\epsilon) applies\
+  \ group normalization to M with \\gamma and \\beta as affine parameters, over the specified number of\
+  \ groups, and \\epsilon for numerical stability.\n\nPyTorch reference snippet:\n```python\nz = torch.add(input1,\
+  \ input2)\nm = torch.mul(z, input2)\no = torch.nn.functional.group_norm(m, num_groups=num_groups, weight=weight,\
+  \ bias=bias, eps=eps)\n```\n\nExample / usage notes:\n```python\nimport torch\nimport torch.nn.functional\
+  \ as F\n\ndef fused_add_mul_groupnorm(input1, input2, weight, bias, num_groups, eps=1e-5, *, out=None):\n\
+  \    z = torch.add(input1, input2)\n    m = torch.mul(z, input2)\n    o = torch.nn.functional.group_norm(m,\
+  \ num_groups=num_groups, weight=weight, bias=bias, eps=eps)\n    if out is not None:\n        out.copy_(o)\n\
+  \        return out\n    return o\n\n# Example usage\nN, C, H, W = 2, 4, 5, 5  # Batch size, channels,\
+  \ height, width\ninput1 = torch.randn(N, C, H, W)\ninput2 = torch.randn(N, C, H, W)\nweight = torch.ones(C)\n\
+  bias = torch.zeros(C)\nnum_groups = 2  # Number of groups for GroupNorm\n\noutput = fused_add_mul_groupnorm(input1,\
+  \ input2, weight, bias, num_groups)\nprint(\"Output shape:\", output.shape)\n# Output shape: torch.Size([2,\
+  \ 4, 5, 5])\n```\n\nAdditional constraints:\n- The shapes of `input1` and `input2` must be broadcastable\
+  \ to each other.\n- The `weight` and `bias` parameters must have shape `(C,)`, where `C` is the number\
+  \ of channels in the input tensors.\n- The `num_groups` parameter must divide the number of channels\
+  \ `C` evenly.\n- This function supports autograd for gradient computation.\n- All operations are differentiable\
+  \ and support backpropagation.\n\nRequirements (SparkDistill / TritonBench harness):\n- Translate the\
+  \ PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120\n- Preserve numerics: include torch.allclose\
+  \ vs the reference (atol/rtol appropriate for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor\
+  \ over tl.make_block_ptr\n- Add @triton.autotune when there are meaningful tile/block choices\n- Provide\
+  \ a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 6
+  torch_cnt: 3
+  func_inputs: 'fused_add_mul_groupnorm(input1, input2, weight, bias, num_groups, eps=1e-5, *, out=None)
+    -> Tensor; input1 (Tensor): The first input tensor X; input2 (Tensor): The second input tensor Y,
+    must be broadcastable to the shape of X; weight (Tensor): Learnable weight parameter \gamma of shape
+    (C,), where C is the number of channels; bias (Tensor): Learnable bias parameter \beta of shape (C,);
+    num_groups (int): Number of groups to separate the channels into for group normalization; eps (float,
+    optional'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- normalization
+- elementwise
+- reduction
+- fused
+source:
+  channel: T
+  file: fused_add_mul_groupnorm.py
+  name: fused_add_mul_groupnorm
+  difficulty: '2'
+  params_cnt: 6
+  torch_cnt: 3
+gold_kernel: data/TritonBench_T_v1/fused_add_mul_groupnorm.py

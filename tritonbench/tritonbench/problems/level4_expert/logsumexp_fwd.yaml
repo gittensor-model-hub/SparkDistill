@@ -1,0 +1,52 @@
+id: logsumexp_fwd
+level: 4
+category: kernel_generation
+title: Logsumexp Fwd
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `logsumexp_fwd.py` (repo: sustcsonglin/flash-linear-attention).\n\nTask description:\nThe Triton\
+  \ operator `logsumexp_fwd_kernel` calculates the log-sum-exp over the last dimension of an input tensor.\
+  \ This is often used to stabilize the computation of the exponential function on input elements, especially\
+  \ with large values. The kernel operates in parallel using Triton, leveraging the GPU architecture for\
+  \ efficiency.\n\n        The `logsumexp_fwd_kernel` kernel is decorated with `triton.autotune` to optimize\
+  \ its execution across different hardware configurations, particularly varying the number of warps between\
+  \ 1 and 32. It uses a heuristic `HAS_SCALE` to determine whether the input tensor should be scaled.\n\
+  \n        Within the kernel, we calculate the indices `i_n` and `i_d` using Triton's `program_id`, which\
+  \ represent the current program's block IDs. The indices `o_d` and `m_d` determine the positions to\
+  \ operate on and apply masking to avoid out-of-bounds memory accesses. The input tensor `x` is loaded\
+  \ into a block `b_x`, potentially scaled, and the maximum value `b_m` is computed along the block dimension.\
+  \ The kernel then calculates the log of the sum of exponentials, adds the maximum value `b_m`, and stores\
+  \ the result in `z`.\n\n        The `logsumexp_fwd` function prepares the input tensor by reshaping\
+  \ it and calculates `N`, `D`, and `B`. It determines `ND`, the division of `D` by `B`, creating an empty\
+  \ tensor `z` to hold results. The kernel is invoked with `(N, ND)` blocks. After computation, `z` is\
+  \ reduced along the last dimension to produce the final result. If a different output data type is desired,\
+  \ it casts `z` to this type before returning it.\n\nRequirements (SparkDistill / TritonBench harness):\n\
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)\n- Prefer tl.make_tensor_descriptor\
+  \ over deprecated tl.make_block_ptr\n- Use @triton.jit kernels with correct boundary masking\n- Include\
+  \ @triton.autotune with at least 3 configs when tile sizes matter\n- Provide a Python launcher + grid\
+  \ and a torch.allclose correctness test\n- Use fp32 accumulators for tl.dot reductions\n- Print a short\
+  \ note if you intentionally skip autotune for a tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- attention
+- matmul
+- elementwise
+- reduction
+source:
+  channel: G
+  file: logsumexp_fwd.py
+  repo: sustcsonglin/flash-linear-attention
+  difficulty: '4'
+  star: 1382
+  simp_instru_len: 242
+  comp_instru_len: 399
+  output_triton_len: 801
+gold_kernel: data/TritonBench_G_v1/logsumexp_fwd.py

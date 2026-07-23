@@ -1,0 +1,85 @@
+id: torch_log1p
+level: 1
+category: kernel_translation
+title: Torch Log1P
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.log1p`.
+
+
+  Operator description:
+
+  Returns a new tensor with the natural logarithm of (1 + input). This function is more accurate than
+  torch.log for small values of input.
+
+
+  Target Python signature / call pattern:
+
+  log1p(input, *, out=None) -> Tensor; Args: input (Tensor): the input tensor. Keyword args: out (Tensor,
+  optional): the output tensor.
+
+
+  Mathematical definition:
+
+  y_i = \log_{e} (x_i + 1)
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  torch.log1p(a)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> a = torch.randn(5)
+
+  >>> a
+
+  tensor([-1.0090, -0.9923,  1.0249, -0.5372,  0.2492])
+
+  >>> torch.log1p(a)
+
+  tensor([    nan, -4.8653,  0.7055, -0.7705,  0.2225])
+
+
+  Additional constraints:
+
+  This function is more accurate than torch.log for small values of input.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 2
+  torch_cnt: 1
+  func_inputs: 'log1p(input, *, out=None) -> Tensor; Args: input (Tensor): the input tensor. Keyword args:
+    out (Tensor, optional): the output tensor.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+source:
+  channel: T
+  file: log1p.py
+  name: torch.log1p
+  difficulty: '2'
+  params_cnt: 2
+  torch_cnt: 1
+gold_kernel: data/TritonBench_T_v1/log1p.py

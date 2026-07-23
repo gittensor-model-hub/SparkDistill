@@ -1,0 +1,62 @@
+id: relu_conv2d
+level: 4
+category: kernel_translation
+title: Relu Conv2D
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `relu_conv2d`.\n\
+  \nOperator description:\nApplies a 2D convolution over an input tensor, followed by applying the rectified\
+  \ linear unit (ReLU) activation function element-wise on the result. This operation first applies a\
+  \ 2D convolution over the input tensor using the specified filters, and then applies ReLU activation\
+  \ to the convolution result, setting all negative values to zero.\n\nTarget Python signature / call\
+  \ pattern:\nrelu_conv2d(input, weight, bias=None, stride=1, padding=0, dilation=1, groups=1, inplace=False)\
+  \ -> Tensor: input (Tensor): The input tensor of shape (minibatch, in_channels, iH, iW). weight (Tensor):\
+  \ The convolution filters of shape (out_channels, in_channels / groups, kH, kW). bias (Tensor, optional):\
+  \ Optional bias tensor of shape (out_channels). Default: None. stride (int or tuple, optional): The\
+  \ stride of the convolution kernel. Default: 1. padding (int, tuple, or string, optional): Padding added\
+  \ to all sides of the input. Default: 0. dilation (int or tuple, optional): The spacing between kernel\
+  \ elements. Default: 1. groups (int, optional): Number of blocked connections from input channels to\
+  \ output channels. Default: 1. inplace (bool, optional): If True, will perform ReLU operation in-place.\
+  \ Default: False.\n\nMathematical definition:\nThe operation is defined as: \\text{out} = \\text{ReLU}(\\\
+  text{conv2d}(\\text{input})), where \\text{ReLU}(x) = \\max(0, x).\n\nPyTorch reference snippet:\n```python\n\
+  conv_result = torch.nn.functional.conv2d(input, weight, bias=bias, stride=stride, padding=padding, dilation=dilation,\
+  \ groups=groups)\nreturn torch.nn.functional.relu(conv_result, inplace=inplace)\n```\n\nExample / usage\
+  \ notes:\nExample::\n\n    >>> import torch\n    >>> import torch.nn.functional as F\n    >>> # Define\
+  \ inputs and filters\n    >>> inputs = torch.randn(1, 3, 5, 5)\n    >>> filters = torch.randn(6, 3,\
+  \ 3, 3)\n    >>> bias = torch.randn(6)\n    >>> # Apply relu_conv2d with padding and bias\n    >>> result\
+  \ = relu_conv2d(inputs, filters, bias=bias, padding=1)\n    >>> result.shape\n    torch.Size([1, 6,\
+  \ 5, 5])\n\n    >>> # Apply relu_conv2d without bias and with stride 2\n    >>> result = relu_conv2d(inputs,\
+  \ filters, stride=2)\n    >>> result.shape\n    torch.Size([1, 6, 2, 2])\n\nAdditional constraints:\n\
+  Returns:\n    Tensor: A tensor resulting from the 2D convolution followed by ReLU activation.\n\nRequirements\
+  \ (SparkDistill / TritonBench harness):\n- Translate the PyTorch reference into Triton 3.7.1 kernels\
+  \ for Blackwell SM120\n- Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate\
+  \ for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n\
+  - Add @triton.autotune when there are meaningful tile/block choices\n- Provide a launcher and a small\
+  \ self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 8
+  torch_cnt: 2
+  func_inputs: 'relu_conv2d(input, weight, bias=None, stride=1, padding=0, dilation=1, groups=1, inplace=False)
+    -> Tensor: input (Tensor): The input tensor of shape (minibatch, in_channels, iH, iW). weight (Tensor):
+    The convolution filters of shape (out_channels, in_channels / groups, kH, kW). bias (Tensor, optional):
+    Optional bias tensor of shape (out_channels). Default: None. stride (int or tuple, optional): The
+    stride of the convolution kernel. Default: 1. padding (int, tuple, or string, optional): Padding a'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+- convolution
+source:
+  channel: T
+  file: relu_conv2d.py
+  name: relu_conv2d
+  difficulty: '4'
+  params_cnt: 8
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/relu_conv2d.py

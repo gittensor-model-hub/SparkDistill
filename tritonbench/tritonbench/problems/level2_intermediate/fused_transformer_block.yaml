@@ -1,0 +1,76 @@
+id: fused_transformer_block
+level: 2
+category: kernel_translation
+title: Fused Transformer Block
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `fused_transformer_block`.\n\
+  \nOperator description:\nPerforms a sequence of operations commonly used in transformer models, combining\
+  \ matrix multiplication, softmax, dropout, another matrix multiplication, layer normalization, and addition\
+  \ (residual connection).\n\nTarget Python signature / call pattern:\nfused_transformer_block(input,\
+  \ weight1, weight2, residual, dropout_p=0.1, eps=1e-5, *, out=None) -> Tensor; input (Tensor): Input\
+  \ tensor of shape (*, N, D_in), where * denotes any number of batch dimensions.; weight1 (Tensor): Weight\
+  \ matrix of shape (D_in, D_k).; weight2 (Tensor): Weight matrix of shape (D_k, D_out).; residual (Tensor):\
+  \ Residual tensor to be added before layer normalization, must be broadcastable to the shape of Z_4.;\
+  \ dropout_p (float, optional): Probability of an element to be zeroed in the dropout layer. Default:\
+  \ 0.1.; eps (float, optional): A value added to the denominator for numerical stability in layer normalization.\
+  \ Default: 1e-5.; out (Tensor, optional): Output tensor. Ignored if None. Default: None.\n\nMathematical\
+  \ definition:\nGiven an input tensor X, weight matrices W_1 and W_2, and a residual tensor R, the function\
+  \ computes:\n\n    \\[\n    \\begin{align*}\n    Z_1 &= X W_1 \\\\\n    Z_2 &= \\text{softmax}(Z_1)\
+  \ \\\\\n    Z_3 &= \\text{dropout}(Z_2, p) \\\\\n    Z_4 &= Z_3 W_2 \\\\\n    Y &= \\text{LayerNorm}(Z_4\
+  \ + R, \\gamma, \\beta, \\epsilon)\n    \\end{align*}\n    \\]\n\n    where:\n    - \\text{softmax}(Z)\
+  \ is applied along the last dimension.\n    - \\text{dropout}(Z, p) randomly zeroes elements of Z with\
+  \ probability p.\n    - \\text{LayerNorm} applies layer normalization with learnable parameters \\gamma\
+  \ and \\beta, and epsilon \\epsilon for numerical stability.\n    - R is the residual tensor added to\
+  \ Z_4 before layer normalization.\n\nPyTorch reference snippet:\n```python\nz1 = input @ weight1\n \
+  \   z2 = F.softmax(z1, dim=-1)\n    z3 = F.dropout(z2, p=dropout_p, training=True)\n    z4 = z3 @ weight2\n\
+  \    y = F.layer_norm(z4 + residual, normalized_shape=(z4.size(-1),), eps=eps)\n    if out is not None:\n\
+  \        out.copy_(y)\n        return out\n    return y\n```\n\nExample / usage notes:\nimport torch\n\
+  \    import torch.nn.functional as F\n\n    def fused_transformer_block(input, weight1, weight2, residual,\
+  \ dropout_p=0.1, eps=1e-5, *, out=None):\n        z1 = input @ weight1\n        z2 = F.softmax(z1, dim=-1)\n\
+  \        z3 = F.dropout(z2, p=dropout_p, training=True)\n        z4 = z3 @ weight2\n        y = F.layer_norm(z4\
+  \ + residual, normalized_shape=(z4.size(-1),), eps=eps)\n        if out is not None:\n            out.copy_(y)\n\
+  \            return out\n        return y\n\n    # Example usage\n    N, D_in, D_k, D_out = 5, 10, 20,\
+  \ 10\n    input = torch.randn(N, D_in)\n    weight1 = torch.randn(D_in, D_k)\n    weight2 = torch.randn(D_k,\
+  \ D_out)\n    residual = torch.randn(N, D_out)\n\n    output = fused_transformer_block(input, weight1,\
+  \ weight2, residual)\n    print('Output shape:', output.shape)\n    # Output shape: torch.Size([5, 10])\n\
+  \nAdditional constraints:\n- The dimensions of `input` and `weight1` must be compatible for matrix multiplication:\
+  \ the last dimension of `input` must match the first dimension of `weight1`.\n    - The output of the\
+  \ first matrix multiplication has shape `(*, N, D_k)`.\n    - The `softmax` is applied along the last\
+  \ dimension (`dim=-1`).\n    - The `dropout` is applied during training. Set `training=False` to disable\
+  \ dropout during evaluation.\n    - The `layer_norm` is applied over the last dimension of the input\
+  \ tensor.\n    - The `residual` tensor must be broadcastable to the shape of `z4`.\n\nRequirements (SparkDistill\
+  \ / TritonBench harness):\n- Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell\
+  \ SM120\n- Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)\n\
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n- Add @triton.autotune\
+  \ when there are meaningful tile/block choices\n- Provide a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 7
+  torch_cnt: 4
+  func_inputs: 'fused_transformer_block(input, weight1, weight2, residual, dropout_p=0.1, eps=1e-5, *,
+    out=None) -> Tensor; input (Tensor): Input tensor of shape (*, N, D_in), where * denotes any number
+    of batch dimensions.; weight1 (Tensor): Weight matrix of shape (D_in, D_k).; weight2 (Tensor): Weight
+    matrix of shape (D_k, D_out).; residual (Tensor): Residual tensor to be added before layer normalization,
+    must be broadcastable to the shape of Z_4.; dropout_p (float, optional): Probability of an element
+    to be '
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- softmax
+- normalization
+- elementwise
+- reduction
+- dropout
+- fused
+source:
+  channel: T
+  file: fused_transformer_block.py
+  name: fused_transformer_block
+  difficulty: '3'
+  params_cnt: 7
+  torch_cnt: 4
+gold_kernel: data/TritonBench_T_v1/fused_transformer_block.py

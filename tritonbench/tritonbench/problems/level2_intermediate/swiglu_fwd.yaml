@@ -1,0 +1,61 @@
+id: swiglu_fwd
+level: 2
+category: kernel_generation
+title: Swiglu Fwd
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `swiglu_fwd.py` (repo: MzeroMiko/VMamba).
+
+
+  Task description:
+
+  The Triton kernel `_swiglu_fwd_kernel` is designed to perform the Swiglu operation for the forward pass,
+  where each element of the input `X` is multiplied by its sigmoid activation and then multiplied by the
+  corresponding element in `Y`. The kernel is implemented with `@triton.jit`, allowing it to run on the
+  GPU efficiently. It is autotuned over various configurations to handle different block sizes, optimizing
+  performance based on the `ncols` parameter. The kernel uses Triton''s `program_id` to determine which
+  row and block of columns to process. The `load` function fetches data from the input tensors, and the
+  `store` function writes the result to the `OUT` tensor. The function `_swiglu_fwd` prepares input tensors
+  `x` and `y`, ensuring they are contiguous and splitting them from the input `xy`. It also reshapes the
+  tensors as needed and initializes the output tensor. The grid is defined based on the number of rows
+  (`M`) and columns (`N`) using `triton.cdiv` to calculate blocks per column. The kernel is then launched
+  with the specified grid configuration.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: G
+  file: swiglu_fwd.py
+  repo: MzeroMiko/VMamba
+  difficulty: '3'
+  star: 2235
+  simp_instru_len: 147
+  comp_instru_len: 264
+  output_triton_len: 721
+gold_kernel: data/TritonBench_G_v1/swiglu_fwd.py

@@ -1,0 +1,63 @@
+id: token_attn_llama2
+level: 4
+category: kernel_generation
+title: Token Attn Llama2
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `token_attn_llama2.py` (repo: S-LoRA/S-LoRA).
+
+
+  Task description:
+
+  The Triton kernel function ''_fwd_kernel_token_att1'' performs a forward pass for a token attention
+  mechanism, often used in transformer models for calculating the attention scores between query (Q) and
+  key (K) tensors. This kernel accepts various input tensors, including ''Q'' and ''K'', which represent
+  the query and key matrices, ''B_Loc'', which provides positional information about the keys, ''B_Start_Loc''
+  and ''B_Seqlen'', which give sequence start indices and lengths, and ''max_input_len'' as the maximum
+  sequence length within a batch. The output ''Att_Out'' stores the computed attention values. Internally,
+  the kernel uses several predefined strides to navigate through the tensor dimensions. For each batch,
+  head, and block of sequences defined by the block size ''BLOCK_N'', it loads segments of the query and
+  key tensors, computes their dot product, scales it by ''sm_scale'', and stores the result back. The
+  grid configuration ensures coverage across all required dimensions with specific ''num_warps'' for parallel
+  processing. The wrapper function ''token_att_fwd'' initializes and launches this kernel, checking the
+  compatibility of input dimensions and adjusting the scaling factor based on the key dimension.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- attention
+- matmul
+- reduction
+source:
+  channel: G
+  file: token_attn_llama2.py
+  repo: S-LoRA/S-LoRA
+  difficulty: '4'
+  star: 1760
+  simp_instru_len: 201
+  comp_instru_len: 271
+  output_triton_len: 1208
+gold_kernel: data/TritonBench_G_v1/token_attn_llama2.py

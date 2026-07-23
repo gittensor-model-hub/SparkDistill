@@ -1,0 +1,103 @@
+id: softplus_linear
+level: 3
+category: kernel_translation
+title: Softplus Linear
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `softplus_linear`.
+
+
+  Operator description:
+
+  Applies a linear transformation to the input tensor, followed by the Softplus activation function applied
+  element-wise. This combined operation first performs a linear transformation and then introduces non-linearity
+  with Softplus, which is smoother than ReLU and approximates it for large values. The function is particularly
+  designed to improve numerical stability by reverting to a linear function for values above a specified
+  threshold.
+
+
+  Target Python signature / call pattern:
+
+  softplus_linear(input, weight, bias=None, beta=1, threshold=20) -> Tensor
+
+
+  Mathematical definition:
+
+  The combined operation is defined as: out = Softplus(Linear(x)), where the Softplus function is defined
+  as: Softplus(x) = (1/β) * log(1 + exp(β * x))
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  linear_result = torch.nn.functional.linear(input, weight, bias)
+
+  return torch.nn.functional.softplus(linear_result, beta=beta, threshold=threshold)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> import torch
+
+  >>> import torch.nn.functional as F
+
+  >>> input = torch.randn(2, 3)   # (batch_size, in_features)
+
+  >>> weight = torch.randn(4, 3)  # (out_features, in_features)
+
+  >>> bias = torch.randn(4)       # (out_features)
+
+  >>> result = softplus_linear(input, weight, bias)
+
+  >>> result.shape
+
+  torch.Size([2, 4])
+
+  >>> result = softplus_linear(input, weight, bias, beta=2, threshold=10)
+
+  >>> result.shape
+
+  torch.Size([2, 4])
+
+
+  Additional constraints:
+
+  For values exceeding the threshold, the function helps maintain numerical stability by approximating
+  a linear function, which enhances stability and prevents potential overflow.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 5
+  torch_cnt: 2
+  func_inputs: softplus_linear(input, weight, bias=None, beta=1, threshold=20) -> Tensor
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+source:
+  channel: T
+  file: softplus_linear.py
+  name: softplus_linear
+  difficulty: '3'
+  params_cnt: 5
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/softplus_linear.py

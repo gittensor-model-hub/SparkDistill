@@ -1,0 +1,52 @@
+id: torch_linalg_lu
+level: 4
+category: kernel_translation
+title: Torch Linalg Lu
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.linalg.lu`.\n\
+  \nOperator description:\nComputes the LU decomposition with partial pivoting of a matrix. If pivot=True,\
+  \ returns a permutation matrix P, a lower triangular matrix L, and an upper triangular matrix U such\
+  \ that A = PLU. If pivot=False and A is on GPU, computes the LU decomposition without pivoting, returning\
+  \ empty P, L and U such that A = LU. Supports float, double, cfloat, and cdouble dtypes, as well as\
+  \ batches of matrices. Outputs have the same batch dimensions as input.\n\nTarget Python signature /\
+  \ call pattern:\nlu(A, *, pivot=True, out=None) -> (Tensor, Tensor, Tensor) Args: A (Tensor): tensor\
+  \ of shape `(*, m, n)` where `*` is zero or more batch dimensions. pivot (bool, optional): Controls\
+  \ whether to compute the LU decomposition with partial pivoting or no pivoting. Default: `True`. Keyword\
+  \ args: out (tuple, optional): output tuple of three tensors. Ignored if `None`. Default: `None`.\n\n\
+  Mathematical definition:\nA = PLU where P is a permutation matrix, L is lower triangular with ones on\
+  \ the diagonal, U is upper triangular. If pivot=False, A = LU.\n\nPyTorch reference snippet:\n```python\n\
+  torch.linalg.lu(A, *, pivot=True, out=None) -> (Tensor, Tensor, Tensor)\n```\n\nExample / usage notes:\n\
+  >>> A = torch.randn(3, 2)\n>>> P, L, U = torch.linalg.lu(A)\n>>> P\ntensor([[0., 1., 0.],\n        [0.,\
+  \ 0., 1.],\n        [1., 0., 0.]])\n>>> L\ntensor([[1.0000, 0.0000],\n        [0.5007, 1.0000],\n  \
+  \      [0.0633, 0.9755]])\n>>> U\ntensor([[0.3771, 0.0489],\n        [0.0000, 0.9644]])\n>>> torch.dist(A,\
+  \ P @ L @ U)\ntensor(5.9605e-08)\n\n>>> A = torch.randn(2, 5, 7, device=\"cuda\")\n>>> P, L, U = torch.linalg.lu(A,\
+  \ pivot=False)\n>>> P\ntensor([], device='cuda:0')\n>>> torch.dist(A, L @ U)\ntensor(1.0376e-06, device='cuda:0')\n\
+  \nAdditional constraints:\nLU decomposition is not unique; different platforms may yield different decompositions.\
+  \ Gradient computations are supported only if the matrix is full-rank.\n\nRequirements (SparkDistill\
+  \ / TritonBench harness):\n- Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell\
+  \ SM120\n- Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)\n\
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n- Add @triton.autotune\
+  \ when there are meaningful tile/block choices\n- Provide a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 3
+  torch_cnt: 2
+  func_inputs: 'lu(A, *, pivot=True, out=None) -> (Tensor, Tensor, Tensor) Args: A (Tensor): tensor of
+    shape `(*, m, n)` where `*` is zero or more batch dimensions. pivot (bool, optional): Controls whether
+    to compute the LU decomposition with partial pivoting or no pivoting. Default: `True`. Keyword args:
+    out (tuple, optional): output tuple of three tensors. Ignored if `None`. Default: `None`.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags: []
+source:
+  channel: T
+  file: lu.py
+  name: torch.linalg.lu
+  difficulty: '4'
+  params_cnt: 3
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/lu.py

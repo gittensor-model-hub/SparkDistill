@@ -1,0 +1,72 @@
+id: torch_nn_functional_selu
+level: 1
+category: kernel_debugging
+title: Torch Nn Functional Selu
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.nn.functional.selu`.
+
+
+  Operator description:
+
+  Applies the element-wise SELU (Scaled Exponential Linear Unit) function to the input tensor. The SELU
+  function is defined as scale * (max(0, x) + min(0, alpha * (exp(x) - 1))), where the constants alpha
+  and scale are fixed values with alpha approximately 1.673 and scale approximately 1.051.
+
+
+  Target Python signature / call pattern:
+
+  selu(input, inplace=False) -> Tensor
+
+
+  Mathematical definition:
+
+  SELU(x) = scale * (max(0,x) + min(0, alpha * (exp(x) - 1))), with alpha=1.6732632423543772848170429916717
+  and scale=1.0507009873554804934193349852946.
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  torch.nn.functional.selu
+
+  ```
+
+
+  Additional constraints:
+
+  See torch.nn.SELU for more details.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 2
+  torch_cnt: 1
+  func_inputs: selu(input, inplace=False) -> Tensor
+required_patterns:
+- '@triton.jit'
+- mask
+tags:
+- matmul
+- elementwise
+- reduction
+- debug
+source:
+  channel: T
+  file: selu.py
+  name: torch.nn.functional.selu
+  difficulty: '1'
+  params_cnt: 2
+  torch_cnt: 1
+gold_kernel: data/TritonBench_T_v1/selu.py

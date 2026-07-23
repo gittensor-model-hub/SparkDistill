@@ -1,0 +1,62 @@
+id: triton_linear_activation
+level: 4
+category: kernel_generation
+title: Triton Linear Activation
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `triton_linear_activation.py` (repo: ELS-RD/kernl).
+
+
+  Task description:
+
+  This code defines a Triton-based implementation of a linear layer with optional activation functions.
+  The implementation starts with several auxiliary functions for different activations, such as tanh,
+  ReLU, GELU, and fast GELU. The core computation is done in the kernel_fma function, which is a Triton
+  kernel. This function takes in matrix pointers A, B, and C, along with optional bias and activation
+  inputs, and computes the matrix multiplication with optional additions and activations. Key parameters
+  like matrix dimensions, strides, and meta-parameters are passed to control the operation. This kernel
+  is designed to work efficiently on GPUs, employing Triton''s autotuning and heuristics to choose optimal
+  configurations based on the inputs'' dimensions and characteristics. The LinearLayer class is a custom
+  PyTorch Function that sets up and calls the kernel_fma, managing inputs and outputs between PyTorch
+  tensors and Triton. It ensures the input dimensions match and applies the chosen activation function.
+  The linear_layer function is a user-facing wrapper for applying the LinearLayer function. It handles
+  activation options and the optional saving of pre-activation inputs for backpropagation.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+source:
+  channel: G
+  file: triton_linear_activation.py
+  repo: ELS-RD/kernl
+  difficulty: '4'
+  star: 1537
+  simp_instru_len: 150
+  comp_instru_len: 250
+  output_triton_len: 4517
+gold_kernel: data/TritonBench_G_v1/triton_linear_activation.py

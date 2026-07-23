@@ -1,0 +1,97 @@
+id: torch_nn_functional_batch_norm
+level: 3
+category: kernel_translation
+title: Torch Nn Functional Batch Norm
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.nn.functional.batch_norm`.
+
+
+  Operator description:
+
+  Applies Batch Normalization for each channel across a batch of data. Batch Normalization is a technique
+  to improve the training of deep neural networks by ensuring that each layer receives whitened input,
+  which helps to stabilize the learning process and reduce the number of training epochs needed to converge.
+
+
+  Target Python signature / call pattern:
+
+  def batch_norm(input, running_mean, running_var, weight=None, bias=None, training=False, momentum=0.1,
+  eps=1e-05) -> Tensor
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  F.batch_norm(input, running_mean, running_var, weight=None, bias=None, training=True, momentum=0.1,
+  eps=1e-05, cudnn_enabled=True)
+
+  ```
+
+
+  Example / usage notes:
+
+  import torch
+
+  import torch.nn.functional as F
+
+
+  # Example input
+
+  input = torch.randn(20, 100, 35, 45)
+
+
+  # Running mean and variance
+
+  running_mean = torch.zeros(100)
+
+  running_var = torch.ones(100)
+
+
+  # Apply batch normalization
+
+  output = F.batch_norm(input, running_mean, running_var, training=True)
+
+
+  Additional constraints:
+
+  This function is related to the BatchNorm classes like BatchNorm1d, BatchNorm2d, and BatchNorm3d, which
+  are layers that handle this operation with additional features.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 8
+  torch_cnt: 1
+  func_inputs: def batch_norm(input, running_mean, running_var, weight=None, bias=None, training=False,
+    momentum=0.1, eps=1e-05) -> Tensor
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- normalization
+- elementwise
+- reduction
+- convolution
+source:
+  channel: T
+  file: batch_norm.py
+  name: torch.nn.functional.batch_norm
+  difficulty: '4'
+  params_cnt: 8
+  torch_cnt: 1
+gold_kernel: data/TritonBench_T_v1/batch_norm.py

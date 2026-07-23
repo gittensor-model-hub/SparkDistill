@@ -1,0 +1,89 @@
+id: matrix_multiply_and_row_dot
+level: 2
+category: kernel_translation
+title: Matrix Multiply And Row Dot
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `matrix_multiply_and_row_dot`.
+
+
+  Operator description:
+
+  Computes a scaled matrix-matrix product, then calculates the dot product of the first two rows of the
+  resulting matrix. First, it multiplies matrix A and B using the scalar alpha and then adds the scaled
+  version of matrix C using scalar beta. Finally, it computes the dot product of the first two rows of
+  the updated matrix C.
+
+
+  Target Python signature / call pattern:
+
+  def matrix_multiply_and_row_dot(A: torch.Tensor, B: torch.Tensor, alpha: float, beta: float, C: torch.Tensor)
+  -> torch.Tensor: A (Tensor): First input matrix of shape `(n, m)`. B (Tensor): Second input matrix of
+  shape `(m, p)`. alpha (float): Scalar multiplier for the matrix-matrix product. beta (float): Scalar
+  multiplier for the input matrix `C`. C (Tensor): Output matrix of shape `(n, p)` where the results are
+  added.
+
+
+  Mathematical definition:
+
+  1. `C = alpha * torch.mm(A, B) + beta * C`; 2. `result = torch.dot(C[0], C[1])`
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  C = alpha * torch.mm(A, B) + beta * C; result = torch.dot(C[0], C[1])
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> A = torch.tensor([[1.0, 2.0], [3.0, 4.0]]); >>> B = torch.tensor([[5.0, 6.0], [7.0, 8.0]]); >>>
+  C = torch.zeros(2, 2); >>> alpha, beta = 1.5, 0.5; >>> result = matrix_multiply_and_row_dot(A, B, alpha,
+  beta, C); >>> print(result)
+
+
+  Additional constraints:
+
+  Assumes `C` has at least two rows for the dot product to be computed.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 5
+  torch_cnt: 3
+  func_inputs: 'def matrix_multiply_and_row_dot(A: torch.Tensor, B: torch.Tensor, alpha: float, beta:
+    float, C: torch.Tensor) -> torch.Tensor: A (Tensor): First input matrix of shape `(n, m)`. B (Tensor):
+    Second input matrix of shape `(m, p)`. alpha (float): Scalar multiplier for the matrix-matrix product.
+    beta (float): Scalar multiplier for the input matrix `C`. C (Tensor): Output matrix of shape `(n,
+    p)` where the results are added.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+source:
+  channel: T
+  file: matrix_multiply_and_row_dot.py
+  name: matrix_multiply_and_row_dot
+  difficulty: '2'
+  params_cnt: 5
+  torch_cnt: 3
+gold_kernel: data/TritonBench_T_v1/matrix_multiply_and_row_dot.py

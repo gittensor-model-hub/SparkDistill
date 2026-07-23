@@ -1,0 +1,45 @@
+id: torch_argmax
+level: 3
+category: kernel_translation
+title: Torch Argmax
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.argmax`.\n\
+  \nOperator description:\nReturns the indices of the maximum values of a tensor across a specified dimension.\
+  \ If the dimension is None, it returns the index of the maximum value in the flattened input tensor.\
+  \ The output tensor can retain the reduced dimension if keepdim is set to True.\n\nTarget Python signature\
+  \ / call pattern:\nargmax(input, dim, keepdim=False) -> LongTensor\nArgs:\n    input (Tensor): the input\
+  \ tensor.\n    dim (int): the dimension to reduce. If ``None``, the argmax of the flattened input is\
+  \ returned.\n    keepdim (bool): whether the output tensor has :attr:`dim` retained or not.\n\nPyTorch\
+  \ reference snippet:\n```python\ntorch.argmax(a, dim=1)\n```\n\nExample / usage notes:\n>>> a = torch.randn(4,\
+  \ 4)\n>>> a\ntensor([[ 1.3398,  0.2663, -0.2686,  0.2450],\n        [-0.7401, -0.8805, -0.3402, -1.1936],\n\
+  \        [ 0.4907, -1.3948, -1.0691, -0.3132],\n        [-1.6092,  0.5419, -0.2993,  0.3195]])\n>>>\
+  \ torch.argmax(a, dim=1)\ntensor([ 0,  2,  0,  1])\n\nAdditional constraints:\nThis is the second value\
+  \ returned by torch.max. See its documentation for the exact semantics of this method.\n\nRequirements\
+  \ (SparkDistill / TritonBench harness):\n- Translate the PyTorch reference into Triton 3.7.1 kernels\
+  \ for Blackwell SM120\n- Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate\
+  \ for dtype)\n- Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n\
+  - Add @triton.autotune when there are meaningful tile/block choices\n- Provide a launcher and a small\
+  \ self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 3
+  torch_cnt: 1
+  func_inputs: "argmax(input, dim, keepdim=False) -> LongTensor\nArgs:\n    input (Tensor): the input\
+    \ tensor.\n    dim (int): the dimension to reduce. If ``None``, the argmax of the flattened input\
+    \ is returned.\n    keepdim (bool): whether the output tensor has :attr:`dim` retained or not."
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- reduction
+source:
+  channel: T
+  file: argmax.py
+  name: torch.argmax
+  difficulty: '3'
+  params_cnt: 3
+  torch_cnt: 1
+gold_kernel: data/TritonBench_T_v1/argmax.py

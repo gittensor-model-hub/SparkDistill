@@ -1,0 +1,57 @@
+id: triton_softmax
+level: 1
+category: kernel_generation
+title: Triton Softmax
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `triton_softmax.py` (repo: Infatoshi/cuda-course).\n\nTask description:\nThe Triton kernel function\
+  \ 'softmax_kernel' is designed to compute the softmax operation for each row of a 2D input tensor, indicated\
+  \ by 'input_ptr'. It writes the result to the location pointed by 'output_ptr'. This kernel takes several\
+  \ parameters: 'input_row_stride' and 'output_row_stride' which denote the memory strides for input and\
+  \ output matrices respectively, 'n_cols' which denotes the number of columns in the row being processed,\
+  \ and a compile-time constant 'BLOCK_SIZE' which determines the size of the block of memory being processed\
+  \ in parallel.\n\n        For each row, identified by 'tl.program_id(axis=0)', the kernel computes memory\
+  \ offsets for both input and output using the strides. It loads a row of data from global memory into\
+  \ on-chip SRAM using 'tl.load' with masking to handle cases where 'n_cols' is less than 'BLOCK_SIZE',\
+  \ filling absent values with '-inf'.\n\n        The kernel computes the maximum value of the loaded\
+  \ row using 'tl.max' for numerical stability. This maximum value is subtracted from each element in\
+  \ the row, followed by exponentiation through 'tl.exp' to form the numerator of the softmax calculation.\n\
+  \n        The sum of the numerators is computed using 'tl.sum' to serve as the denominator for normalization.\
+  \ Each numerator is then divided by this denominator to obtain the softmax result for the row. The final\
+  \ normalized values are stored back to the output tensor using 'tl.store', employing a mask to ensure\
+  \ that only valid column entries (less than 'n_cols') are written.\n\n        The function 'triton_softmax'\
+  \ acts as a wrapper to set up and execute the Triton kernel. It extracts dimensions of the input tensor\
+  \ 'x' to determine 'n_rows' and 'n_cols'. An output tensor of the same shape is initialized. The block\
+  \ size for parallel processing is chosen as the next power of two greater than or equal to 'n_cols',\
+  \ but capped at 1024, to optimize the hardware resources usage. It configures the execution grid to\
+  \ cover all rows and launches the kernel to perform the operation across the entire input tensor. This\
+  \ setup allows efficient parallel execution of the softmax operation across multiple rows.\n\nRequirements\
+  \ (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x\
+  \ / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use @triton.jit\
+  \ kernels with correct boundary masking\n- Include @triton.autotune with at least 3 configs when tile\
+  \ sizes matter\n- Provide a Python launcher + grid and a torch.allclose correctness test\n- Use fp32\
+  \ accumulators for tl.dot reductions\n- Print a short note if you intentionally skip autotune for a\
+  \ tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- softmax
+- elementwise
+- reduction
+source:
+  channel: G
+  file: triton_softmax.py
+  repo: Infatoshi/cuda-course
+  difficulty: '2'
+  star: 588
+  simp_instru_len: 226
+  comp_instru_len: 505
+  output_triton_len: 552
+gold_kernel: data/TritonBench_G_v1/triton_softmax.py

@@ -1,0 +1,85 @@
+id: mul_relu
+level: 3
+category: kernel_translation
+title: Mul Relu
+prompt: 'Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `mul_relu`.
+
+
+  Operator description:
+
+  This function performs element-wise multiplication of two inputs, input and other, and then applies
+  the Rectified Linear Unit (ReLU) function to the result, which replaces all negative values with zero.
+
+
+  Target Python signature / call pattern:
+
+  def mul_relu(input, other, inplace=False, out=None) -> Tensor: input (Tensor): The input tensor to be
+  multiplied. other (Tensor or Number): The tensor or number to multiply with `input`. inplace (bool,
+  optional): If True, modifies `input` in-place, if possible. Default is False. out (Tensor, optional):
+  The output tensor.
+
+
+  Mathematical definition:
+
+  ReLU(x) = max(0, x); out_i = ReLU(input_i * other_i)
+
+
+  PyTorch reference snippet:
+
+  ```python
+
+  mul_result = torch.mul(input, other, out=out); return F.relu(mul_result, inplace=inplace)
+
+  ```
+
+
+  Example / usage notes:
+
+  >>> import torch; >>> import torch.nn.functional as F; >>> a = torch.tensor([1.0, -2.0, 3.0]); >>> b
+  = torch.tensor([0.5, 1.5, -1.0]); >>> result = mul_relu(a, b); >>> result; tensor([0.5000, 0.0000, 0.0000]);
+  >>> result = mul_relu(a, 2); >>> result; tensor([2.0000, 0.0000, 6.0000])
+
+
+  Additional constraints:
+
+  The function uses torch.mul for multiplication and F.relu for the ReLU operation.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell SM120
+
+  - Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)
+
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr
+
+  - Add @triton.autotune when there are meaningful tile/block choices
+
+  - Provide a launcher and a small self-contained test'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 4
+  torch_cnt: 2
+  func_inputs: 'def mul_relu(input, other, inplace=False, out=None) -> Tensor: input (Tensor): The input
+    tensor to be multiplied. other (Tensor or Number): The tensor or number to multiply with `input`.
+    inplace (bool, optional): If True, modifies `input` in-place, if possible. Default is False. out (Tensor,
+    optional): The output tensor.'
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+source:
+  channel: T
+  file: mul_relu.py
+  name: mul_relu
+  difficulty: '3'
+  params_cnt: 4
+  torch_cnt: 2
+gold_kernel: data/TritonBench_T_v1/mul_relu.py

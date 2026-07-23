@@ -1,0 +1,38 @@
+id: torch_special_gammaln
+level: 1
+category: kernel_translation
+title: Torch Special Gammaln
+prompt: "Translate the following PyTorch operator into a Triton 3.7.1 kernel suite named `torch.special.gammaln`.\n\
+  \nOperator description:\nComputes the natural logarithm of the absolute value of the gamma function\
+  \ on the input tensor.\n\nTarget Python signature / call pattern:\ngammaln(input, *, out=None) -> Tensor\n\
+  \nArgs:\n    input (Tensor): the input tensor.\n\nKeyword args:\n    out (Tensor, optional): the output\
+  \ tensor.\n\nMathematical definition:\n\\text{out}_{i} = \\ln \\Gamma(|\\text{input}_{i}|)\n\nPyTorch\
+  \ reference snippet:\n```python\ntorch.special.gammaln(a)\n```\n\nExample / usage notes:\n>>> a = torch.arange(0.5,\
+  \ 2, 0.5)\n>>> torch.special.gammaln(a)\ntensor([ 0.5724,  0.0000, -0.1208])\n\nRequirements (SparkDistill\
+  \ / TritonBench harness):\n- Translate the PyTorch reference into Triton 3.7.1 kernels for Blackwell\
+  \ SM120\n- Preserve numerics: include torch.allclose vs the reference (atol/rtol appropriate for dtype)\n\
+  - Use @triton.jit + boundary masks; prefer tl.make_tensor_descriptor over tl.make_block_ptr\n- Add @triton.autotune\
+  \ when there are meaningful tile/block choices\n- Provide a launcher and a small self-contained test"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  params_cnt: 2
+  torch_cnt: 1
+  func_inputs: "gammaln(input, *, out=None) -> Tensor\n\nArgs:\n    input (Tensor): the input tensor.\n\
+    \nKeyword args:\n    out (Tensor, optional): the output tensor."
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- torch.allclose
+- '@triton.autotune'
+tags:
+- elementwise
+source:
+  channel: T
+  file: gammaln.py
+  name: torch.special.gammaln
+  difficulty: '1'
+  params_cnt: 2
+  torch_cnt: 1
+gold_kernel: data/TritonBench_T_v1/gammaln.py

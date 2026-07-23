@@ -1,0 +1,23 @@
+id: gather_oob_index
+level: bugfix
+category: kernel_debugging
+title: Gather Without Index Bounds Check
+prompt: Embedding gather crashes on out-of-range indices. Add safe indexing.
+input_code: "@triton.jit\ndef gather_kernel(weight_ptr, index_ptr, out_ptr, n, emb_dim, BLOCK: tl.constexpr):\n\
+  \    pid = tl.program_id(0)\n    offs = pid * BLOCK + tl.arange(0, BLOCK)\n    mask = offs < n\n   \
+  \ idx = tl.load(index_ptr + offs, mask=mask, other=0)\n    # BUG: no clamp against nrow\n    rows =\
+  \ tl.load(weight_ptr + idx[:, None] * emb_dim + tl.arange(0, emb_dim)[None, :])\n    tl.store(out_ptr\
+  \ + offs[:, None] * emb_dim + tl.arange(0, emb_dim)[None, :], rows, mask=mask[:, None])\n"
+expected_fix: Clamp or mask indices before gather loads
+required_patterns:
+- '@triton.jit'
+tags:
+- debugging
+- embedding
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+source:
+  channel: synthetic
+  file: gather_oob_index.py
+  difficulty: bugfix

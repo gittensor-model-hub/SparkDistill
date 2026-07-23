@@ -1,0 +1,65 @@
+id: l2_norm_bwd
+level: 4
+category: kernel_generation
+title: L2 Norm Bwd
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `l2_norm_bwd.py` (repo: ridgerchu/matmulfreellm).
+
+
+  Task description:
+
+  The Triton kernel `_l2_norm_bwd_kernel` performs a backward pass operation for L2 normalization on a
+  per-row basis. It receives pointers to input `X`, output gradient `DY`, and calculates the input gradient
+  `DX`. Each row of the input is accessed using the `stride_x_row`. `BLOCK_N` determines the number of
+  elements processed per block, set based on maximum allowable fused size and next power of 2 of `N`.
+  Within the kernel, it computes the variance of the input slice, uses it to compute the reciprocal of
+  the standard deviation (`rstd`), and then calculates `dx` using the formula `dy * rstd - tl.sum(dy *
+  x) * (1 / (var+eps)) * rstd * x`. The result is conditionally stored in `DX` using masks. The `_l2_norm_bwd`
+  function orchestrates this process, ensuring input tensors `x` and `dy` are properly reshaped and their
+  strides configured for contiguity if necessary. If `N` exceeds `BLOCK_N`, an error is raised to prevent
+  excessive feature dimensions. Finally, the kernel is launched over `M` rows of the reshaped tensors,
+  and the output `dx` is reshaped back to the original input shape.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- matmul
+- rope
+- elementwise
+- reduction
+- fused
+source:
+  channel: G
+  file: l2_norm_bwd.py
+  repo: ridgerchu/matmulfreellm
+  difficulty: '3'
+  star: 2927
+  simp_instru_len: 162
+  comp_instru_len: 288
+  output_triton_len: 697
+gold_kernel: data/TritonBench_G_v1/l2_norm_bwd.py

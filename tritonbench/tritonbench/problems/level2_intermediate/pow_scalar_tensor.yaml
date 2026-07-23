@@ -1,0 +1,60 @@
+id: pow_scalar_tensor
+level: 2
+category: kernel_generation
+title: Pow Scalar Tensor
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `pow_scalar_tensor.py` (repo: FlagOpen/FlagGems).
+
+
+  Task description:
+
+  The Triton operator is designed to compute the power of each element in a tensor by a scalar value,
+  using a specialized kernel function `pow_func_scalar_tensor_kernel_rank_1`. The wrapper function `pow_func_scalar_tensor_wrapper_rank_1`
+  sets up the computation by ensuring input-output shape alignment and using heuristics to determine optimal
+  computation parameters, such as tile size, number of warps, and grid configuration. It handles both
+  torch `Tensor` and `StridedBuffer` inputs. The kernel function processes data in parallel, managing
+  memory offsets and data loading using block pointers, and performs boundary checks to ensure safe memory
+  operations. The operation is divided into tiles, and depending on the configuration, it either uses
+  a monolithic or a grid-stride-loop style kernel execution. The use of Triton''s `pow` function ensures
+  compatibility and efficiency in computing the exponentiation on the GPU.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- elementwise
+- reduction
+source:
+  channel: G
+  file: pow_scalar_tensor.py
+  repo: FlagOpen/FlagGems
+  difficulty: '3'
+  star: 347
+  simp_instru_len: 148
+  comp_instru_len: 210
+  output_triton_len: 2454
+gold_kernel: data/TritonBench_G_v1/pow_scalar_tensor.py

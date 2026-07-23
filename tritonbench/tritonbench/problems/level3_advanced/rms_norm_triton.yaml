@@ -1,0 +1,63 @@
+id: rms_norm_triton
+level: 3
+category: kernel_generation
+title: Rms Norm Triton
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `rms_norm_triton.py` (repo: FlagOpen/FlagGems).
+
+
+  Task description:
+
+  The code defines a custom operation for RMS normalization using the Triton library, which is optimized
+  for GPU execution. The kernel `rms_norm_kernel` is responsible for computing the RMS normalized version
+  of input `X` with weights `W`, storing the results in `Y`. It operates on a per-row basis, controlled
+  by the program ID `pid`, which assigns each row of `X` to a separate block. The mask ensures computations
+  respect the dimensions of `X` even if it''s smaller than the block size. Variance is computed as `var
+  = tl.sum(x * x, axis=0) / N`, where `x` is the loaded data of the current row. `rrms` is calculated
+  as the reciprocal of the root of `var` plus a small `eps` to ensure numerical stability. The computation
+  `y = (x * rrms).to(Y.dtype.element_ty) * w` applies normalization and scales by weights. The result
+  is stored in `Y`. The `RmsNorm` class encapsulates this in a PyTorch `Function`, providing a `forward`
+  method which allocates outputs and calls the kernel, passing dimensions and strides. The method `rms_norm`
+  wraps this `Function` for user-friendly access, taking the input tensor `x`, its normalized shape, the
+  weight tensor, and an optional `eps` parameter, and returns the RMS normalized tensor.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- mask
+- '@triton.autotune'
+tags:
+- normalization
+- reduction
+source:
+  channel: G
+  file: rms_norm_triton.py
+  repo: FlagOpen/FlagGems
+  difficulty: '3'
+  star: 347
+  simp_instru_len: 112
+  comp_instru_len: 314
+  output_triton_len: 651
+gold_kernel: data/TritonBench_G_v1/rms_norm_triton.py

@@ -1,0 +1,60 @@
+id: bgmv_expand_slice
+level: 4
+category: kernel_generation
+title: Bgmv Expand Slice
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `bgmv_expand_slice.py` (repo: vllm-project/vllm).
+
+
+  Task description:
+
+  The Triton kernel `_bgmv_expand_slice_kernel` is designed to optimize the matrix-vector multiplication
+  by splitting the N dimension into multiple blocks, improving performance for large hidden sizes. It
+  operates on inputs from `input_ptr` (input matrix), `lora_ptr` (LoRA weight matrix), and `out_ptr` (output
+  matrix), considering the batch and index information provided by `lora_indices`. The kernel computes
+  matrix-vector products for each block and optionally accumulates these products into the output tensor.
+  Key constants like `BLOCK_N`, `BLOCK_K`, `SPLIT_N`, `EVEN_K`, `ADD_INPUTS`, and `CAST_TYPE` control
+  the block dimensions, input data handling, and type casting behavior. The `_bgmv_expand_slice` function,
+  marked with `@torch.inference_mode()`, initializes tensor properties, validates shapes, and prepares
+  the grid configuration before invoking the Triton kernel, ensuring data and operational integrity.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- matmul
+- rope
+- elementwise
+source:
+  channel: G
+  file: bgmv_expand_slice.py
+  repo: vllm-project/vllm
+  difficulty: '4'
+  star: 31119
+  simp_instru_len: 149
+  comp_instru_len: 232
+  output_triton_len: 1625
+gold_kernel: data/TritonBench_G_v1/bgmv_expand_slice.py

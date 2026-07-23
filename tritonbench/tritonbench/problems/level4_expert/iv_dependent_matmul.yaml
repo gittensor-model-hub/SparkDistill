@@ -1,0 +1,62 @@
+id: iv_dependent_matmul
+level: 4
+category: kernel_generation
+title: Iv Dependent Matmul
+prompt: 'Write a complete Triton 3.7.1 implementation for the following GPU kernel task.
+
+  Upstream reference file: `iv_dependent_matmul.py` (repo: triton-lang/triton).
+
+
+  Task description:
+
+  The provided Triton operator defines a matrix multiplication function `iv_dependent_matmul_kernel`,
+  which is executed on a GPU using the Triton framework. The kernel function takes pointers to matrices
+  `a`, `b`, and `c`, along with their dimensions `M`, `N`, `K`, and strides for memory layout. It also
+  accepts block sizes `BLOCK_SIZE_M`, `BLOCK_SIZE_N`, `BLOCK_SIZE_K` and a string `type` to define different
+  loading strategies. The kernel uses a double loop strategy to load and compute block matrices from `a`
+  and `b`, storing results in `c`, based on specified offsets calculated from program ID `pid`. The function
+  supports conditional logic for various data preloading strategies to optimize memory access patterns.
+  The wrapper function `iv_dependent_matmul_wrapper` handles setup, including device selection, random
+  matrix generation, and grid configuration, to invoke the kernel with specific parameters. It uses the
+  Triton grid configuration to determine execution dimensions and sets the number of pipeline stages depending
+  on the scheduling type. The result is stored in `triton_output`.
+
+
+  Requirements (SparkDistill / TritonBench harness):
+
+  - Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x / SM120)
+
+  - Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr
+
+  - Use @triton.jit kernels with correct boundary masking
+
+  - Include @triton.autotune with at least 3 configs when tile sizes matter
+
+  - Provide a Python launcher + grid and a torch.allclose correctness test
+
+  - Use fp32 accumulators for tl.dot reductions
+
+  - Print a short note if you intentionally skip autotune for a tiny elementwise kernel'
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- matmul
+- elementwise
+- reduction
+source:
+  channel: G
+  file: iv_dependent_matmul.py
+  repo: triton-lang/triton
+  difficulty: '4'
+  star: 13556
+  simp_instru_len: 139
+  comp_instru_len: 247
+  output_triton_len: 1871
+gold_kernel: data/TritonBench_G_v1/iv_dependent_matmul.py

@@ -1,0 +1,49 @@
+id: rmsnorm_fused
+level: 4
+category: kernel_generation
+title: Rmsnorm Fused
+prompt: "Write a complete Triton 3.7.1 implementation for the following GPU kernel task.\nUpstream reference\
+  \ file: `rmsnorm_fused.py` (repo: declare-lab/instruct-eval).\n\nTask description:\nThis code implements\
+  \ a custom RMS normalization using Triton to accelerate the computation process. The kernel function\
+  \ `rms_norm_fwd_fused` is defined with the `@triton.jit` decorator, which makes it suitable for just-in-time\
+  \ compilation and execution on GPUs. The function is responsible for calculating the root mean square\
+  \ (RMS) normalization of each row in the input matrix `X`. It does so by computing the variance of elements\
+  \ in each row, calculating the inverse of the standard deviation (rstd), and applying a learned weight\
+  \ matrix `W` to the normalized output.\n\n            The function takes in pointers to input tensor\
+  \ `X`, output tensor `Y`, and weights `W`, along with some metadata such as `stride` for row access\
+  \ and `N` for the number of columns. It utilizes a block-based approach to iterate over input data,\
+  \ computing partial results in blocks of `BLOCK_SIZE` to efficiently leverage GPU capabilities.\n\n\
+  \            The `TritonLlamaRMSNorm` class is a PyTorch `nn.Module` that integrates this kernel into\
+  \ a model. The constructor receives a `weight` tensor and an `eps` value for numerical stability. The\
+  \ `forward` method reshapes the input tensor into a 2D format, calculates the optimal block size, and\
+  \ enqueues the Triton kernel for execution. The kernel computes the normalized output stored in tensor\
+  \ `y`, ensuring high performance for inputs where the feature dimension is less than 64KB.\n\nRequirements\
+  \ (SparkDistill / TritonBench harness):\n- Target Triton 3.7.1 on workstation Blackwell (CUDA SM12x\
+  \ / SM120)\n- Prefer tl.make_tensor_descriptor over deprecated tl.make_block_ptr\n- Use @triton.jit\
+  \ kernels with correct boundary masking\n- Include @triton.autotune with at least 3 configs when tile\
+  \ sizes matter\n- Provide a Python launcher + grid and a torch.allclose correctness test\n- Use fp32\
+  \ accumulators for tl.dot reductions\n- Print a short note if you intentionally skip autotune for a\
+  \ tiny elementwise kernel"
+constraints:
+  triton_version: 3.7.1
+  gpu_target: Blackwell-SM120
+  dtype_hint: float32 preferred unless the task requires lower precision
+required_patterns:
+- '@triton.jit'
+- tl.load
+- tl.store
+- '@triton.autotune'
+tags:
+- normalization
+- reduction
+- fused
+source:
+  channel: G
+  file: rmsnorm_fused.py
+  repo: declare-lab/instruct-eval
+  difficulty: '3'
+  star: 532
+  simp_instru_len: 154
+  comp_instru_len: 329
+  output_triton_len: 885
+gold_kernel: data/TritonBench_G_v1/rmsnorm_fused.py
