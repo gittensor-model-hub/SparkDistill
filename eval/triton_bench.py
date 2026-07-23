@@ -39,6 +39,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from eval.gpu_architecture import GpuArchitecture, normalize_gpu_architecture
+from eval.serve_stack import serve_path_env, vllm_serve_argv
 
 HEADLINE_METRIC = "avg_composite"
 _QUICK_LEVELS = [1]  # cheap re-verification, mirrors configs/eval_quick.yaml
@@ -160,13 +161,12 @@ def serve_checkpoint(model_path: str, port: int = 8000, startup_timeout_s: int =
     endpoint = f"http://127.0.0.1:{port}/v1"
     # --seed and no prefix caching: shrink cross-instance generation drift so a
     # miner's claim and the validator's re-run see the same numerics.
-    command = ["vllm", "serve", model_path, "--port", str(port), "--seed", "0", "--no-enable-prefix-caching"]
-    if served_model_name:
-        command += ["--served-model-name", served_model_name]
+    command = vllm_serve_argv(model_path, port=port, served_model_name=served_model_name)
     proc = subprocess.Popen(
         command,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
+        env=serve_path_env(),
     )
     try:
         deadline = time.monotonic() + startup_timeout_s
