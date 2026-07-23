@@ -279,10 +279,22 @@ def _add_row_to_registry(working: Any, row: dict[str, Any], fingerprint_row: Cal
 def load_trajectories_jsonl(path: Path) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     with path.open(encoding="utf-8") as handle:
-        for line in handle:
+        for line_no, line in enumerate(handle, start=1):
             line = line.strip()
-            if line:
-                rows.append(json.loads(line))
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"{path}:{line_no}: invalid JSON: {exc}") from exc
+            if not isinstance(row, dict):
+                # Raise ValueError (not AttributeError) so registry_gate's
+                # (OSError, RuntimeError, ValueError) catch returns dataset:REJECT (#214).
+                raise ValueError(
+                    f"{path}:{line_no}: trajectory row must be a JSON object, "
+                    f"got {type(row).__name__}"
+                )
+            rows.append(row)
     return rows
 
 

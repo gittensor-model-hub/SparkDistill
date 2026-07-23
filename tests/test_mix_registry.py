@@ -502,3 +502,12 @@ def test_trajectory_to_sft_record_prefers_multi_turn_episode(sparkproof_root: Pa
     assert len(record["messages"]) == 5
     assert record["metadata"]["multi_turn"] is True
     assert record["metadata"]["repairs_used"] == 1
+
+
+def test_load_trajectories_jsonl_rejects_non_object(tmp_path: Path):
+    from eval.mix_registry import load_trajectories_jsonl
+
+    path = tmp_path / "trajectories.jsonl"
+    path.write_text('["not", "an", "object"]\n', encoding="utf-8")
+    with pytest.raises(ValueError, match="must be a JSON object"):
+        load_trajectories_jsonl(path)
