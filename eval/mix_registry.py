@@ -5,7 +5,7 @@ Each component must be a merged line in ``datasets/registry.jsonl`` with a pinne
 Hugging Face repo, deduplicates across sources, converts to Axolotl ``messages``
 records, and writes a small ``mix_manifest.json`` that auditors can re-check.
 
-    # Build a mix from two merged registry entries
+    # Build a mix from two merged registry entries (SparkProof checkout required for export)
     python -m eval.mix_registry mix \\
         --registry datasets/registry.jsonl \\
         --sha256 <sha-a> --sha256 <sha-b> \\
@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from dataclasses import dataclass, field
@@ -33,7 +34,6 @@ from typing import Any, Callable, Literal
 
 from eval.dataset_verify import _sha256_file, check_proof_dir
 from eval.registry_gate import hf_repo_from_url, validate_registry_entry
-from teacher.format import to_messages_record
 
 MIX_VERSION = "sparkdistill-mix-v0"
 REGISTRY_PATH = Path("datasets/registry.jsonl")
@@ -48,6 +48,7 @@ class MixComponent:
     rows_in_source: int = 0
     rows_selected: int = 0
     rows_skipped_dedupe: int = 0
+    rows_skipped_unexportable: int = 0
 
 
 @dataclass
@@ -78,6 +79,7 @@ class MixResult:
                     "rows_in_source": component.rows_in_source,
                     "rows_selected": component.rows_selected,
                     "rows_skipped_dedupe": component.rows_skipped_dedupe,
+                    "rows_skipped_unexportable": component.rows_skipped_unexportable,
                     "dataset_version": component.registry_entry.get("dataset_version"),
                     "gpu_architecture": component.registry_entry.get("gpu_architecture"),
                 }
@@ -151,12 +153,45 @@ def select_registry_entries(
     return selected
 
 
-def _import_novelty(sparkproof_root: Path | None):
-    if sparkproof_root is None:
-        return None
-    root = sparkproof_root.resolve()
+def resolve_sparkproof_root(sparkproof_root: Path | None) -> Path:
+    """Return a SparkProof checkout (explicit arg, ``SPARKPROOF_ROOT``, or sibling clone)."""
+    if sparkproof_root is not None:
+        root = sparkproof_root.resolve()
+    else:
+        env = os.environ.get("SPARKPROOF_ROOT")
+        if env:
+            root = Path(env).resolve()
+        else:
+            root = (Path(__file__).resolve().parents[1] / ".." / "SparkProof").resolve()
+    marker = root / "sparkproof" / "publish" / "hf_dataset.py"
+    if not marker.is_file():
+        raise ValueError(
+            f"SparkProof checkout required for registry mix export (missing {marker}). "
+            "Pass --sparkproof-root or set SPARKPROOF_ROOT."
+        )
+    return root
+
+
+def _ensure_sparkproof_on_path(root: Path) -> None:
     if str(root) not in sys.path:
         sys.path.insert(0, str(root))
+
+
+def _import_trajectory_exporter(sparkproof_root: Path | None) -> Callable[[dict[str, Any]], dict[str, Any] | None]:
+    """SparkProof HF publish export: skips empty/failed rows, prefers multi-turn episodes."""
+    root = resolve_sparkproof_root(sparkproof_root)
+    _ensure_sparkproof_on_path(root)
+    from sparkproof.publish.hf_dataset import trajectory_to_messages_record
+
+    return trajectory_to_messages_record
+
+
+def _import_novelty(sparkproof_root: Path | None):
+    try:
+        root = resolve_sparkproof_root(sparkproof_root)
+    except ValueError:
+        return None
+    _ensure_sparkproof_on_path(root)
     try:
         from sparkproof.triton_dataset.novelty import NoveltyRegistry, fingerprint_row
     except ImportError:
@@ -284,15 +319,22 @@ def trajectory_to_sft_record(
     *,
     component: dict[str, Any],
     row_index: int,
-) -> dict[str, Any]:
-    record = to_messages_record(trajectory)
-    record["metadata"] = {
+    export_fn: Callable[[dict[str, Any]], dict[str, Any] | None],
+) -> dict[str, Any] | None:
+    """Convert one proof trajectory to an SFT row using SparkProof's publish exporter."""
+    record = export_fn(trajectory)
+    if record is None:
+        return None
+    mix_meta = {
         "mix_source_miner": component["miner"],
         "mix_source_hf_url": component["hf_url"],
         "mix_source_sha256": component["trajectories_sha256"],
         "mix_row_index": row_index,
         "mix_task_id": ((trajectory.get("metadata") or {}).get("prompt_meta") or {}).get("task_id"),
     }
+    record_meta = dict(record.get("metadata") or {})
+    record_meta.update(mix_meta)
+    record["metadata"] = record_meta
     return record
 
 
@@ -314,8 +356,15 @@ def mix_registry_datasets(
     out_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
 
+    export_fn = _import_trajectory_exporter(sparkproof_root)
+
     components: list[MixComponent] = []
-    dedupe_counts = {"exact_skipped": 0, "near_skipped": 0, "intra_mix_skipped": 0}
+    dedupe_counts = {
+        "exact_skipped": 0,
+        "near_skipped": 0,
+        "intra_mix_skipped": 0,
+        "unexportable_skipped": 0,
+    }
     rows_written = 0
 
     with out_path.open("w", encoding="utf-8", newline="\n") as out_f:
@@ -339,7 +388,16 @@ def mix_registry_datasets(
                         dedupe_counts["intra_mix_skipped"] += 1
                     continue
 
-                record = trajectory_to_sft_record(trajectory, component=entry, row_index=rows_written)
+                record = trajectory_to_sft_record(
+                    trajectory,
+                    component=entry,
+                    row_index=rows_written,
+                    export_fn=export_fn,
+                )
+                if record is None:
+                    component.rows_skipped_unexportable += 1
+                    dedupe_counts["unexportable_skipped"] += 1
+                    continue
                 out_f.write(json.dumps(record, separators=(",", ":")) + "\n")
                 rows_written += 1
                 selected_for_source += 1
@@ -478,7 +536,12 @@ def main(argv: list[str] | None = None) -> int:
     mix_parser.add_argument("--out", type=Path, required=True, help="output SFT jsonl (messages format)")
     mix_parser.add_argument("--manifest-out", type=Path, required=True, help="provenance manifest json")
     mix_parser.add_argument("--mix-id", default=None, help="identifier recorded in mix_manifest.json")
-    mix_parser.add_argument("--sparkproof-root", type=Path, default=None, help="SparkProof checkout for novelty dedupe")
+    mix_parser.add_argument(
+        "--sparkproof-root",
+        type=Path,
+        default=None,
+        help="SparkProof checkout for novelty dedupe and SFT export (default: SPARKPROOF_ROOT or ../SparkProof)",
+    )
     mix_parser.add_argument("--proof-cache", type=Path, default=None, help="HF snapshot cache directory")
     mix_parser.add_argument("--dedupe", choices=["near", "exact", "none"], default="near")
     mix_parser.add_argument("--max-rows-per-source", type=int, default=None)
