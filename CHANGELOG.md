@@ -41,6 +41,13 @@ All notable changes to SparkDistill are documented here. The format follows
   never filled its architecture bucket. `record_merged_ledger_entry` now calls
   `apply_verified_report_to_frontiers` (and backfills the Hopper frontier from
   `2026-07-15-magicrails-hopper-v2`).
+- **vLLM serve stack installs GPU wheels again**: `scripts/install_serve.sh` now
+  pulls the official `vllm==0.25.0+cu129` wheel plus matching PyTorch CUDA
+  builds instead of the generic PyPI package (which could install CPU-only torch
+  and spend minutes JIT-compiling at engine start). `eval/serve_stack.py` centralizes
+  wheel selection for Hopper H100/H200 and Blackwell CC nodes; `eval.triton_bench`
+  auto-uses the serve venv, caps `--max-model-len` for eval, and disables Blackwell
+  CUDA graphs that regressed short decode runs on vLLM 0.25.
 - **Canonical-dataset gate no longer skips non-mapping recipe dataset entries**:
   `assert_recipe_uses_canonical_dataset` only inspected dict entries with a string
   `path`, so a bare-string dataset entry (`datasets: ["some-org/private-set"]`) or a

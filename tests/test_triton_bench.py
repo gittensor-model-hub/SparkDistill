@@ -121,12 +121,13 @@ def test_serve_checkpoint_passes_served_model_name(monkeypatch):
         def wait(self, timeout=None):
             return 0
 
-    def fake_popen(command, stdout=None, stderr=None):
+    def fake_popen(command, stdout=None, stderr=None, env=None):
         captured["command"] = command
         return FakeProc()
 
     monkeypatch.setattr(tb.subprocess, "Popen", fake_popen)
     monkeypatch.setattr(tb, "_endpoint_ready", lambda endpoint: True)
+    monkeypatch.setenv("SPARKDISTILL_GPU_ARCHITECTURE", "hopper-h100")
 
     with serve_checkpoint("/models/ckpt", served_model_name="ckpt") as endpoint:
         assert endpoint.endswith("/v1")
@@ -134,6 +135,8 @@ def test_serve_checkpoint_passes_served_model_name(monkeypatch):
     assert "ckpt" in captured["command"]
     assert "--seed" in captured["command"]
     assert "--no-enable-prefix-caching" in captured["command"]
+    assert "--dtype" in captured["command"]
+    assert "bfloat16" in captured["command"]
 
 
 def test_triton_registered_in_basket():
