@@ -16,7 +16,12 @@ import pytest
 jwt = pytest.importorskip("jwt")
 
 
-def _es384_token_fixture(*, eat_nonce: str | None = None, device_eat_nonce: str | None = None):
+def _es384_token_fixture(
+    *,
+    eat_nonce: str | None = None,
+    device_eat_nonce: str | None = None,
+    hwmodel: str = "GH100 A01 GSP BROM",
+):
     from cryptography.hazmat.primitives.asymmetric import ec
 
     key = ec.generate_private_key(ec.SECP384R1())
@@ -28,7 +33,7 @@ def _es384_token_fixture(*, eat_nonce: str | None = None, device_eat_nonce: str 
         platform_payload["eat_nonce"] = eat_nonce
     device_payload: dict = {
         "iss": "https://nras.attestation.nvidia.com",
-        "hwmodel": "GH100 A01 GSP BROM",
+        "hwmodel": hwmodel,
     }
     if device_eat_nonce is not None:
         device_payload["eat_nonce"] = device_eat_nonce
@@ -346,6 +351,73 @@ def test_check_attestation_integrity_require_tdx_for_attested_samples_path(tmp_p
     att = {"passed": True, "token": token}
     assert check_attestation_integrity(bundle, att, require_tdx=False) == []
     assert any("TDX quote is required" in i for i in check_attestation_integrity(bundle, att, require_tdx=True))
+
+
+def test_verify_submission_rejects_hwmodel_spoofed_via_claims_sidecar(tmp_path, monkeypatch):
+    """A genuinely attested Hopper run must not claim train_gpu on the Blackwell frontier.
+
+    Everything here is real except `attestation["claims"]`: the NRAS token is
+    JWKS-valid and its signed device JWT reports hwmodel=GH100, while the unsigned
+    sidecar the miner commits in `runs/<run-id>/attestation.json` says B300. Trusting
+    the sidecar tiered the run against the wrong (speed-derived) frontier bucket.
+    """
+    from eval.canonical_dataset import canonical_hf_url
+    from eval.verify import verify_submission
+    from proof.bundle import claim_sha256
+
+    bundle = _bundle(tmp_path)
+    (bundle / "manifest.json").write_text(
+        json.dumps(
+            {
+                "run_id": "spoof-1",
+                "dataset_url": canonical_hf_url(),
+                "train_hours": 3.0,
+                "train_gpu": "NVIDIA B300",
+            }
+        ),
+        encoding="utf-8",
+    )
+    digest = claim_sha256(bundle)
+    key, token = _es384_token_fixture(device_eat_nonce=digest, hwmodel="GH100 A01 GSP BROM")
+    _patch_jwks(monkeypatch, key)
+
+    report = verify_submission(
+        bundle,
+        frontier={"gsm8k": 0.5, "triton": 0.4},
+        attestation={
+            "passed": True,
+            "token": token,
+            "claims": {"devices": {"GPU-0": {"hwmodel": "B300 A01 GSP BROM"}}},
+        },
+    )
+    assert report["verified"] is False
+    assert report["reason"] == "training_claims_failed"
+    assert report["label"] == "eval:REJECT"
+    assert any("corroborate" in i for i in report["issues"])
+
+
+def test_verify_submission_accepts_signed_hwmodel_matching_train_gpu(tmp_path, monkeypatch):
+    """The honest Hopper path still passes the training-claims gate."""
+    from eval.canonical_dataset import canonical_hf_url
+    from eval.verify import check_training_claims
+    from proof.bundle import claim_sha256
+
+    bundle = _bundle(tmp_path)
+    (bundle / "manifest.json").write_text(
+        json.dumps(
+            {
+                "run_id": "honest-1",
+                "dataset_url": canonical_hf_url(),
+                "train_hours": 3.0,
+                "train_gpu": "NVIDIA H200",
+            }
+        ),
+        encoding="utf-8",
+    )
+    key, token = _es384_token_fixture(device_eat_nonce=claim_sha256(bundle))
+    _patch_jwks(monkeypatch, key)
+    manifest = json.loads((bundle / "manifest.json").read_text())
+    assert check_training_claims(manifest, {"passed": True, "token": token}) == []
 
 
 def test_verify_submission_rejects_forged_passed_true_attestation(tmp_path):

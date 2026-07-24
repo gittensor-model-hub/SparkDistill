@@ -95,26 +95,63 @@ def test_training_claims_absent_fields_do_not_fail():
     assert check_training_claims({}, None) == []
 
 
+def _signed(hwmodel: str) -> tuple[dict, dict]:
+    """(attestation, gpu_sig) whose JWKS-verified device claim reports `hwmodel`.
+
+    The attestation's own `claims` sidecar deliberately disagrees: only the signed
+    `gpu_sig` claims may decide corroboration.
+    """
+    attestation = {"passed": True, "token": "<signed>", "claims": {"hwmodel": "SPOOFED B300"}}
+    gpu_sig = {"verified": True, "claims": {"devices": {"GPU-0": {"hwmodel": hwmodel}}}}
+    return attestation, gpu_sig
+
+
 def test_training_claims_attestation_must_corroborate_gpu():
     manifest = {"train_hours": 3.0, "train_gpu": "NVIDIA RTX PRO 6000 Blackwell"}
-    attestation = {"passed": True, "claims": {"hwmodel": "GH100 A01 GSP BROM"}}
-    issues = check_training_claims(manifest, attestation)
+    attestation, gpu_sig = _signed("GH100 A01 GSP BROM")
+    issues = check_training_claims(manifest, attestation, gpu_sig=gpu_sig)
     assert any("corroborate" in issue for issue in issues)
 
-    corroborating = {"passed": True, "claims": {"hwmodel": "GB202 RTX PRO 6000"}}
-    assert check_training_claims(manifest, corroborating) == []
+    corroborating, corroborating_sig = _signed("GB202 RTX PRO 6000")
+    assert check_training_claims(manifest, corroborating, gpu_sig=corroborating_sig) == []
 
     h100_manifest = {"train_hours": 3.0, "train_gpu": "NVIDIA H100"}
-    h100_attestation = {"passed": True, "claims": {"hwmodel": "NVIDIA H100 SXM"}}
-    assert check_training_claims(h100_manifest, h100_attestation) == []
+    h100_attestation, h100_sig = _signed("NVIDIA H100 SXM")
+    assert check_training_claims(h100_manifest, h100_attestation, gpu_sig=h100_sig) == []
 
     # H200 is the same GH100 die as H100 (upgraded HBM3e only) — NVIDIA's hwmodel
     # attestation claim reports the die, not the memory SKU. Confirmed live on a
     # real H200 submission (gittensor-model-hub/SparkDistill#120): hwmodel="GH100",
     # which this must corroborate rather than reject.
     h200_manifest = {"train_hours": 4.2, "train_gpu": "NVIDIA H200"}
-    h200_attestation = {"passed": True, "claims": {"hwmodel": "GH100"}}
-    assert check_training_claims(h200_manifest, h200_attestation) == []
+    h200_attestation, h200_sig = _signed("GH100")
+    assert check_training_claims(h200_manifest, h200_attestation, gpu_sig=h200_sig) == []
+
+
+def test_training_claims_ignore_the_editable_claims_sidecar():
+    """A Hopper run must not corroborate a Blackwell train_gpu by editing attestation.json.
+
+    `attestation["claims"]` is an unsigned convenience copy the miner commits in the
+    PR, so hwmodel must be read from the JWKS-verified NRAS claims instead.
+    """
+    manifest = {"train_hours": 3.0, "train_gpu": "NVIDIA B300"}
+    _, hopper_sig = _signed("GH100 A01 GSP BROM")
+
+    # Sidecar rewritten to a Blackwell hwmodel.
+    spoofed = {"passed": True, "token": "<signed>", "claims": {"devices": {"GPU-0": {"hwmodel": "B300 A01"}}}}
+    assert any("corroborate" in i for i in check_training_claims(manifest, spoofed, gpu_sig=hopper_sig))
+
+    # Sidecar deleted or emptied — must not short-circuit the check to a pass.
+    for stripped in ({"passed": True, "token": "<signed>"}, {"passed": True, "token": "<signed>", "claims": {}}):
+        assert any("corroborate" in i for i in check_training_claims(manifest, stripped, gpu_sig=hopper_sig))
+
+
+def test_training_claims_reject_unverifiable_gpu_token():
+    """No signed hwmodel evidence at all is fail-closed, not a pass-through."""
+    manifest = {"train_hours": 3.0, "train_gpu": "NVIDIA B300"}
+    attestation = {"passed": True, "claims": {"devices": {"GPU-0": {"hwmodel": "B300 A01"}}}}
+    issues = check_training_claims(manifest, attestation, gpu_sig=None)
+    assert any("unverified" in i for i in issues)
 
 
 def test_proof_only_bundle_requires_local_checkpoint(tmp_path):
