@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from eval.gpu_architecture import GpuArchitecture, normalize_gpu_architecture
+
 # Substrings matched case-insensitively against manifest train_gpu claims.
 ACCEPTED_TRAINING_GPU_SUBSTRINGS = (
   # Blackwell workstation (RTX PRO 6000, etc.)
@@ -46,6 +48,21 @@ def claimed_hwmodels(claims: dict) -> list[str]:
         if hwmodel:
             models.append(str(hwmodel).lower())
     return models
+
+
+def attested_gpu_architectures(claims: dict) -> set[GpuArchitecture]:
+    """Architecture families evidenced by an attestation's `hwmodel` claims.
+
+    Only `hwmodel` is read, for the same reason `attestation_corroborates_training_gpu`
+    restricts itself to it: other claim fields are hex-shaped and miner-influenced, so
+    matching the whole blob would let a nonce stand in for hardware evidence (#148).
+    """
+    architectures: set[GpuArchitecture] = set()
+    for model in claimed_hwmodels(claims):
+        architecture = normalize_gpu_architecture(model)
+        if architecture is not None:
+            architectures.add(architecture)
+    return architectures
 
 
 def attestation_corroborates_training_gpu(train_gpu: str, attestation: dict | None) -> bool:

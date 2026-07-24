@@ -41,6 +41,7 @@ from eval.score import score
 from eval.training_gpus import (
     accepted_training_gpu_label,
     attestation_corroborates_training_gpu,
+    attested_gpu_architectures,
     is_accepted_training_gpu,
 )
 
@@ -90,6 +91,59 @@ def check_training_claims(
     if train_gpu is not None and not attestation_corroborates_training_gpu(str(train_gpu), attestation):
         issues.append("attestation claims do not corroborate the claimed training GPU")
     return issues
+
+
+def check_gpu_architecture_claim(
+    manifest: dict,
+    attestation: dict | None,
+    *,
+    gpu_sig: dict | None = None,
+) -> list[str]:
+    """An explicit `gpu_architecture` manifest claim must match the attested hardware.
+
+    `resolve_bundle_gpu_architecture` prefers this field over `train_gpu`, and the
+    architecture it returns selects the frontier bucket a run is tiered against and
+    merged into (`eval.frontiers`). TritonBench composites are speed-derived and are
+    never compared across architectures, so an unchecked field lets a run be scored
+    against — and written into — the other architecture's frontier.
+
+    `proof.bundle` never writes this field, so honest bundles do not carry it and this
+    check is a no-op for them; only a hand-added claim is validated. Corroboration reads
+    hwmodel from the *JWKS-verified* NRAS claims, never `attestation["claims"]`, which
+    the miner commits alongside the bundle. Bundles without attestation are unchanged —
+    they cannot earn an `eval:*` tier anyway
+    (`training_track_gate._attestation_issues_for_eval_tiering`).
+    """
+    if attestation is None:
+        return []
+    raw = manifest.get("gpu_architecture")
+    claimed = normalize_gpu_architecture(str(raw)) if raw else None
+    if claimed is None:
+        # Absent (or unrecognized, which resolve_bundle_gpu_architecture ignores):
+        # the bucket comes from the corroborated train_gpu or the legacy default.
+        return []
+
+    if gpu_sig is None:
+        gpu_sig = check_gpu_signature(attestation)
+    if not gpu_sig or not gpu_sig.get("verified"):
+        return [
+            f"gpu_architecture {claimed!r} cannot be corroborated: the attestation carries "
+            "no JWKS-verified NRAS GPU token"
+        ]
+
+    attested = attested_gpu_architectures(gpu_sig.get("claims") or {})
+    if not attested:
+        return [
+            f"gpu_architecture {claimed!r} cannot be corroborated: the signed attestation "
+            "claims carry no hwmodel"
+        ]
+    if claimed not in attested:
+        return [
+            f"gpu_architecture {claimed!r} is not corroborated by the attested hardware "
+            f"({', '.join(sorted(attested))}); the frontier bucket must match the GPU the "
+            "run was attested on"
+        ]
+    return []
 
 
 def check_canonical_dataset_claim(
@@ -441,6 +495,18 @@ def verify_submission(
             "verified": False,
             "reason": "canonical_dataset_failed",
             "issues": canonical_issues,
+            "label": "eval:REJECT",
+            "run_id": manifest.get("run_id"),
+        }
+
+    # `gpu_architecture` was resolved above and decides the frontier bucket for both
+    # tiering and the merge-time frontier write, so it must be attested hardware.
+    architecture_issues = check_gpu_architecture_claim(manifest, attestation)
+    if architecture_issues:
+        return {
+            "verified": False,
+            "reason": "gpu_architecture_claim_failed",
+            "issues": architecture_issues,
             "label": "eval:REJECT",
             "run_id": manifest.get("run_id"),
         }
