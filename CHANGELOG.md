@@ -11,6 +11,14 @@ All notable changes to SparkDistill are documented here. The format follows
   `teacher.format`. Empty or failed-validation trajectories are skipped (not coerced
   into empty assistant turns), multi-turn episodes are preferred, and repair rows use
   `prompt_meta.prompt` instead of the validator wrapper. Closes the approach in #213.
+- **Accepted-registry snapshot applies the same exportability filter as the mix**:
+  follow-up to the SparkProof publish-path export above — `mix_registry_datasets` now
+  skips unexportable (empty/failed) rows, but `export_registry_snapshot.collect_accepted_trajectories`
+  still accepted every non-duplicate row, so `accepted_registry_snapshot.jsonl` /
+  `accepted_task_ids.json` over-reported rows the canonical mix rejects and their dedup
+  state diverged (an unexportable row wrongly blocked a later good duplicate). The
+  snapshot builder now runs the same exporter and drops the rows the mix drops, so miners'
+  pre-generation dedup matches what actually enters the mix.
 - **Claim binding uses signed NRAS ``eat_nonce``, not editable JSON** : `check_claim_binding`
   / `check_attestation_integrity` require `eat_nonce` from JWKS-verified platform or
   per-device JWTs (`REMOTE_GPU_CLAIMS`) to equal `claim_sha256(bundle)`. Miner-editable
