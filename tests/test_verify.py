@@ -238,6 +238,8 @@ def test_no_frontier_yields_baseline_label(tmp_path, monkeypatch):
     # With a frontier, tier scoring uses triton only.
     scored = v.verify_submission(bundle, frontier={"gsm8k": 0.5, "triton": 0.4})
     assert scored["label"] == "eval:XL"
+    # The full claim is recorded for frontier merging, not just the scored projection.
+    assert scored["scores"] == {"gsm8k": 0.6, "triton": 0.5}
 
 
 def test_tdx_binding_matches_report_data(tmp_path):

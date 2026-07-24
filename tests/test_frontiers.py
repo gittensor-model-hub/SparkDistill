@@ -151,3 +151,60 @@ def test_candidate_scores_from_report():
         {"per_benchmark": {"gsm8k": {"candidate": 0.5}, "triton": {"candidate": 0.2}}}
     ) == {"gsm8k": 0.5, "triton": 0.2}
 
+
+def test_candidate_scores_prefers_full_claim_over_per_benchmark():
+    """`per_benchmark` is the candidate-vs-frontier projection, not the full claim."""
+    report = {
+        "scores": {"gsm8k": 0.5, "triton": 0.2, "humaneval": 0.6},
+        "per_benchmark": {"gsm8k": {"candidate": 0.5}, "triton": {"candidate": 0.2}},
+    }
+    assert candidate_scores_from_report(report) == {"gsm8k": 0.5, "triton": 0.2, "humaneval": 0.6}
+
+
+def test_apply_verified_report_adds_benchmark_missing_from_frontier(tmp_path: Path):
+    """A benchmark the frontier does not carry yet must still raise it (issue #233).
+
+    `eval.score` omits such a key from `per_benchmark`, and a benchmark absent
+    from the frontier is never regression-guarded — so dropping it here leaves it
+    unguarded permanently.
+    """
+    frontiers_path = tmp_path / "frontiers.json"
+    frontiers_path.write_text(
+        json.dumps(
+            {
+                "blackwell": {"gpu_architecture": "blackwell", "run_id": None, "proof_bundle": None, "scores": {}},
+                "hopper": {
+                    "gpu_architecture": "hopper",
+                    "run_id": "hopper-1",
+                    "proof_bundle": "https://example.com/1",
+                    "scores": {"triton": 0.30, "gsm8k": 0.60},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    report = {
+        "verified": True,
+        "label": "eval:XL",
+        "run_id": "hopper-2",
+        "gpu_architecture": "hopper",
+        # what eval.score emits: only keys in both candidate and frontier
+        "per_benchmark": {
+            "triton": {"candidate": 0.40, "frontier": 0.30},
+            "gsm8k": {"candidate": 0.62, "frontier": 0.60},
+        },
+        # the full claim, including a benchmark the frontier has never carried
+        "scores": {"triton": 0.40, "gsm8k": 0.62, "humaneval": 0.55, "triton_syntax_pass_rate": 0.9},
+    }
+
+    updates = apply_verified_report_to_frontiers(
+        report,
+        proof_bundle="https://huggingface.co/org/hopper-2",
+        path=frontiers_path,
+    )
+    assert "humaneval" in updates
+    scores = json.loads(frontiers_path.read_text(encoding="utf-8"))["hopper"]["scores"]
+    assert scores["humaneval"] == 0.55
+    # diagnostic breakdown keys keep seeding alongside the basket, not just at BASELINE
+    assert scores["triton_syntax_pass_rate"] == 0.9
+

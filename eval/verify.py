@@ -516,6 +516,12 @@ def verify_submission(
         }
     report["verified"] = True
     report["reason"] = None
+    # The full claimed score set, authoritative for frontier merging. `per_benchmark`
+    # is a display projection: `eval.score` only emits keys present in *both* the
+    # candidate and the frontier, so a benchmark the frontier does not carry yet
+    # would otherwise never reach `runs/frontiers.json` — and a benchmark absent
+    # from the frontier is never regression-guarded.
+    report["scores"] = dict(claimed)
     report["run_id"] = manifest.get("run_id")
     report["gpu_architecture"] = gpu_architecture
     report["attested_eval_benchmarks"] = sorted(attested_keys)

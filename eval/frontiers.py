@@ -28,29 +28,35 @@ def _empty_record(arch: GpuArchitecture) -> dict[str, Any]:
     }
 
 
-def candidate_scores_from_report(report: dict[str, Any]) -> dict[str, float]:
-    """Extract candidate benchmark scores from an ``eval.verify`` report."""
-    per = report.get("per_benchmark")
-    if isinstance(per, dict) and per:
-        out: dict[str, float] = {}
-        for key, row in per.items():
-            if isinstance(row, dict) and "candidate" in row:
-                try:
-                    out[str(key)] = float(row["candidate"])
-                except (TypeError, ValueError):
-                    continue
-        if out:
-            return out
-    scores = report.get("scores")
-    if isinstance(scores, dict):
-        out = {}
-        for key, value in scores.items():
-            try:
-                out[str(key)] = float(value)
-            except (TypeError, ValueError):
+def _numeric_scores(raw: Any) -> dict[str, float]:
+    """Coerce a flat `{key: score}` map, or a `{key: {"candidate": score}}` one."""
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, float] = {}
+    for key, value in raw.items():
+        if isinstance(value, dict):
+            if "candidate" not in value:
                 continue
-        return out
-    return {}
+            value = value["candidate"]
+        try:
+            out[str(key)] = float(value)
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def candidate_scores_from_report(report: dict[str, Any]) -> dict[str, float]:
+    """Extract candidate benchmark scores from an ``eval.verify`` report.
+
+    Prefers the report's full ``scores`` claim. ``per_benchmark`` is only a
+    fallback (for reports written before ``scores`` was recorded): `eval.score`
+    restricts it to keys present in both the candidate and the frontier, so
+    relying on it silently drops any benchmark the frontier does not carry yet.
+    """
+    scores = _numeric_scores(report.get("scores"))
+    if scores:
+        return scores
+    return _numeric_scores(report.get("per_benchmark"))
 
 
 def write_frontiers(frontiers: dict[str, dict[str, Any]], path: Path = FRONTIERS_PATH) -> None:
