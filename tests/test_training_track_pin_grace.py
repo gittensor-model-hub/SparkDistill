@@ -5,13 +5,16 @@ from pathlib import Path
 
 import pytest
 
-from eval.canonical_dataset import sft_sha256_from_canonical_text
+from eval.canonical_dataset import canonical_hf_url, sft_sha256_from_canonical_text
+from eval.mix_registry import MIX_VERSION
 from eval.training_track_gate import (
     _canonical_sft_sha256s_for_pr_window,
     gate_training_pr,
     validate_pr_body_canonical_pin,
     verify_remote_proof_bundle,
+    verify_remote_proof_bundle_scores,
 )
+from eval.verify import verify_submission
 
 
 def _canonical_json(sft_sha: str) -> str:
@@ -128,3 +131,76 @@ def test_verify_remote_proof_bundle_rejects_outside_window(monkeypatch):
         acceptable_sft_shas={SHA_BASE, SHA_HEAD},
     )
     assert any("accepted canonical pin" in issue for issue in issues)
+
+
+def _bundle_with_mix_pin(tmp_path: Path, sft_sha: str) -> Path:
+    """A proof bundle whose mix_manifest pins `sft_sha`, as published on HF."""
+    bundle = tmp_path / "bundle"
+    bundle.mkdir()
+    (bundle / "manifest.json").write_text(
+        json.dumps({"run_id": "r1", "dataset_url": canonical_hf_url()}), encoding="utf-8"
+    )
+    (bundle / "eval_scores.json").write_text(json.dumps({"scores": {"triton": 0.5}}), encoding="utf-8")
+    (bundle / "mix_manifest.json").write_text(
+        json.dumps({"mix_version": MIX_VERSION, "sft_sha256": sft_sha, "components": []}),
+        encoding="utf-8",
+    )
+    return bundle
+
+
+def test_verify_submission_accepts_pin_from_window(tmp_path):
+    """eval.verify must honour the same grace window the gate computed.
+
+    A weights-free bundle still ends at `checkpoint_required`; what matters is
+    that the merge-base pin no longer fails the canonical-dataset claim.
+    """
+    bundle = _bundle_with_mix_pin(tmp_path, SHA_BASE)
+
+    report = verify_submission(
+        bundle,
+        frontier=None,
+        acceptable_sft_shas={SHA_BASE, SHA_HEAD},
+    )
+    assert report["reason"] == "checkpoint_required"
+
+
+def test_verify_submission_rejects_pin_outside_window(tmp_path):
+    bundle = _bundle_with_mix_pin(tmp_path, "e" * 64)
+
+    report = verify_submission(
+        bundle,
+        frontier=None,
+        acceptable_sft_shas={SHA_BASE, SHA_HEAD},
+    )
+    assert report["verified"] is False
+    assert report["reason"] == "canonical_dataset_failed"
+
+
+def test_verify_remote_proof_bundle_scores_threads_pin_window(tmp_path, monkeypatch):
+    """A base-pin bundle must not be tiered eval:REJECT (which auto-closes the PR)."""
+    import eval.training_track_gate as gate
+    import eval.verify as verify_mod
+
+    bundle = _bundle_with_mix_pin(tmp_path, SHA_BASE)
+
+    monkeypatch.setattr(
+        "huggingface_hub.snapshot_download",
+        lambda *, repo_id, repo_type=None, token=None: str(bundle),
+    )
+    monkeypatch.setattr(
+        gate,
+        "_git_show",
+        lambda ref, path: json.dumps({"passed": True, "token": "x"})
+        if path.endswith("attestation.json")
+        else "",
+    )
+    monkeypatch.setattr(verify_mod, "check_attestation_integrity", lambda *a, **k: [])
+
+    issues, eval_label = verify_remote_proof_bundle_scores(
+        "org/repo",
+        head_ref="HEAD",
+        changed_paths=["recipes/foo.yaml", "runs/r1/attestation.json"],
+        acceptable_sft_shas={SHA_BASE, SHA_HEAD},
+    )
+    assert issues == []
+    assert eval_label != "eval:REJECT"

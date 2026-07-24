@@ -173,7 +173,7 @@ def test_verify_remote_proof_bundle_scores_reads_attestation_from_head_ref(tmp_p
         assert path == "runs/r1/attestation.json"
         return json.dumps({"passed": True})
 
-    def fake_verify_submission(bundle_dir, frontier, attestation=None):
+    def fake_verify_submission(bundle_dir, frontier, attestation=None, **kwargs):
         captured["attestation"] = attestation
         return {"verified": True, "label": "eval:BASELINE"}
 
