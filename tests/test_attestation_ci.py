@@ -348,6 +348,49 @@ def test_check_attestation_integrity_require_tdx_for_attested_samples_path(tmp_p
     assert any("TDX quote is required" in i for i in check_attestation_integrity(bundle, att, require_tdx=True))
 
 
+def test_verify_submission_rejects_uncorroborated_gpu_architecture_claim(tmp_path, monkeypatch):
+    """A Hopper-attested run must not select the Blackwell frontier bucket.
+
+    Everything here is genuine — JWKS-valid NRAS token, signed device hwmodel GH100,
+    eat_nonce bound to claim_sha256 — except the hand-added `gpu_architecture` field,
+    which `resolve_bundle_gpu_architecture` prefers over `train_gpu` and which decides
+    the frontier a run is tiered against and merged into.
+    """
+    from eval.canonical_dataset import canonical_hf_url
+    from eval.verify import resolve_bundle_gpu_architecture, verify_submission
+    from proof.bundle import claim_sha256
+
+    bundle = _bundle(tmp_path)
+    (bundle / "manifest.json").write_text(
+        json.dumps(
+            {
+                "run_id": "arch-spoof-1",
+                "dataset_url": canonical_hf_url(),
+                "train_hours": 3.0,
+                "train_gpu": "NVIDIA H200",
+                "gpu_architecture": "blackwell",
+            }
+        ),
+        encoding="utf-8",
+    )
+    manifest = json.loads((bundle / "manifest.json").read_text())
+    # The claim really does redirect the frontier bucket away from the attested GPU.
+    assert resolve_bundle_gpu_architecture(manifest) == "blackwell"
+
+    key, token = _es384_token_fixture(device_eat_nonce=claim_sha256(bundle))
+    _patch_jwks(monkeypatch, key)
+
+    report = verify_submission(
+        bundle,
+        frontier={"gsm8k": 0.5, "triton": 0.4},
+        attestation={"passed": True, "token": token},
+    )
+    assert report["verified"] is False
+    assert report["reason"] == "gpu_architecture_claim_failed"
+    assert report["label"] == "eval:REJECT"
+    assert any("hopper" in i for i in report["issues"])
+
+
 def test_verify_submission_rejects_forged_passed_true_attestation(tmp_path):
     """CI must not accept {"passed": true} without NRAS/JWKS evidence."""
     from eval.canonical_dataset import canonical_hf_url

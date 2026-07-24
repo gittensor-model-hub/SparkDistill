@@ -67,3 +67,14 @@ def test_absent_attestation_or_claims_still_skips_corroboration():
     # Attestation is optional; absence is handled by the caller, not here.
     assert attestation_corroborates_training_gpu("NVIDIA B200", None)
     assert attestation_corroborates_training_gpu("NVIDIA B200", {"passed": True, "claims": {}})
+
+
+def test_attested_gpu_architectures_from_hwmodel_claims():
+    from eval.training_gpus import attested_gpu_architectures
+
+    assert attested_gpu_architectures({"devices": {"GPU-0": {"hwmodel": "GH100 A01 GSP BROM"}}}) == {"hopper"}
+    assert attested_gpu_architectures({"devices": {"GPU-0": {"hwmodel": "GB202 RTX PRO 6000"}}}) == {"blackwell"}
+    assert attested_gpu_architectures({"hwmodel": "B200 A01 GSP BROM"}) == {"blackwell"}
+    # No hwmodel at all — a grindable nonce is not hardware evidence (#148).
+    assert attested_gpu_architectures({"eat_nonce": "deadbeefb200cafe"}) == set()
+    assert attested_gpu_architectures({}) == set()

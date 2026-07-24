@@ -388,3 +388,60 @@ def test_verify_submission_hopper_tiers_on_triton(tmp_path, monkeypatch):
     assert report["gpu_architecture"] == "hopper"
     assert report["best_benchmark"] == "triton"
     assert report["label"] == "eval:XL"
+
+
+def _signed_sig(hwmodel: str) -> dict:
+    """A JWKS-verified check_gpu_signature result reporting `hwmodel`."""
+    return {"verified": True, "claims": {"devices": {"GPU-0": {"hwmodel": hwmodel}}}}
+
+
+def test_gpu_architecture_claim_must_match_attested_hardware():
+    """A Blackwell run may not claim the hopper frontier bucket, or vice versa."""
+    from eval.verify import check_gpu_architecture_claim
+
+    attestation = {"passed": True, "token": "<signed>"}
+    blackwell = _signed_sig("GB202 RTX PRO 6000")
+    hopper = _signed_sig("GH100 A01 GSP BROM")
+
+    assert check_gpu_architecture_claim({"gpu_architecture": "blackwell"}, attestation, gpu_sig=blackwell) == []
+    assert check_gpu_architecture_claim({"gpu_architecture": "hopper"}, attestation, gpu_sig=hopper) == []
+
+    spoofed = check_gpu_architecture_claim({"gpu_architecture": "hopper"}, attestation, gpu_sig=blackwell)
+    assert any("not corroborated by the attested hardware" in i for i in spoofed)
+    reverse = check_gpu_architecture_claim({"gpu_architecture": "blackwell"}, attestation, gpu_sig=hopper)
+    assert any("not corroborated by the attested hardware" in i for i in reverse)
+
+
+def test_gpu_architecture_claim_is_a_noop_without_a_claim_or_attestation():
+    """proof.bundle never writes gpu_architecture; honest bundles must be unaffected."""
+    from eval.verify import check_gpu_architecture_claim
+
+    attestation = {"passed": True, "token": "<signed>"}
+    hopper = _signed_sig("GH100 A01 GSP BROM")
+
+    # No claim: the bucket comes from the corroborated train_gpu or the legacy default.
+    assert check_gpu_architecture_claim({"train_gpu": "NVIDIA H200"}, attestation, gpu_sig=hopper) == []
+    assert check_gpu_architecture_claim({}, attestation, gpu_sig=hopper) == []
+    # Unrecognized value — resolve_bundle_gpu_architecture ignores it too.
+    assert check_gpu_architecture_claim({"gpu_architecture": "ampere"}, attestation, gpu_sig=hopper) == []
+    # No attestation: unchanged, and such bundles cannot earn an eval:* tier anyway.
+    assert check_gpu_architecture_claim({"gpu_architecture": "hopper"}, None) == []
+
+
+def test_gpu_architecture_claim_is_fail_closed_without_signed_hwmodel():
+    from eval.verify import check_gpu_architecture_claim
+
+    attestation = {"passed": True, "token": "<signed>"}
+    manifest = {"gpu_architecture": "hopper"}
+
+    unverified = check_gpu_architecture_claim(manifest, attestation, gpu_sig={"verified": False, "claims": {}})
+    assert any("no JWKS-verified NRAS GPU token" in i for i in unverified)
+
+    no_hwmodel = check_gpu_architecture_claim(
+        manifest, attestation, gpu_sig={"verified": True, "claims": {"eat_nonce": "deadbeef"}}
+    )
+    assert any("no hwmodel" in i for i in no_hwmodel)
+
+    # The editable sidecar must never stand in for signed claims.
+    sidecar_only = {"passed": True, "claims": {"devices": {"GPU-0": {"hwmodel": "GH100"}}}}
+    assert any("no JWKS-verified" in i for i in check_gpu_architecture_claim(manifest, sidecar_only))
