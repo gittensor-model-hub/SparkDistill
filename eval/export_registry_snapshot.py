@@ -21,6 +21,7 @@ from eval.mix_registry import (
     DedupeMode,
     _add_row_to_registry,
     _classify_row,
+    _import_trajectory_exporter,
     _make_dedupe_registry,
     _should_skip,
     load_trajectories_jsonl,
@@ -53,11 +54,24 @@ def collect_accepted_trajectories(
     dedupe: DedupeMode | str | None = None,
     download_proof: Callable[[str, Path | None], Path] | None = None,
     proof_cache: Path | None = None,
+    export_fn: Callable[[dict[str, Any]], dict[str, Any] | None] | None = None,
 ) -> list[dict[str, Any]]:
-    """Return trajectory rows whose fingerprints occupy the accepted registry mix state."""
+    """Return trajectory rows whose fingerprints occupy the accepted registry mix state.
+
+    Applies the SAME exportability filter as
+    ``eval.mix_registry.mix_registry_datasets``: rows SparkProof's publish exporter
+    drops (empty/failed episodes) never enter the canonical mix, so they must not
+    occupy the accepted snapshot / task-id index either. Otherwise a miner would
+    dedup against — and skip regenerating — a task whose only prior submission was a
+    dropped row the mix never actually filled, and the snapshot's dedup state would
+    diverge from the mix's (an unexportable row would wrongly block a later good
+    duplicate). ``export_fn`` defaults to SparkProof's exporter; tests inject a stub.
+    """
     mode: DedupeMode = (dedupe or mining_dedupe_mode())  # type: ignore[assignment]
     working_registry, fingerprint_row = _make_dedupe_registry(sparkproof_root)
     working = working_registry.copy() if hasattr(working_registry, "copy") else working_registry
+    if export_fn is None:
+        export_fn = _import_trajectory_exporter(sparkproof_root)
 
     accepted: list[dict[str, Any]] = []
     for entry in registry_entries:
@@ -65,6 +79,10 @@ def collect_accepted_trajectories(
         for trajectory in load_trajectories_jsonl(proof_dir / "trajectories.jsonl"):
             verdict = _classify_row(trajectory, working, dedupe=mode, fingerprint_row=fingerprint_row)
             if _should_skip(verdict, dedupe=mode):
+                continue
+            if export_fn(trajectory) is None:
+                # Unexportable row: the mix drops it and does not record its
+                # fingerprint, so neither does the snapshot.
                 continue
             accepted.append(trajectory)
             _add_row_to_registry(working, trajectory, fingerprint_row)
@@ -79,6 +97,7 @@ def write_registry_snapshot(
     sparkproof_root: Path | None = None,
     dedupe: DedupeMode | str | None = None,
     download_proof: Callable[[str, Path | None], Path] | None = None,
+    export_fn: Callable[[dict[str, Any]], dict[str, Any] | None] | None = None,
 ) -> dict[str, Any]:
     """Write SparkProof-compatible snapshot JSONL plus a lightweight task-id index."""
     accepted = collect_accepted_trajectories(
@@ -86,6 +105,7 @@ def write_registry_snapshot(
         sparkproof_root=sparkproof_root,
         dedupe=dedupe,
         download_proof=download_proof,
+        export_fn=export_fn,
     )
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with out_path.open("w", encoding="utf-8", newline="\n") as handle:
@@ -140,6 +160,7 @@ def verify_registry_snapshot_pins(
     sparkproof_root: Path | None = None,
     dedupe: DedupeMode | str | None = None,
     download_proof: Callable[[str, Path | None], Path] | None = None,
+    export_fn: Callable[[dict[str, Any]], dict[str, Any] | None] | None = None,
 ) -> list[str]:
     """Recompute the snapshot and confirm it matches mix_manifest pins."""
     issues: list[str] = []
@@ -171,6 +192,7 @@ def verify_registry_snapshot_pins(
             sparkproof_root=sparkproof_root,
             dedupe=dedupe,
             download_proof=download_proof,
+            export_fn=export_fn,
         )
         if recomputed["sha256"] != expected_sha:
             issues.append(
