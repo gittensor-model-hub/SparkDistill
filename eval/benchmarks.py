@@ -23,6 +23,7 @@ enforces this at ingestion — see its docstring for why the distinction is load
 from __future__ import annotations
 
 import json
+import math
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -85,7 +86,33 @@ def assert_fraction_scores(scores: dict[str, float], source: str) -> None:
     gap to percentage points with a hardcoded `* 100.0`, so a percentage-unit score would
     silently make its tolerance 100x too tight and reject honest submissions. Fail loudly
     at ingestion instead of scoring the wrong unit. See docs/miner-guide.md (proof-bundle
-    score format)."""
+    score format).
+
+    `scores` is miner-controlled (`eval_scores.json["scores"]` from the proof bundle),
+    so every value is validated to be a finite, non-boolean real number *before* the
+    range check: `float(value)` on a `null`/list/object value raised `TypeError`, and a
+    non-numeric string raised a bare `float()` `ValueError` — either one escaped this
+    function's fail-closed contract and crashed `eval.verify` (and the CI training-track
+    gate, which does not wrap `verify_submission`) instead of rejecting the bundle. A
+    JSON `true`/`false` also slipped through as `1.0`/`0.0`."""
+    if not isinstance(scores, dict):
+        raise ValueError(
+            f"{source} scores must be a JSON object mapping benchmark -> fraction, "
+            f"got {type(scores).__name__}"
+        )
+    # bool is a subclass of int, so it must be rejected before the numeric check or a
+    # JSON `true` would score 1.0. math.isfinite guards NaN/Infinity, which json.loads
+    # accepts by default and which would otherwise sneak past a naive range comparison.
+    malformed = {
+        key: value
+        for key, value in scores.items()
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value)
+    }
+    if malformed:
+        raise ValueError(
+            f"{source} scores must be finite numeric fractions in [0, 1], got malformed {malformed}; "
+            "eval scores are numeric accuracies / pass-rates, not strings, booleans, or non-finite values"
+        )
     out_of_range = {key: value for key, value in scores.items() if not 0.0 <= float(value) <= 1.0}
     if out_of_range:
         raise ValueError(

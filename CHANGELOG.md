@@ -6,6 +6,16 @@ All notable changes to SparkDistill are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- **Malformed proof-bundle scores fail closed instead of crashing verify**:
+  `assert_fraction_scores` (the ingestion guard for the miner-controlled
+  `eval_scores.json["scores"]`) ran `float(value)` directly, so a `null`, list, or
+  object score value raised `TypeError` and a non-numeric string raised a bare
+  `float()` `ValueError` — both escaped the function's fail-closed contract and crashed
+  `eval.verify` / the CI training-track gate (which does not wrap `verify_submission`)
+  instead of rejecting the bundle. A JSON `true`/`false` also slipped through as
+  `1.0`/`0.0`, and NaN/Infinity (which `json.loads` accepts) could sneak past the range
+  check. Every score value is now validated to be a finite, non-boolean real number,
+  and a non-object `scores` payload is rejected up front.
 - **Registry mix export uses SparkProof publish path**: `eval.mix_registry` now delegates
   to SparkProof's `trajectory_to_messages_record` (same as HF publish) instead of
   `teacher.format`. Empty or failed-validation trajectories are skipped (not coerced
