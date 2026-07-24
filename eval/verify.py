@@ -381,6 +381,7 @@ def verify_submission(
     *,
     registry_path: Path = REGISTRY_PATH,
     checkpoint: Path | None = None,
+    acceptable_sft_shas: set[str] | None = None,
 ) -> dict:
     """Verify a proof bundle; `frontier=None` is the BASELINE case.
 
@@ -388,6 +389,10 @@ def verify_submission(
     `.gittensor/weights.json`), every proof and claim check still runs, but
     instead of tier scoring the submission is labeled `eval:BASELINE` — its
     scores then seed `runs/frontier.json` for the next submission to beat.
+
+    `acceptable_sft_shas` is the canonical-pin grace window ([#121]) for the
+    calling PR: the pins valid from its merge-base through HEAD. Leave it None
+    (validator default) to require the pin at the current `datasets/canonical.json`.
     """
     manifest = json.loads((bundle_dir / "manifest.json").read_text())
     claimed = json.loads((bundle_dir / "eval_scores.json").read_text())["scores"]
@@ -435,7 +440,11 @@ def verify_submission(
             "run_id": manifest.get("run_id"),
         }
 
-    canonical_issues = check_canonical_dataset_claim(manifest, bundle_dir=bundle_dir)
+    canonical_issues = check_canonical_dataset_claim(
+        manifest,
+        bundle_dir=bundle_dir,
+        acceptable_sft_shas=acceptable_sft_shas,
+    )
     if canonical_issues:
         return {
             "verified": False,

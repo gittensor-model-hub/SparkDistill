@@ -29,6 +29,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--pr-url", required=True)
     parser.add_argument("--pr-body-file", type=Path, default=None)
     parser.add_argument("--head-ref", default="HEAD")
+    parser.add_argument(
+        "--merge-base-ref",
+        default=None,
+        help="git ref for merge-base with the PR base; enables canonical-pin grace window",
+    )
     parser.add_argument("--changed-paths-file", type=Path, default=None)
     parser.add_argument("--ledger-path", type=Path, default=Path("runs/ledger.jsonl"))
     args = parser.parse_args(argv)
@@ -47,6 +52,7 @@ def main(argv: list[str] | None = None) -> int:
         pr_body=pr_body,
         head_ref=args.head_ref,
         changed_paths=changed_paths,
+        merge_base_ref=args.merge_base_ref,
         hf_token=os.environ.get("HF_TOKEN"),
         ledger_path=args.ledger_path,
     )

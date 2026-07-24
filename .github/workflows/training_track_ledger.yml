@@ -45,6 +45,7 @@ jobs:
         run: |
           jq -r '.pull_request.body // ""' "$GITHUB_EVENT_PATH" > /tmp/pr_body.md
           git diff --name-only "${BASE_SHA}" "${MERGE_SHA}" > /tmp/changed_paths.txt
+          echo "${BASE_SHA}" > /tmp/merge_base_ref.txt
 
       - uses: astral-sh/setup-uv@v6
         with:
@@ -62,6 +63,7 @@ jobs:
             --pr-url "$PR_URL" \
             --pr-body-file /tmp/pr_body.md \
             --head-ref main \
+            --merge-base-ref "$(cat /tmp/merge_base_ref.txt)" \
             --changed-paths-file /tmp/changed_paths.txt
 
       - name: Commit ledger / frontier updates if changed

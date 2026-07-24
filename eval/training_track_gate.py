@@ -378,6 +378,7 @@ def _download_and_verify_bundle(
     head_ref: str,
     changed_paths: list[str] | None,
     hf_token: str | None = None,
+    acceptable_sft_shas: set[str] | None = None,
 ) -> tuple[dict | None, dict | None, str | None, Path | None]:
     """Download the cited proof bundle and run eval.verify against it.
 
@@ -385,6 +386,11 @@ def _download_and_verify_bundle(
     record_merged_ledger_entry (merge-time ledger write) — both need the same
     attestation lookup, frontier resolution, and verify_submission call, just
     consuming the result differently (issues+label vs. the full report).
+
+    `acceptable_sft_shas` carries the PR's canonical-pin grace window ([#121])
+    into `verify_submission`; without it the bundle's `mix_manifest.sft_sha256`
+    is re-checked against live HEAD only and an honest submission whose pin
+    advanced mid-training is rejected — the exact race issue #118 describes.
 
     Returns `(report, attestation, error, bundle_dir)`: `error` is set (and the other
     fields None) only when the bundle couldn't be read at all (bad attestation JSON,
@@ -417,7 +423,12 @@ def _download_and_verify_bundle(
     manifest = json.loads((bundle_dir / "manifest.json").read_text(encoding="utf-8"))
     frontier = load_frontier_scores(resolve_bundle_gpu_architecture(manifest))
 
-    report = verify_submission(bundle_dir, frontier, attestation=attestation)
+    report = verify_submission(
+        bundle_dir,
+        frontier,
+        attestation=attestation,
+        acceptable_sft_shas=acceptable_sft_shas,
+    )
     return report, attestation, None, bundle_dir
 
 
@@ -453,6 +464,7 @@ def verify_remote_proof_bundle_scores(
     head_ref: str,
     changed_paths: list[str] | None,
     hf_token: str | None = None,
+    acceptable_sft_shas: set[str] | None = None,
 ) -> tuple[list[str], str | None]:
     """Re-run eval.verify's no-GPU attested checks against the cited proof bundle.
 
@@ -474,6 +486,10 @@ def verify_remote_proof_bundle_scores(
     binding (and TDX checks when a quote is present) — forged ``passed: true``
     JSON is ``eval:REJECT``.
 
+    `acceptable_sft_shas` must be the same canonical-pin grace window
+    `verify_remote_proof_bundle` was given, so the two stages agree on which pins
+    this PR may have trained against ([#121]).
+
     Returns `(issues, eval_label)` — `eval_label` is the reward-tier label
     eval.verify computed (e.g. "eval:BASELINE", "eval:XL", "eval:REJECT"), or
     a tier derived from claimed scores when verify is deferred *and* attestation
@@ -481,7 +497,11 @@ def verify_remote_proof_bundle_scores(
     (download failure).
     """
     report, attestation, error, bundle_dir = _download_and_verify_bundle(
-        repo_id, head_ref=head_ref, changed_paths=changed_paths, hf_token=hf_token
+        repo_id,
+        head_ref=head_ref,
+        changed_paths=changed_paths,
+        hf_token=hf_token,
+        acceptable_sft_shas=acceptable_sft_shas,
     )
     if error is not None:
         return [error], None
@@ -513,6 +533,7 @@ def record_merged_ledger_entry(
     pr_body: str | None,
     head_ref: str,
     changed_paths: list[str] | None,
+    merge_base_ref: str | None = None,
     hf_token: str | None = None,
     ledger_path: Path = Path("runs/ledger.jsonl"),
     frontiers_path: Path | None = None,
@@ -528,6 +549,11 @@ def record_merged_ledger_entry(
     Also seeds / raises ``runs/frontiers.json`` for verified non-REJECT runs
     (including ``eval:BASELINE``). Frontier updates still run when the ledger
     entry already exists, so a retry can heal a previously missed frontier write.
+
+    ``merge_base_ref`` reuses the PR's canonical-pin grace window ([#121]) so a
+    run that was merge-eligible at gate time is not re-rejected here just because
+    the pin advanced again before the ledger job ran — that would record
+    ``eval:REJECT`` for an already-merged PR and skip its frontier update.
     """
     from eval.frontiers import apply_verified_report_to_frontiers
     from eval.ledger import append_entry, build_entry
@@ -536,8 +562,17 @@ def record_merged_ledger_entry(
     if repo_id is None:
         return []
 
+    acceptable_sft_shas = (
+        _canonical_sft_sha256s_for_pr_window(merge_base_ref=merge_base_ref, head_ref="HEAD")
+        if merge_base_ref
+        else None
+    )
     report, attestation, error, _bundle_dir = _download_and_verify_bundle(
-        repo_id, head_ref=head_ref, changed_paths=changed_paths, hf_token=hf_token
+        repo_id,
+        head_ref=head_ref,
+        changed_paths=changed_paths,
+        hf_token=hf_token,
+        acceptable_sft_shas=acceptable_sft_shas,
     )
     if error is not None:
         return [error]
@@ -644,6 +679,7 @@ def gate_training_pr(
                     head_ref=head_ref,
                     changed_paths=changed_paths,
                     hf_token=hf_token,
+                    acceptable_sft_shas=acceptable_sft_shas,
                 )
                 issues.extend(score_issues)
 
