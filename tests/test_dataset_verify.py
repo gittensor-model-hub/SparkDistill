@@ -157,6 +157,41 @@ def test_missing_tdx_on_new_bundle_rejects(tmp_path):
     assert any("tdx required" in issue for issue in issues)
 
 
+def test_non_object_gpu_attestation_rejects(tmp_path):
+    # gpu_attestation.json is miner-published. A top-level JSON array/scalar
+    # (corrupted or hand-crafted) must fail closed with a REJECT issue, not
+    # crash the verify gate with AttributeError on attestation.get(...).
+    proof, sha = _write_proof_dir(tmp_path)
+    (proof / "gpu_attestation.json").write_text(json.dumps(["passed"]))
+    issues, rows, gpu_architecture = check_proof_dir(proof, claimed_sha256=sha)
+    assert any("gpu_attestation.json must be a JSON object" in issue for issue in issues)
+    assert rows == 0
+    assert gpu_architecture is None
+    report = verify_dataset_submission(proof, claimed_sha256=sha)
+    assert report["label"] == "dataset:REJECT"
+
+
+def test_non_object_dataset_manifest_rejects(tmp_path):
+    # Same fail-closed guard for the miner-published dataset_manifest.json.
+    proof, sha = _write_proof_dir(tmp_path)
+    (proof / "dataset_manifest.json").write_text(json.dumps("not-a-manifest"))
+    issues, rows, gpu_architecture = check_proof_dir(proof, claimed_sha256=sha)
+    assert any("dataset_manifest.json must be a JSON object" in issue for issue in issues)
+    assert rows == 0
+    assert gpu_architecture is None
+
+
+def test_non_object_tdx_rejects(tmp_path):
+    # A truthy-but-non-object tdx (e.g. a bare string) must REJECT rather than
+    # crash the tdx.get(...) calls in _check_dataset_tdx_attestation.
+    proof, sha = _write_proof_dir(tmp_path)
+    (proof / "gpu_attestation.json").write_text(
+        json.dumps({"passed": True, "nonce": "a" * 64, "tdx": "attested"})
+    )
+    issues, _rows, _arch = check_proof_dir(proof, claimed_sha256=sha)
+    assert any("gpu_attestation.tdx must be a JSON object" in issue for issue in issues)
+
+
 def test_bound_tdx_passes(tmp_path):
     import base64
 

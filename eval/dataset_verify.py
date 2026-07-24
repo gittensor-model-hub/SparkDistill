@@ -90,6 +90,10 @@ def _check_dataset_tdx_attestation(attestation: dict) -> list[str]:
             "gpu_attestation.tdx required for production dataset bundles — "
             "regenerate on an Intel TDX guest with configfs-tsm provisioned"
         ]
+    if not isinstance(tdx, dict):
+        # A truthy-but-non-object tdx (e.g. a bare string) would crash the
+        # tdx.get() calls below; reject it as malformed instead.
+        return [f"gpu_attestation.tdx must be a JSON object, got {type(tdx).__name__}"]
     nonce = attestation.get("nonce") or ""
     if not nonce:
         return ["gpu_attestation.tdx present but dataset nonce missing"]
@@ -126,6 +130,15 @@ def check_proof_dir(proof_dir: Path, claimed_sha256: str | None = None) -> tuple
         return issues, 0, None
 
     attestation = json.loads((proof_dir / "gpu_attestation.json").read_text())
+    if not isinstance(attestation, dict):
+        # gpu_attestation.json is miner-published: a top-level JSON array/scalar
+        # (corrupted or hand-crafted) must fail closed, not crash the gate with
+        # AttributeError on the .get() calls below.
+        return (
+            [f"gpu_attestation.json must be a JSON object, got {type(attestation).__name__}"],
+            0,
+            None,
+        )
     if not attestation.get("passed"):
         issues.append("gpu_attestation.passed is false")
     if not attestation.get("nonce"):
@@ -133,6 +146,14 @@ def check_proof_dir(proof_dir: Path, claimed_sha256: str | None = None) -> tuple
     issues.extend(_check_dataset_tdx_attestation(attestation))
 
     dataset_manifest = json.loads((proof_dir / "dataset_manifest.json").read_text())
+    if not isinstance(dataset_manifest, dict):
+        # Same fail-closed guard as gpu_attestation.json: a non-object manifest
+        # must REJECT rather than crash the gate on the .get() calls below.
+        return (
+            [f"dataset_manifest.json must be a JSON object, got {type(dataset_manifest).__name__}"],
+            0,
+            None,
+        )
     if not dataset_manifest.get("passed"):
         issues.append("release gate did not pass (dataset_manifest.passed is false)")
     if dataset_manifest.get("blocked_rows"):

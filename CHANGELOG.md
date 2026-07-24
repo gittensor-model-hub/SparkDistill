@@ -6,6 +6,14 @@ All notable changes to SparkDistill are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- **Dataset-track verify fails closed on non-object miner JSON**: `check_proof_dir`
+  parsed the miner-published `gpu_attestation.json` and `dataset_manifest.json` and
+  immediately called `.get(...)` on them, and `_check_dataset_tdx_attestation` called
+  `.get(...)` on `attestation["tdx"]`. A bundle whose top-level document was a JSON
+  array/scalar (or whose `tdx` was a bare string) crashed the gate with
+  `AttributeError: 'list'/'str' object has no attribute 'get'` instead of returning a
+  clean `dataset:REJECT`. All three are now type-checked and rejected as malformed,
+  matching the fail-closed handling of non-object registry/trajectory rows.
 - **Registry mix export uses SparkProof publish path**: `eval.mix_registry` now delegates
   to SparkProof's `trajectory_to_messages_record` (same as HF publish) instead of
   `teacher.format`. Empty or failed-validation trajectories are skipped (not coerced
