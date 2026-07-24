@@ -8,6 +8,7 @@ from eval.attested_samples import (
     build_triton_entry,
     read_attested_samples,
     verify_attested_eval_samples,
+    verify_tritonbench_report,
 )
 from eval.regression_sample import build_regression_sample, load_regression_problems
 
@@ -191,3 +192,42 @@ def test_read_attested_samples_wraps_legacy_gsm8k_file(tmp_path):
     wrapped = read_attested_samples(bundle)
     assert wrapped is not None
     assert "gsm8k" in wrapped["benchmarks"]
+
+
+def _triton_report(summary_composite, detail_composites):
+    return {
+        "summary": {
+            "avg_composite": summary_composite,
+            "exec_pass_rate": 0.0,
+            "avg_correctness": 0.0,
+            "syntax_pass_rate": 1.0,
+        },
+        "details": [{"level": 1, "composite_score": c} for c in detail_composites],
+    }
+
+
+def test_verify_tritonbench_report_rejects_forged_full_composite():
+    # Honest quick-subset details (mean 0.44), but an inflated summary headline (0.90) —
+    # the value the reward tier is scored on. The tier would read claimed["triton"]=0.90
+    # (eval:XL); verification must reject the summary/claim that the details don't support.
+    report = _triton_report(0.90, [0.44, 0.44])
+    entry = build_triton_entry(report)
+    claimed = {"triton": 0.90, "triton_quick": 0.44}
+    _val, issues = verify_tritonbench_report(entry, claimed=claimed, frontier={"triton": 0.428})
+    assert issues, "forged full composite must be rejected"
+    assert any("mean of per-problem" in i or "details mean" in i for i in issues), issues
+
+
+def test_verify_tritonbench_report_requires_details():
+    entry = build_triton_entry({"summary": {"avg_composite": 0.9}})  # no details
+    _val, issues = verify_tritonbench_report(entry, claimed={"triton": 0.9}, frontier=None)
+    assert any("per-problem details" in i for i in issues), issues
+
+
+def test_verify_tritonbench_report_accepts_consistent_report():
+    # summary == mean(details) == claimed triton: an honest report still verifies.
+    report = _triton_report(0.5, [0.5, 0.5])
+    entry = build_triton_entry(report)
+    claimed = {"triton": 0.5, "triton_quick": 0.5}
+    _val, issues = verify_tritonbench_report(entry, claimed=claimed, frontier=None)
+    assert issues == [], issues

@@ -194,11 +194,36 @@ def verify_tritonbench_report(
         if key in reported_scores and abs(float(reported_scores[key]) - recomputed_scores[key]) > 1e-9:
             issues.append(f"triton: bundled {key} {reported_scores[key]!r} != recomputed {recomputed_scores[key]!r}")
 
+    tolerance = _score_tolerance_pct("triton")
+
+    # The reward tier is scored on the *full* triton composite (claimed["triton"]), but the
+    # check below only re-derives triton_quick (the level-1 subset). TritonBench's
+    # avg_composite is exactly the mean of every problem's composite_score (tritonbench
+    # reporter._summarize) and report["details"] is that full result list, so recompute the
+    # full composite from the details and require both the report summary and the claimed
+    # full composite to match it. Without this, a miner can submit honest quick-subset
+    # details while inflating summary.avg_composite — the value the tier reads — to forge an
+    # arbitrary triton tier (e.g. eval:XL) through the no-GPU attested path.
+    details = report.get("details")
+    if not isinstance(details, list) or not details:
+        issues.append("triton: attested report has no per-problem details to recompute the composite")
+    else:
+        full_from_details = sum(float(row.get("composite_score", 0.0)) for row in details) / len(details)
+        if abs(recomputed_scores["triton"] - full_from_details) * 100.0 > tolerance:
+            issues.append(
+                f"triton: summary avg_composite {recomputed_scores['triton']!r} does not match the "
+                f"mean of per-problem composite scores {full_from_details!r}"
+            )
+        claimed_full = claimed.get("triton")
+        if claimed_full is not None and abs(float(claimed_full) - full_from_details) * 100.0 > tolerance:
+            issues.append(
+                f"claimed triton {claimed_full!r} diverges from the per-problem details mean {full_from_details!r}"
+            )
+
     compare_key = "triton_quick" if "triton_quick" in claimed else "triton"
     claimed_value = _claimed_score(claimed, "triton")
     recomputed = recomputed_scores.get(compare_key, recomputed_scores["triton"])
     if claimed_value is not None:
-        tolerance = _score_tolerance_pct("triton")
         if abs(claimed_value - recomputed) * 100.0 > tolerance:
             issues.append(
                 f"claimed triton {claimed_value!r} diverges from attested sample {recomputed!r}"
