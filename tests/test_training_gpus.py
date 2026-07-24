@@ -67,3 +67,22 @@ def test_absent_attestation_or_claims_still_skips_corroboration():
     # Attestation is optional; absence is handled by the caller, not here.
     assert attestation_corroborates_training_gpu("NVIDIA B200", None)
     assert attestation_corroborates_training_gpu("NVIDIA B200", {"passed": True, "claims": {}})
+
+
+def test_signed_claims_override_the_editable_sidecar():
+    # attestation["claims"] is committed by the miner and can say anything; the
+    # JWKS-verified NRAS claims are what must decide.
+    spoofed = _attestation("B200 A01 GSP BROM")
+    hopper = {"devices": {"GPU-0": {"hwmodel": "GH100 A01 GSP BROM"}}}
+    assert not attestation_corroborates_training_gpu("NVIDIA B200", spoofed, signed_claims=hopper)
+    assert attestation_corroborates_training_gpu("NVIDIA H100", spoofed, signed_claims=hopper)
+
+
+def test_signed_claims_without_hwmodel_are_fail_closed():
+    # Unlike the legacy sidecar path, empty signed claims corroborate nothing —
+    # otherwise deleting attestation["claims"] would still buy a free pass.
+    spoofed = _attestation("B200 A01 GSP BROM")
+    assert not attestation_corroborates_training_gpu("NVIDIA B200", spoofed, signed_claims={})
+    assert not attestation_corroborates_training_gpu(
+        "NVIDIA B200", spoofed, signed_claims={"eat_nonce": "deadbeefb200cafe"}
+    )

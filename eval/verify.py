@@ -69,11 +69,18 @@ def check_training_claims(
     manifest: dict,
     attestation: dict | None,
     max_train_hours: float = MAX_TRAIN_HOURS,
+    *,
+    gpu_sig: dict | None = None,
 ) -> list[str]:
     """Validate the bundle's training-track claims (train_hours / train_gpu).
 
     Older bundles without these fields are not failed here — they simply don't
     qualify for the training track and fall back to full retrain-verification.
+
+    The `train_gpu` corroboration reads hwmodel from the *JWKS-verified* NRAS
+    claims, never from `attestation["claims"]` — that sidecar is miner-editable
+    (same rule as `check_claim_binding` for `eat_nonce`). Pass `gpu_sig` to reuse
+    an already-computed `check_gpu_signature` result.
     """
     issues: list[str] = []
     train_hours = manifest.get("train_hours")
@@ -87,8 +94,17 @@ def check_training_claims(
             f"({accepted_training_gpu_label()})"
         )
 
-    if train_gpu is not None and not attestation_corroborates_training_gpu(str(train_gpu), attestation):
-        issues.append("attestation claims do not corroborate the claimed training GPU")
+    if train_gpu is not None and attestation is not None:
+        signed_claims = signed_attestation_claims(attestation, gpu_sig=gpu_sig)
+        if signed_claims is None:
+            issues.append(
+                "attestation GPU token is unverified, so no signed hwmodel claim can "
+                "corroborate the claimed training GPU"
+            )
+        elif not attestation_corroborates_training_gpu(
+            str(train_gpu), attestation, signed_claims=signed_claims
+        ):
+            issues.append("attestation claims do not corroborate the claimed training GPU")
     return issues
 
 
@@ -292,6 +308,19 @@ def check_gpu_signature(attestation: dict | None) -> dict | None:
     return verify_gpu_token(attestation["token"])
 
 
+def signed_attestation_claims(attestation: dict | None, *, gpu_sig: dict | None = None) -> dict | None:
+    """Claims decoded from JWKS-verified NRAS tokens, or None when unverifiable.
+
+    The trusted counterpart of the miner-editable `attestation["claims"]` sidecar:
+    anything that decides a reward (hwmodel, eat_nonce) must come from here.
+    """
+    if gpu_sig is None:
+        gpu_sig = check_gpu_signature(attestation)
+    if not gpu_sig or not gpu_sig.get("verified"):
+        return None
+    return gpu_sig.get("claims") or {}
+
+
 def check_tdx_signature(attestation: dict | None, pccs_url: str | None = None) -> dict | None:
     """DCAP-verify the attestation's TDX quote against Intel PCS.
 
@@ -313,6 +342,7 @@ def check_attestation_integrity(
     attestation: dict | None,
     *,
     require_tdx: bool = False,
+    gpu_sig: dict | None = None,
 ) -> list[str]:
     """CPU-only fail-closed checks for GPU CC + optional Intel TDX attestation.
 
@@ -327,7 +357,8 @@ def check_attestation_integrity(
         return ["attestation must report passed: true"]
 
     issues: list[str] = []
-    gpu_sig = check_gpu_signature(attestation)
+    if gpu_sig is None:
+        gpu_sig = check_gpu_signature(attestation)
     if gpu_sig is None:
         issues.append("attestation missing NRAS GPU token for JWKS signature verification")
     elif not gpu_sig.get("verified"):
@@ -400,11 +431,13 @@ def verify_submission(
     # bundles require TDX as well (GPU nonce alone is not enough for no-GPU
     # verification); bare attestation without samples still needs a real NRAS
     # token + claim binding so forged {"passed": true} cannot pass CI.
+    gpu_sig = check_gpu_signature(attestation)
     if attestation is not None:
         integrity_issues = check_attestation_integrity(
             bundle_dir,
             attestation,
             require_tdx=has_attested_samples(bundle_dir),
+            gpu_sig=gpu_sig,
         )
         if integrity_issues:
             return {
@@ -415,7 +448,7 @@ def verify_submission(
                 "run_id": manifest.get("run_id"),
             }
 
-    training_issues = check_training_claims(manifest, attestation)
+    training_issues = check_training_claims(manifest, attestation, gpu_sig=gpu_sig)
     if training_issues:
         return {
             "verified": False,
@@ -522,8 +555,8 @@ def verify_submission(
     report["attested_gsm8k_regression"] = REGRESSION_BENCHMARK_KEY in attested_keys
     # Trust signals — also fail-closed earlier via check_attestation_integrity
     # when attestation is present; retained here for ledger / human review.
-    report["claim_bound"] = check_claim_binding(bundle_dir, attestation)
-    report["gpu_signature"] = check_gpu_signature(attestation)
+    report["claim_bound"] = check_claim_binding(bundle_dir, attestation, gpu_sig=gpu_sig)
+    report["gpu_signature"] = gpu_sig
     report["tdx_bound"] = check_tdx_binding(bundle_dir, attestation)
     report["tdx_signature"] = check_tdx_signature(attestation)
     report["checkpoint_hash_match"] = check_checkpoint_manifest(manifest, checkpoint_path)

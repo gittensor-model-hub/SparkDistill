@@ -28,11 +28,13 @@ def test_decode_includes_device_hardware_claims():
     assert claims["devices"]["GPU-0"]["hwmodel"] == "GB20X"
 
 
-def test_device_claims_corroborate_training_gpu():
+def test_device_claims_corroborate_training_gpu(monkeypatch):
     # The overall JWT has no hardware fields; without device submodule claims the
     # verify-side corroboration check wrongly rejected genuinely attested bundles.
-    token = _token({"iss": "NRAS"}, {"GPU-0": {"hwmodel": "GB20X"}})
-    attestation = {"passed": True, "claims": _decode_overall_claims(token)}
+    # hwmodel must come from the JWKS-verified device JWT, not the JSON sidecar.
+    key, token = _es384_token_fixture()
+    _patch_jwks(monkeypatch, key)
+    attestation = {"passed": True, "token": token, "claims": _decode_overall_claims(token)}
     manifest = {"train_hours": 0.1, "train_gpu": "NVIDIA RTX PRO 6000 Blackwell Server Edition"}
     assert check_training_claims(manifest, attestation) == []
 
@@ -164,11 +166,7 @@ def _es384_token_fixture(*, device_eat_nonce: str | None = None):
     return key, token
 
 
-def test_verify_gpu_token_accepts_valid_signatures(monkeypatch):
-    from eval.attestation import verify_gpu_token
-
-    key, token = _es384_token_fixture()
-
+def _patch_jwks(monkeypatch, key):
     class FakeKey:
         def __init__(self, k):
             self.key = k.public_key()
@@ -181,6 +179,13 @@ def test_verify_gpu_token_accepts_valid_signatures(monkeypatch):
             return FakeKey(key)
 
     monkeypatch.setattr(jwt, "PyJWKClient", FakeJWKClient)
+
+
+def test_verify_gpu_token_accepts_valid_signatures(monkeypatch):
+    from eval.attestation import verify_gpu_token
+
+    key, token = _es384_token_fixture()
+    _patch_jwks(monkeypatch, key)
     result = verify_gpu_token(token)
     assert result["verified"] is True
     assert result["tokens_checked"] == 2

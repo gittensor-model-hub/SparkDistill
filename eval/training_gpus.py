@@ -48,8 +48,21 @@ def claimed_hwmodels(claims: dict) -> list[str]:
     return models
 
 
-def attestation_corroborates_training_gpu(train_gpu: str, attestation: dict | None) -> bool:
+def attestation_corroborates_training_gpu(
+    train_gpu: str,
+    attestation: dict | None,
+    *,
+    signed_claims: dict | None = None,
+) -> bool:
     """When attestation is present, hwmodel claims must match the declared train_gpu family.
+
+    `signed_claims` are the JWKS-verified NRAS claims (`eval.attestation.verify_gpu_token`)
+    and are the only trustworthy source of `hwmodel`. `attestation["claims"]` is an
+    unsigned convenience copy the miner commits next to the token, so it can be rewritten
+    to any hwmodel — or dropped entirely, which short-circuits the sidecar path below to
+    True. Callers holding a token must pass `signed_claims`; `eval.verify` always does.
+    With it the check is fail-closed: a claim set carrying no hardware identity
+    corroborates nothing.
 
     Only `hwmodel` claims are considered. Matching against the whole claims blob
     would let unrelated hex fields stand in for hardware evidence: `b200` and
@@ -58,14 +71,20 @@ def attestation_corroborates_training_gpu(train_gpu: str, attestation: dict | No
     """
     if not attestation:
         return True
-    claims = attestation.get("claims")
-    if not claims:
-        return True
-    models = claimed_hwmodels(claims) if isinstance(claims, dict) else []
-    if isinstance(claims, dict) and claims and not models:
+    if signed_claims is None:
+        claims = attestation.get("claims")
+        if not claims:
+            # Legacy "no claims decoded" pass-through, for call sites that never
+            # see a token. Unreachable from eval.verify.
+            return True
+        if not isinstance(claims, dict):
+            return False
+    else:
+        claims = signed_claims
+    models = claimed_hwmodels(claims)
+    if not models:
         # No hardware identity to check — fail closed so a nonce/claims grind
-        # cannot stand in for hwmodel (unlike an empty claims dict above, which
-        # preserves the legacy "no claims decoded" pass-through).
+        # cannot stand in for hwmodel.
         return False
 
     def attests(*tokens: str) -> bool:
