@@ -6,6 +6,16 @@ All notable changes to SparkDistill are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- **Attested triton tier can no longer be forged via the report summary**: the reward tier
+  is scored on the *full* `triton` composite (`claimed["triton"]`), but the no-GPU attested
+  path only re-derived `triton_quick` from the level-1 details and read the full composite
+  straight from the miner-written `report.summary.avg_composite`. A bundle with honest
+  quick-subset details but an inflated summary headline therefore verified while claiming an
+  arbitrary tier (e.g. `triton_quick=0.44` → real ~`eval:XS`, but `summary/claimed triton=0.90`
+  → `eval:XL`). `verify_tritonbench_report` now recomputes the full composite from every
+  per-problem `details` entry (TritonBench's `avg_composite` is exactly that mean) and requires
+  both the report summary and the claimed full composite to match it (and rejects a report
+  with no details).
 - **Registry mix export uses SparkProof publish path**: `eval.mix_registry` now delegates
   to SparkProof's `trajectory_to_messages_record` (same as HF publish) instead of
   `teacher.format`. Empty or failed-validation trajectories are skipped (not coerced
